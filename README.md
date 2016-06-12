@@ -1,2 +1,2 @@
 # V-Drive
-Shortterm playing with and learning the Vulkan API, longterm creative coding library
+Short term playing with and learning the Vulkan API, long term a creative coding library.

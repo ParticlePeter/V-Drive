@@ -1,0 +1,51 @@
+{
+	"folders":
+	[
+		{
+			"path"						: "../Vulkan-Docs/src/vulkan",
+			"name"						: "c-vulkan-h",
+			"file_exclude_patterns"		: [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk" ],
+			"folder_exclude_patterns"	: [ ".dub", "lib", "Debug", "Release" ],
+		},
+
+		{
+			"path"						: "../ErupteD",
+			"name"						: "erupted",
+			"file_exclude_patterns"		: [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk" ],
+			"folder_exclude_patterns"	: [ ".dub", "lib", "Debug", "Release" ],
+		},
+
+		{
+			"path"						: ".",
+			"name"						: "v-drive",
+			"file_exclude_patterns"		: [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk" ],
+			"folder_exclude_patterns"	: [ ".dub", "lib", "Debug", "Release" ]
+		},
+
+		{
+			"path"						: "../ErupteD/source/erupted",
+			"name"						: "erupted source",
+			"file_exclude_patterns"		: [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk" ],
+			"folder_exclude_patterns"	: [ ".dub", "lib", "Debug", "Release" ],
+		},
+
+		{
+			"path"						: "shader",
+			"name"						: "v-drive shader",
+			"file_exclude_patterns"		: [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk" ],
+			"folder_exclude_patterns"	: [ ".dub", "lib", "Debug", "Release" ]
+		},
+
+		{
+			"path"						: "source/vdrive",
+			"name"						: "v-drive source",
+			"file_exclude_patterns"		: [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk" ],
+			"folder_exclude_patterns"	: [ ".dub", "lib", "Debug", "Release" ]
+		},
+
+	],
+
+	"settings":	{
+		"tab_size"	:	4,
+	},
+}
