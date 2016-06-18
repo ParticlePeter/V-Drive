@@ -11,7 +11,11 @@ import erupted;
 
 // stub for geometry managmenet
 
-auto initTriangle( ref Vulkan vk ) {
+auto createTriangleBuffer( ref Vulkan vk ) {
+
+	// Works! But avoid dependency for now
+	//import dlsl.vector;
+	//vec4[3] triangle = [ vec4( -1.0f, -1.0f, 0, 1.0f ), vec4(  1.0f, -1.0f, 0, 1.0f ), vec4(  0.0f,  1.0f, 0, 1.0f ) ];
 
 	struct Vertex { float x, y, z, w; }
 	Vertex[3] triangle = [ Vertex( -1.0f, -1.0f, 0, 1.0f ), Vertex(  1.0f, -1.0f, 0, 1.0f ), Vertex(  0.0f,  1.0f, 0, 1.0f ) ];

@@ -8,12 +8,12 @@ import vdrive.state;
 import erupted;
 
 
-auto createPipeline( ref Vulkan vk ) {
+auto createPipeline( ref Vulkan vk, VkDescriptorSetLayout descriptor_set_layout ) {
 
 	// Create an empty pipeline
 	VkPipelineLayoutCreateInfo layout_create_info = {
-		setLayoutCount			: 0,
-		pSetLayouts				: null,    // Not setting any bindings!
+		setLayoutCount			: 1,
+		pSetLayouts				: &descriptor_set_layout,
 		pushConstantRangeCount	: 0,
 		pPushConstantRanges		: null,
 	};

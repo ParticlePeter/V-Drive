@@ -11,23 +11,33 @@ import erupted;
 void initFramebuffer( ref Vulkan vk, VkImageView[] present_image_views ) {
 
 	// create attachment description
-	VkAttachmentDescription[2] attachment_description;
-	foreach( ref pass; attachment_description ) {
-		pass.samples = VK_SAMPLE_COUNT_1_BIT;
-		pass.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-		pass.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-		pass.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	VkAttachmentDescription[2] attachment_description; 
+	{
+		VkAttachmentDescription color_description = {
+			samples			: VK_SAMPLE_COUNT_1_BIT,
+			loadOp			: VK_ATTACHMENT_LOAD_OP_CLEAR,
+			stencilLoadOp	: VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+			stencilStoreOp	: VK_ATTACHMENT_STORE_OP_DONT_CARE,
+			format			: vk.present_image_format,
+			storeOp			: VK_ATTACHMENT_STORE_OP_STORE,
+			initialLayout	: VK_IMAGE_LAYOUT_UNDEFINED,		//VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+			finalLayout		: VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,	//VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+		};
+
+		VkAttachmentDescription depth_description = {
+			samples			: VK_SAMPLE_COUNT_1_BIT,
+			loadOp			: VK_ATTACHMENT_LOAD_OP_CLEAR,
+			stencilLoadOp	: VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+			stencilStoreOp	: VK_ATTACHMENT_STORE_OP_DONT_CARE,
+			format			: vk.depth_image_format,
+			storeOp			: VK_ATTACHMENT_STORE_OP_DONT_CARE,
+			initialLayout	: VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+			finalLayout		: VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+		};
+
+		attachment_description[0] = color_description;
+		attachment_description[1] = depth_description;
 	}
-
-	attachment_description[0].format = vk.present_image_format;
-	attachment_description[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-	attachment_description[0].initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-	attachment_description[0].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-	attachment_description[1].format = vk.depth_image_format;
-	attachment_description[1].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-	attachment_description[1].initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-	attachment_description[1].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
 	VkAttachmentReference color_attachment_reference;
 	color_attachment_reference.attachment = 0;
@@ -64,7 +74,7 @@ void initFramebuffer( ref Vulkan vk, VkImageView[] present_image_views ) {
 
 	VkFramebufferCreateInfo framebufferCreateInfo;
 	framebufferCreateInfo.renderPass = vk.render_pass;
-	framebufferCreateInfo.attachmentCount = framebuffer_attachments.length;  // must be equal to the attachment count on render pass
+	framebufferCreateInfo.attachmentCount = cast( uint32_t )framebuffer_attachments.length;  // must be equal to the attachment count on render pass
 	framebufferCreateInfo.pAttachments = framebuffer_attachments.ptr;
 	framebufferCreateInfo.width = vk.surface_extent.width;
 	framebufferCreateInfo.height = vk.surface_extent.height;

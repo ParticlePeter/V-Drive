@@ -74,17 +74,8 @@ int main() {
 
 	//"VK_LAYER_LUNARG_standard_validation".isLayer;
 
-	static if( true )	const( char* )[1] layers = [ "VK_LAYER_LUNARG_standard_validation" ];
-	else				const( char* )[7] layers = [ 
-		"VK_LAYER_GOOGLE_threading",
-		"VK_LAYER_LUNARG_parameter_validation",
-		"VK_LAYER_LUNARG_device_limits",
-		"VK_LAYER_LUNARG_object_tracker",
-		"VK_LAYER_LUNARG_image",
-		"VK_LAYER_LUNARG_core_validation",
-		"VK_LAYER_LUNARG_swapchain",
-		//"VK_LAYER_GOOGLE_unique_objects"
-	];
+	debug	const( char* )[1] layers = [ "VK_LAYER_LUNARG_standard_validation" ];
+	else	const( char* )[0] layers;
 
 
 	// Checking for extensions
@@ -138,10 +129,6 @@ int main() {
 
 	vk.gpu = gpus[0];
 	vk.present_queue_family_index = graphic_queues.front.family_index;
-
-	// memory properties of the current gpu
-	// TODO(pp): the memory properties do not print nicely, fix this
-	vk.memory_properties = vk.gpu.listMemoryProperties( false );
 
 	//printf( "Graphics queue family count with presentation support: %u\n", graphics_queue.length );
 
@@ -217,7 +204,8 @@ int main() {
 	vk.depth_image = depth_meta_image.image ;
 	vk.depth_image_view = depth_meta_image.image_view;
 
-	depth_meta_image.printStructInfo;
+	// TODO(pp): does not print struct content, probably because of the pointer member. Fix it!
+	//depth_meta_image.printStructInfo;
 
 
 
@@ -250,17 +238,17 @@ int main() {
 
 
 
-	///////////////////////////////////////////////////////////////////////////////////////////////////////
-	// Transition of presentation images and depth image from VK_IMAGE_LAYOUT_UNDEFINED to               //
-	// VK_IMAGE_LAYOUT_PRESENT_SRC_KHR and VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL respectively //
-	///////////////////////////////////////////////////////////////////////////////////////////////////////
+	/////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Transition of presentation images from VK_IMAGE_LAYOUT_UNDEFINED to VK_IMAGE_LAYOUT_PRESENT_SRC_KHR //
+	/////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	// start recording on our setup command buffer:
 	vkBeginCommandBuffer( vk.init_command_buffer, &transition_command_buffer_begin_info );
 
 	// this subresource range is used in additional places
 	VkImageSubresourceRange color_image_subresource_range = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
-
+/*	
+	// this is not required as it happens in the renderloop anyway
 	// loop over presentable images and add the transition to vk.init_command_buffer
 	import vdrive.image;
 	foreach( i; 0 .. vk.present_images.length ) {
@@ -271,7 +259,7 @@ int main() {
 			0, VK_ACCESS_MEMORY_READ_BIT
 		);
 	}
-
+*/
 
 
 
@@ -316,10 +304,28 @@ int main() {
 	// create triangle vertex buffer //
 	///////////////////////////////////
 	import vdrive.geometry;
-	auto vertex_meta_buffer = vk.initTriangle;
+	auto vertex_meta_buffer = vk.createTriangleBuffer;
 	scope( exit ) {
 		vk.device.vkDestroyBuffer( vertex_meta_buffer.buffer, vk.allocator );
 		vk.device.vkFreeMemory( vertex_meta_buffer.device_memory, vk.allocator );
+	}
+
+
+	//////////////////////////////////
+	// create matrix uniform buffer //
+	//////////////////////////////////
+	import dlsl.matrix;
+	auto WVPM = mat4( 1 );
+
+	import vdrive.shader; 
+	auto descriptor_pool = vk.createDescriptorPool( VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, 1 );
+	auto matrix_meta_buffer = vk.createMatrixBuffer( WVPM );
+	auto matrix_uniform_meta_descriptor = vk.createMatrixUniform( matrix_meta_buffer.buffer, descriptor_pool );
+	scope( exit ) {
+		vk.device.vkDestroyDescriptorSetLayout( matrix_uniform_meta_descriptor.set_layout, vk.allocator );
+		vk.device.vkDestroyDescriptorPool( descriptor_pool, vk.allocator );
+		vk.device.vkDestroyBuffer( matrix_meta_buffer.buffer, vk.allocator );
+		vk.device.vkFreeMemory( matrix_meta_buffer.device_memory, vk.allocator );
 	}
 
 
@@ -327,7 +333,7 @@ int main() {
 	// create the pipeline //
 	/////////////////////////
 	import vdrive.pipeline;
-	auto shader_modules = vk.createPipeline;
+	auto shader_modules = vk.createPipeline( matrix_uniform_meta_descriptor.set_layout );
 	scope( exit ) {
 		vk.device.vkDestroyPipeline( vk.pipeline, vk.allocator );
 		vk.device.vkDestroyPipelineLayout( vk.pipeline_layout, vk.allocator );
@@ -345,21 +351,22 @@ int main() {
 	};
 
 
-	// transition swapchain image from undefined ( old present data ) to attachment for vkCmdPipelineBarrier
+	// next step, part 1a) of the whole process, is from tutorial but unecessary, as the transition happens in the renderpass
+/*	// transition swapchain image from undefined ( old present data ) to attachment for vkCmdPipelineBarrier
 	VkImageMemoryBarrier undefined_to_attachment_barrier = {
 	//	srcAccessMask		: VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
 		dstAccessMask		: VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-		oldLayout			: VK_IMAGE_LAYOUT_UNDEFINED,	// VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,	// Old Data irrelevant, this is faster
+		oldLayout			: VK_IMAGE_LAYOUT_UNDEFINED,	// VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,	// Old Data irrelevant, this is faster
 		newLayout			: VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 		srcQueueFamilyIndex	: VK_QUEUE_FAMILY_IGNORED,
 		dstQueueFamilyIndex	: VK_QUEUE_FAMILY_IGNORED,
 		subresourceRange	: color_image_subresource_range,
 	};
-
+*/
 
 	// create render pass clear values for VkRenderPassBeginInfo
 	VkClearValue[2] clear_value;
-	clear_value[0].color.float32 = [ 1.0f, 1.0f, 1.0f, 1.0f ];
+	clear_value[0].color.float32 = [ 0.3f, 0.3f, 0.3f, 1.0f ];
 	clear_value[1].depthStencil = VkClearDepthStencilValue( 1.0f, cast( uint32_t )0 );
 
 	// render pass begin info for vkCmdBeginRenderPass
@@ -376,7 +383,8 @@ int main() {
 	auto scissors = VkRect2D( VkOffset2D( 0, 0 ), vk.surface_extent );
 
 
-	// transition swapchain image from attachment to presentable for vkCmdPipelineBarrier
+	// next step, part 2a) of the whole process, is from tutorial but unecessary, as the transition happens in the renderpass
+/*	// transition swapchain image from attachment to presentable for vkCmdPipelineBarrier
 	VkImageMemoryBarrier attachment_to_present_barrier = {
 		srcAccessMask		: VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
 		dstAccessMask		: VK_ACCESS_MEMORY_READ_BIT,
@@ -386,7 +394,7 @@ int main() {
 		dstQueueFamilyIndex	: VK_QUEUE_FAMILY_IGNORED,
 		subresourceRange	: color_image_subresource_range,
 	};
-
+*/
 	// rendering and presenting semaphores for VkSubmitInfo, VkPresentInfoKHR and vkAcquireNextImageKHR
 	VkSemaphore	image_ready_semaphore, render_done_semaphore;
 	VkSemaphoreCreateInfo semaphore_create_info;// = VkSemaphoreCreateInfo( VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO, null, 0 );
@@ -441,13 +449,14 @@ int main() {
 		vk.draw_command_buffer.vkBeginCommandBuffer( &draw_command_buffer_begin_info );
 
 
-		// change image layout from VK_IMAGE_LAYOUT_UNDEFINED to VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+		// next step, part 1b) of the whole process, is from tutorial but unecessary, as the transition happens in the renderpass
+/*		// change image layout from VK_IMAGE_LAYOUT_UNDEFINED to VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
 		undefined_to_attachment_barrier.image = vk.present_images[ next_image_index ];
 		vk.draw_command_buffer.vkCmdPipelineBarrier(
 			VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0,	// flags
 			0, null, 0, null, 1, &undefined_to_attachment_barrier						// barriers
 		);
-
+*/
 
 		// begin the render_pass
 		renderPassBeginInfo.framebuffer = vk.framebuffers[ next_image_index ];
@@ -458,9 +467,18 @@ int main() {
 		vk.draw_command_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline );    
 
 
+		// update the matrix uniform buffer memory
+		import std.math : sin;
+		import vdrive.buffer : bufferData;
+		WVPM[3].x = sin( glfwGetTime() );
+		matrix_meta_buffer.bufferData( WVPM );
+
+
 		// take care of dynamic state
 		vk.draw_command_buffer.vkCmdSetViewport( 0, 1, &viewport );
 		vk.draw_command_buffer.vkCmdSetScissor(  0, 1, &scissors );
+		vk.draw_command_buffer.vkCmdBindDescriptorSets(
+			VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout, 0, 1, &matrix_uniform_meta_descriptor.set, 0, null );
 
 
 		// draw the triangle
@@ -469,13 +487,14 @@ int main() {
 		vk.draw_command_buffer.vkCmdEndRenderPass;
 
 
-		// transition the next swapchain image to presentable with a VkImageMemoryBarrier
+		// next step, part 2b) of the whole process, is from tutorial but unecessary, as the transition happens in the renderpass
+/*		// transition the next swapchain image to presentable with a VkImageMemoryBarrier
 		attachment_to_present_barrier.image = vk.present_images[ next_image_index ];
 		vk.draw_command_buffer.vkCmdPipelineBarrier(
 			VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0,	// flags 
 			0, null, 0, null, 1, &attachment_to_present_barrier								// barriers
 		);
-
+*/
 		// end command buffer recording
 		vk.draw_command_buffer.vkEndCommandBuffer;
 

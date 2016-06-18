@@ -194,20 +194,7 @@ if( is( T == string ) | is( T == string[] ) | is( T == Array!( const( char )* ))
 		return null;
 	}
 
-/*	// get the physical device from the first family_queue
-	VkPhysicalDevice gpu = queue_families[0].vk_physical_device;
 
-	// check if all family queues are from the same physical device
-	foreach( ref family_queue; queue_families[ 1..$ ] ) {
-		if( family_queue.vk_physical_device != gpu ) {
-			writeln( "VkPhysicalDevice missmatch! All queue families must come from the same physical device! ");
-			return null;
-		}
-	}
-
-	// store device and gpu inside the vulkan state struct
-	vk.gpu = gpu;
-*/
 	// Preprocess arguments if passed as string or string[] at compile time
 	static if( is( T == string )) {
 		Array!( const( char )* ) ppExtensionNames;
@@ -251,6 +238,10 @@ if( is( T == string ) | is( T == string[] ) | is( T == Array!( const( char )* ))
 	// create the device and load all device level Vulkan functions for the device
 	vk.gpu.vkCreateDevice( &device_create_info, null, &vk.device ).vk_enforce;
 	loadDeviceLevelFunctions( vk.device );
+
+	// get and store the memory properties of the current gpu
+	// TODO(pp): the memory properties do not print nicely, fix this
+	vk.memory_properties = vk.gpu.listMemoryProperties( false );
 
 
 

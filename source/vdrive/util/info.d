@@ -10,16 +10,16 @@ import erupted;
 // TODO(pp): get rid of the GC with @nogc, remove to!string requirement
 // TODO(pp): extract function for listing available enums of possible enums
 void printStructInfo( T, size_t buffer_size = 256 )(
-	T info,
-	bool printStructName = true,
-	string indent = "",
-	size_t max_type_length = 0,
-	size_t max_name_length = 0
-	) if( is( T == struct )) /*@nogc nothrow*/ {
+	T 		info,
+	bool	printStructName = true,
+	string	indent = "",
+	size_t	max_type_length = 0,
+	size_t	max_name_length = 0,
+	bool	newline = true ) if( is( T == struct )) /*@nogc nothrow*/ {
 
 	// struct name
 	import std.conv : to;
-	import std.array : replicate;
+	//import std.array : replicate;
 	import core.stdc.stdio : printf;
 	//import core.stdc.string : strncpy, memset;
 			//if( strncmp( properties.layerName.ptr, layer.ptr, layer.length ) == 0 ) {
@@ -36,9 +36,9 @@ void printStructInfo( T, size_t buffer_size = 256 )(
 	}
 
 	// indent the buffer and store a pointer posistion;
-	auto buffer_ind = buffer.ptr;
-	buffer_ind[ 0 ] = '\t';						buffer_ind += 1;
-	buffer_ind[ 0 .. indent.length ] = indent;	buffer_ind += indent.length;
+	auto buffer_indent = buffer.ptr;
+	buffer_indent[ 0 ] = '\t';						buffer_indent += 1;
+	buffer_indent[ 0 .. indent.length ] = indent;	buffer_indent += indent.length;
 
 	// need this template as non aliased types are shorter than aliased, but aliased are printed later
 	immutable string[8] integral_alias_types = [ "uint64_t", "uint32_t", "uint16_t", "uint8_t", "int64_t", "int32_t", "int16_t", "int8_t" ]; 
@@ -53,10 +53,10 @@ void printStructInfo( T, size_t buffer_size = 256 )(
 	size_t max( size_t a, size_t b ) { return a < b ? b : a; }
 	foreach( member_name; __traits( allMembers, T )) {
 		alias member = printInfoHelper!( __traits( getMember, T, member_name ));
-		static if( is( member )) {
+		//static if( is( member )) {
 			max_name_length = max( max_name_length, member_name.stringof.length );
 			max_type_length = max( max_type_length, alias_type_length( __traits( getMember, info, member_name )));
-		}
+		//}
 	}
 	max_type_length += 2;		// space to member name
 
@@ -77,11 +77,11 @@ void printStructInfo( T, size_t buffer_size = 256 )(
 
 	foreach( member_name; __traits( allMembers, T )) {
 		alias member = printInfoHelper!( __traits( getMember, T, member_name ));
-		static if( is( member )) {
+		//static if( is( member )) {
 			auto  member_data = __traits( getMember, info, member_name );
 			alias member_type = typeof( member_data );
 
-			auto buffer_ptr = buffer_ind;
+			auto buffer_ptr = buffer_indent;
 			buffer_ptr[ 0 ] = '\0';
 			//printf( "%s", buffer.ptr );
 
@@ -120,17 +120,17 @@ void printStructInfo( T, size_t buffer_size = 256 )(
 				}
 			}
 
-			else static if( member_type!isPointer ) {}
+			//else static if( member_type!isPointer ) {}
 
 			else static if( is( member_type == struct )) {
 				print( buffer_ptr, member_type.stringof, "", "", "" );
-				member_data.printStructInfo( false, "\t", max_type_length, max_name_length );
+				member_data.printStructInfo( false, "\t", max_type_length, max_name_length, false );
 			}
 
 			else static if( is( member_type : B[n], B, size_t n )) {
 				static if( is( B == struct )) {
 					foreach( item; member_data ) {
-						item.printStructInfo( false, "\t", max_type_length, max_name_length );
+						item.printStructInfo( false, "\t", max_type_length, max_name_length, false );
 					}
 				}
 			}
@@ -177,9 +177,9 @@ void printStructInfo( T, size_t buffer_size = 256 )(
 				printf( "%s : %s\n", leftJustify( member_name, max_name_length, ' ' ).toStringz, typeof( member_data ).stringof.toStringz );
 			}
 			*/ 					
-		}
+		//}
 	}
-	//printf("\n");
+	if( newline ) printf("\n");
 }
 
 // From D Cookbok p. 216
@@ -498,7 +498,6 @@ auto listProperties( VkPhysicalDevice gpu, GPU_Info gpu_info = GPU_Info.none ) {
 	VkPhysicalDeviceProperties gpu_properties;
 	vkGetPhysicalDeviceProperties( gpu, &gpu_properties );
 
-	writeln;
 	writeln( gpu_properties.deviceName.ptr.fromStringz );
 	writeln( replicate( "=", gpu_properties.deviceName.ptr.fromStringz.length ));
 
@@ -509,16 +508,17 @@ auto listProperties( VkPhysicalDevice gpu, GPU_Info gpu_info = GPU_Info.none ) {
 		writeln( "\tVendor ID       : ", gpu_properties.vendorID );
 		writeln( "\tDevice ID       : ", gpu_properties.deviceID );
 		writeln( "\tGPU type        : ", gpu_properties.deviceType );
+		writeln;
 	}
 
 	if( gpu_info & GPU_Info.limits ) {
-		writeln;
 		gpu_properties.limits.printStructInfo;
+		//writeln;
 	}
 	
 	if( gpu_info & GPU_Info.sparse_properties ) {
-		writeln;
 		gpu_properties.sparseProperties.printStructInfo;
+		//writeln;
 	}
 
 	return gpu_properties;
