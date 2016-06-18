@@ -168,7 +168,7 @@ auto createMatrixUniform( ref Vulkan vk, VkBuffer buffer, VkDescriptorPool descr
 	VkDescriptorBufferInfo descriptor_buffer_info = {
 		buffer	: buffer,
 		offset	: 0,
-		range	: 64,
+		range	: 64,	// VK_WHOLE_SIZE not working here, Driver Bug?	
 	};
 
 	VkWriteDescriptorSet write_descriptor_set = {
