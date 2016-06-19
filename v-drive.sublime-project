@@ -10,42 +10,49 @@
 
 		{
 			"path"						: "E:/Code/DLang/projects/DLSL",
-			"name"						: "dlsl",
+			"name"						: "DLSL",
 			"file_exclude_patterns"		: [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk" ],
 			"folder_exclude_patterns"	: [ ".dub", "lib", "Debug", "Release" ],
 		},
 
 		{
 			"path"						: "../ErupteD",
-			"name"						: "erupted",
-			"file_exclude_patterns"		: [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk" ],
-			"folder_exclude_patterns"	: [ ".dub", "lib", "Debug", "Release" ],
-		},
-
-		{
-			"path"						: "../ErupteD/source/erupted",
-			"name"						: "erupted source",
+			"name"						: "ErupteD",
 			"file_exclude_patterns"		: [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk" ],
 			"folder_exclude_patterns"	: [ ".dub", "lib", "Debug", "Release" ],
 		},
 
 		{
 			"path"						: ".",
-			"name"						: "v-drive",
+			"name"						: "V-Drive",
 			"file_exclude_patterns"		: [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk" ],
 			"folder_exclude_patterns"	: [ ".dub", "lib", "Debug", "Release" ]
 		},
 
 		{
+			"path"						: "E:/Code/DLang/projects/DLSL/source/dlsl",
+			"name"						: "dlsl",
+			"file_exclude_patterns"		: [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk" ],
+			"folder_exclude_patterns"	: [ ".dub", "lib", "Debug", "Release" ],
+		},
+
+		{
+			"path"						: "../ErupteD/source/erupted",
+			"name"						: "erupted",
+			"file_exclude_patterns"		: [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk" ],
+			"folder_exclude_patterns"	: [ ".dub", "lib", "Debug", "Release" ],
+		},
+
+		{
 			"path"						: "shader",
-			"name"						: "v-drive shader",
+			"name"						: "vd shader",
 			"file_exclude_patterns"		: [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk" ],
 			"folder_exclude_patterns"	: [ ".dub", "lib", "Debug", "Release" ]
 		},
 
 		{
 			"path"						: "source/vdrive",
-			"name"						: "v-drive source",
+			"name"						: "vdrive",
 			"file_exclude_patterns"		: [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk" ],
 			"folder_exclude_patterns"	: [ ".dub", "lib", "Debug", "Release" ]
 		},
