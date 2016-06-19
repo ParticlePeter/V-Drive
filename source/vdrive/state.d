@@ -55,10 +55,6 @@ struct Vulkan {
 	uint32_t			present_queue_family_index;
 	alias				graphic_queue_family_index = present_queue_family_index;
 
-	VkCommandBuffer		init_command_buffer;
-	VkCommandBuffer		draw_command_buffer;
-	
-
 	VkPipelineLayout	pipeline_layout;
 	VkPipeline			pipeline;
 
