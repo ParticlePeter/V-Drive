@@ -212,22 +212,17 @@ int main() {
 
 
 
-	//////////////////////////////////////////////////
-	// create a command pools for image transitions //
-	//////////////////////////////////////////////////
+	/////////////////////////////////////////////////////////////////////////////////////////////////////
+	// create a command pool for drawing command buffers, will be used once for depth image transition //
+	/////////////////////////////////////////////////////////////////////////////////////////////////////
 	import vdrive.command;
-	auto command_pool = vk.createCommandPool( vk.present_queue_family_index, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT );
+	auto command_pool = vk.createCommandPool( vk.present_queue_family_index );
 	scope( exit ) vk.device.vkDestroyCommandPool( command_pool, vk.allocator );
 
-	{	// command_buffers is an Array!VkCommandBuffer, the array itself will be destroyd after this scope
-		auto command_buffers = vk.allocateCommandBuffers( command_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, 2 );
-		vk.init_command_buffer = command_buffers[0];
-		vk.draw_command_buffer = command_buffers[1];
-	}
 
-	VkCommandBufferBeginInfo transition_command_buffer_begin_info = {
-		flags : VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
-	};
+	// allocate one command buffer command_buffer is an Array!VkCommandBuffer, the array itself will be destroyd after this scope
+	auto init_command_buffer = vk.allocateCommandBuffer( command_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY );
+
 
 	// create a fence for the transition
 	VkFenceCreateInfo fence_create_info;
@@ -239,56 +234,38 @@ int main() {
 
 
 
-
-
-	/////////////////////////////////////////////////////////////////////////////////////////////////////////
-	// Transition of presentation images from VK_IMAGE_LAYOUT_UNDEFINED to VK_IMAGE_LAYOUT_PRESENT_SRC_KHR //
-	/////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-	// start recording on our setup command buffer:
-	vkBeginCommandBuffer( vk.init_command_buffer, &transition_command_buffer_begin_info );
-
-	// this subresource range is used in additional places
-	VkImageSubresourceRange color_image_subresource_range = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
-/*	
-	// this is not required as it happens in the renderloop anyway
-	// loop over presentable images and add the transition to vk.init_command_buffer
-	import vdrive.image;
-	foreach( i; 0 .. vk.present_images.length ) {
-		
-		vk.init_command_buffer.imageTransition(
-			vk.present_images[i], color_image_subresource_range,
-			VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-			0, VK_ACCESS_MEMORY_READ_BIT
-		);
-	}
-*/
-
-
-
-
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Transition of depth images from VK_IMAGE_LAYOUT_UNDEFINED to VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL //
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-	vk.init_command_buffer.imageTransition(
+	// start recording on our setup command buffer:
+	{
+		VkCommandBufferBeginInfo transition_command_buffer_begin_info;
+		vkBeginCommandBuffer( init_command_buffer, &transition_command_buffer_begin_info );
+	}
+
+	init_command_buffer.imageTransition(
 		vk.depth_image, depth_image_subresource_range,
 		VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
 		0, VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
 	);
 
-	vkEndCommandBuffer( vk.init_command_buffer );
+	vkEndCommandBuffer( init_command_buffer );
+
 
 	// create a submit info
 	import vdrive.command;
-	auto submit_info = vk.init_command_buffer.queueSubmitInfo;
+	auto submit_info = init_command_buffer.queueSubmitInfo;
 
-	// submit the command buffer with swachain length + one depth image transitions
+
+	// submit the command buffer with one depth image transitions
 	vkQueueSubmit( vk.present_queue, 1, &submit_info, submit_fence ).vk_enforce;
 	vkWaitForFences( vk.device, 1, &submit_fence, VK_TRUE, uint32_t.max );
 	vkResetFences( vk.device, 1, &submit_fence );
-	vkResetCommandBuffer( vk.init_command_buffer, 0 );
 
+
+	// reset the command pool to start recording drawing commands
+	vk.device.vkResetCommandPool( command_pool, 0 );
 
 
 
@@ -351,29 +328,11 @@ int main() {
 	// prepare for rendering //
 	///////////////////////////
 
-	// draw command buffer begin info for vkBeginCommandBuffer
-	VkCommandBufferBeginInfo draw_command_buffer_begin_info = {
-		flags : VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
-	};
-
-
-	// next step, part 1a) of the whole process, is from tutorial but unecessary, as the transition happens in the renderpass
-/*	// transition swapchain image from undefined ( old present data ) to attachment for vkCmdPipelineBarrier
-	VkImageMemoryBarrier undefined_to_attachment_barrier = {
-	//	srcAccessMask		: VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-		dstAccessMask		: VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-		oldLayout			: VK_IMAGE_LAYOUT_UNDEFINED,	// VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,	// Old Data irrelevant, this is faster
-		newLayout			: VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-		srcQueueFamilyIndex	: VK_QUEUE_FAMILY_IGNORED,
-		dstQueueFamilyIndex	: VK_QUEUE_FAMILY_IGNORED,
-		subresourceRange	: color_image_subresource_range,
-	};
-*/
-
 	// create render pass clear values for VkRenderPassBeginInfo
 	VkClearValue[2] clear_value;
 	clear_value[0].color.float32 = [ 0.3f, 0.3f, 0.3f, 1.0f ];
 	clear_value[1].depthStencil = VkClearDepthStencilValue( 1.0f, cast( uint32_t )0 );
+
 
 	// render pass begin info for vkCmdBeginRenderPass
 	VkRenderPassBeginInfo renderPassBeginInfo = {
@@ -389,18 +348,6 @@ int main() {
 	auto scissors = VkRect2D( VkOffset2D( 0, 0 ), vk.surface_extent );
 
 
-	// next step, part 2a) of the whole process, is from tutorial but unecessary, as the transition happens in the renderpass
-/*	// transition swapchain image from attachment to presentable for vkCmdPipelineBarrier
-	VkImageMemoryBarrier attachment_to_present_barrier = {
-		srcAccessMask		: VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-		dstAccessMask		: VK_ACCESS_MEMORY_READ_BIT,
-		oldLayout			: VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-		newLayout			: VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-		srcQueueFamilyIndex	: VK_QUEUE_FAMILY_IGNORED,
-		dstQueueFamilyIndex	: VK_QUEUE_FAMILY_IGNORED,
-		subresourceRange	: color_image_subresource_range,
-	};
-*/
 	// rendering and presenting semaphores for VkSubmitInfo, VkPresentInfoKHR and vkAcquireNextImageKHR
 	VkSemaphore	image_ready_semaphore, render_done_semaphore;
 	VkSemaphoreCreateInfo semaphore_create_info;// = VkSemaphoreCreateInfo( VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO, null, 0 );
@@ -410,18 +357,6 @@ int main() {
 		vk.device.vkDestroySemaphore( render_done_semaphore, null );
 		vk.device.vkDestroySemaphore( image_ready_semaphore, null );
 	}
-
-	// queue submit info for vkQueueSubmit
-	VkPipelineStageFlags render_wait_stage_mask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-	VkSubmitInfo render_submit_info = {
-		waitSemaphoreCount		: 1,
-		pWaitSemaphores			: &image_ready_semaphore,
-		pWaitDstStageMask		: &render_wait_stage_mask,
-		commandBufferCount		: 1,
-		pCommandBuffers			: &vk.draw_command_buffer,
-		signalSemaphoreCount	: 1,
-		pSignalSemaphores		: &render_done_semaphore,
-	};
 
 
 	// fence waiting for queue completion
@@ -442,6 +377,60 @@ int main() {
 	};
 
 
+	// draw command buffer begin info for vkBeginCommandBuffer
+	VkCommandBufferBeginInfo draw_command_buffer_begin_info;
+
+
+	// record command buffer for each swapchain image
+	// command_buffers is an Array!VkCommandBuffer, the array itself will be destroyd after this scope
+	auto draw_command_buffers = vk.allocateCommandBuffers( command_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, cast( uint32_t )vk.present_images.length );
+
+	// queue submit infos for vkQueueSubmit
+	auto render_submit_info = sizedArray!VkSubmitInfo( vk.present_images.length );
+
+
+	foreach( i; 0 .. vk.present_images.length ) {
+
+		// begin command buffer recording
+		draw_command_buffers[ i ].vkBeginCommandBuffer( &draw_command_buffer_begin_info );
+
+
+		// begin the render_pass
+		renderPassBeginInfo.framebuffer = vk.framebuffers[ i ];
+		draw_command_buffers[ i ].vkCmdBeginRenderPass( &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE );
+
+
+		// bind graphics pipeline
+		draw_command_buffers[ i ].vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline );    
+
+
+		// take care of dynamic state
+		draw_command_buffers[ i ].vkCmdSetViewport( 0, 1, &viewport );
+		draw_command_buffers[ i ].vkCmdSetScissor(  0, 1, &scissors );
+		draw_command_buffers[ i ].vkCmdBindDescriptorSets(
+			VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout, 0, 1, &matrix_uniform_meta_descriptor.set, 0, null );
+
+
+		// draw the triangle
+		draw_command_buffers[ i ].vkCmdBindVertexBuffers( 0, 1, &vertex_meta_buffer.buffer, &vertex_meta_buffer.buffer_offset );
+		draw_command_buffers[ i ].vkCmdDraw( 3, 1, 0, 0 );  // vertex count, instance count, first vertex, first instance
+		draw_command_buffers[ i ].vkCmdEndRenderPass;
+
+
+		// end command buffer recording
+		draw_command_buffers[ i ].vkEndCommandBuffer;
+
+
+		// set the draw command buffer into the coresponding queue submit info
+		VkPipelineStageFlags render_wait_stage_mask 	= VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+		render_submit_info[ i ].waitSemaphoreCount		= 1;
+		render_submit_info[ i ].pWaitSemaphores			= &image_ready_semaphore;
+		render_submit_info[ i ].pWaitDstStageMask		= &render_wait_stage_mask;
+		render_submit_info[ i ].commandBufferCount		= 1;
+		render_submit_info[ i ].pCommandBuffers			= &draw_command_buffers[ i ];
+		render_submit_info[ i ].signalSemaphoreCount	= 1;
+		render_submit_info[ i ].pSignalSemaphores		= &render_done_semaphore;
+	}
 	
 
 	void render() {
@@ -451,62 +440,14 @@ int main() {
 		vkAcquireNextImageKHR( vk.device, vk.swapchain, uint64_t.max, image_ready_semaphore, VK_NULL_ND_HANDLE, &next_image_index );
 
 
-		// Transition presentable image layout
-		vk.draw_command_buffer.vkBeginCommandBuffer( &draw_command_buffer_begin_info );
-
-
-		// next step, part 1b) of the whole process, is from tutorial but unecessary, as the transition happens in the renderpass
-/*		// change image layout from VK_IMAGE_LAYOUT_UNDEFINED to VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
-		undefined_to_attachment_barrier.image = vk.present_images[ next_image_index ];
-		vk.draw_command_buffer.vkCmdPipelineBarrier(
-			VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0,	// flags
-			0, null, 0, null, 1, &undefined_to_attachment_barrier						// barriers
-		);
-*/
-
-		// begin the render_pass
-		renderPassBeginInfo.framebuffer = vk.framebuffers[ next_image_index ];
-		vk.draw_command_buffer.vkCmdBeginRenderPass( &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE );
-
-
-		// bind graphics pipeline
-		vk.draw_command_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline );    
-
-
 		// update the matrix uniform buffer memory
-		//import std.math : sin;
 		import vdrive.buffer : bufferData;
 		WVPM = PROJ * MOVE * mat4.rotationY( glfwGetTime() );
 		matrix_meta_buffer.bufferData( WVPM );
 
 
-		// take care of dynamic state
-		vk.draw_command_buffer.vkCmdSetViewport( 0, 1, &viewport );
-		vk.draw_command_buffer.vkCmdSetScissor(  0, 1, &scissors );
-		vk.draw_command_buffer.vkCmdBindDescriptorSets(
-			VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout, 0, 1, &matrix_uniform_meta_descriptor.set, 0, null );
-
-
-		// draw the triangle
-		vk.draw_command_buffer.vkCmdBindVertexBuffers( 0, 1, &vertex_meta_buffer.buffer, &vertex_meta_buffer.buffer_offset );
-		vk.draw_command_buffer.vkCmdDraw( 3, 1, 0, 0 );  // vertex count, instance count, first vertex, first instance
-		vk.draw_command_buffer.vkCmdEndRenderPass;
-
-
-		// next step, part 2b) of the whole process, is from tutorial but unecessary, as the transition happens in the renderpass
-/*		// transition the next swapchain image to presentable with a VkImageMemoryBarrier
-		attachment_to_present_barrier.image = vk.present_images[ next_image_index ];
-		vk.draw_command_buffer.vkCmdPipelineBarrier(
-			VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0,	// flags 
-			0, null, 0, null, 1, &attachment_to_present_barrier								// barriers
-		);
-*/
-		// end command buffer recording
-		vk.draw_command_buffer.vkEndCommandBuffer;
-
-
 		// submit command buffer to queue
-		vk.present_queue.vkQueueSubmit( 1, &render_submit_info, render_fence );
+		vk.present_queue.vkQueueSubmit( 1, &render_submit_info[ next_image_index ], render_fence );
 		vk.device.vkWaitForFences( 1, &render_fence, VK_TRUE, uint64_t.max );
 		vk.device.vkResetFences( 1, &render_fence ).vk_enforce;
 
