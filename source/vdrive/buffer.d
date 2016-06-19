@@ -38,9 +38,6 @@ auto ref createBuffer( ref Meta_Buffer meta, VkBufferUsageFlags usage, VkDeviceS
 	meta.device.vkCreateBuffer( &meta.buffer_create_info, meta.allocator, &meta.buffer ).vk_enforce;
 	meta.device.vkGetBufferMemoryRequirements( meta.buffer, &meta.memory_requirements );
 
-	import vdrive.util.info;
-	meta.memory_requirements.printStructInfo;
-
 	return meta;
 }
 

@@ -143,8 +143,6 @@ auto createMatrixBuffer( ref Vulkan vk, void[] data ) {
 	meta_buffer.bindMemory( VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT );
 	meta_buffer.bufferData( data );
 
-	import std.stdio;
-	writeln( data.length );
 	return meta_buffer;
 }
 

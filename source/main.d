@@ -53,11 +53,6 @@ int main() {
 
 	immutable uint32_t win_w = 720, win_h = 480;
 
-	import dlsl.matrix;
-	auto det = mat4( 3 ).determinant;
-	writeln( det );
-	writeln( mat4( 3 ).invert );
-
 	// glfw window specification
 	glfwWindowHint( GLFW_CLIENT_API, GLFW_NO_API );
 	GLFWwindow* window = glfwCreateWindow( win_w, win_h, "Vulkan Erupted", null, null );
