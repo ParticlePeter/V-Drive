@@ -53,7 +53,10 @@ int main() {
 
 	immutable uint32_t win_w = 720, win_h = 480;
 
-
+	import dlsl.matrix;
+	auto det = mat4( 3 ).determinant;
+	writeln( det );
+	writeln( mat4( 3 ).invert );
 
 	// glfw window specification
 	glfwWindowHint( GLFW_CLIENT_API, GLFW_NO_API );
@@ -314,8 +317,11 @@ int main() {
 	//////////////////////////////////
 	// create matrix uniform buffer //
 	//////////////////////////////////
-	import dlsl.matrix;
+	import dlsl.projection;
+	auto PROJ = vkPerspective( 60, vk.surface_extent.width / vk.surface_extent.height, 1, 100 );
+	auto MOVE = mat4.translation( 0, 0, 5 );
 	auto WVPM = mat4( 1 );
+
 
 	import vdrive.shader; 
 	auto descriptor_pool = vk.createDescriptorPool( VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, 1 );
@@ -468,9 +474,9 @@ int main() {
 
 
 		// update the matrix uniform buffer memory
-		import std.math : sin;
+		//import std.math : sin;
 		import vdrive.buffer : bufferData;
-		WVPM[3].x = sin( glfwGetTime() );
+		WVPM = PROJ * MOVE * mat4.rotationY( glfwGetTime() );
 		matrix_meta_buffer.bufferData( WVPM );
 
 
