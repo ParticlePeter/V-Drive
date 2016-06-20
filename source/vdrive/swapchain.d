@@ -8,14 +8,34 @@ import vdrive.state;
 import erupted;
 
 
+
+struct Meta_Swapchain {
+
+}
+
+
+
+
+/// list surface formats and return 
+alias listSurfaceFormats = listVulkanProperty!( VkSurfaceFormatKHR, vkGetPhysicalDeviceSurfaceFormatsKHR, VkPhysicalDevice, VkSurfaceKHR );
+
+
+
 auto init_swapchain( ref Vulkan vk, ref Array!VkImageView present_image_views ) {
 
 	// Get GPU surface formats
-	uint32_t surface_formats_count;
-	vkGetPhysicalDeviceSurfaceFormatsKHR( vk.gpu, vk.surface, &surface_formats_count, null ).vk_enforce;
-	if( surface_formats_count == 0 ) { printf( "No surface format available!\n" ); return VK_ERROR_FEATURE_NOT_PRESENT; }
-	auto surface_formats = sizedArray!VkSurfaceFormatKHR( surface_formats_count );
-	vkGetPhysicalDeviceSurfaceFormatsKHR( vk.gpu, vk.surface, &surface_formats_count, surface_formats.ptr ).vk_enforce;
+	auto surface_formats = listSurfaceFormats( vk.gpu, vk.surface );
+	if( surface_formats.length == 0 ) { 
+		printf( "No surface format available!\n" );
+		return VK_ERROR_FEATURE_NOT_PRESENT;
+	}
+
+	import std.stdio;
+	foreach( format; surface_formats ) 
+		writeln( format );
+
+
+
 	//foreach( i, ref format; surface_formats.data ) { printf( "&u\n", i ); format.printStructInfo; }
 
 	// Select surface format
