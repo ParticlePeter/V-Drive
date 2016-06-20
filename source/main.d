@@ -122,8 +122,8 @@ int main() {
 	// TODO(pp): find a suitable "best fit" gpu
 
 	auto queue_families = listQueueFamilies( gpus[0], false );
-	auto compute_queues = queue_families.filter_queue_flags( VK_QUEUE_COMPUTE_BIT, VK_QUEUE_GRAPHICS_BIT );
-	auto graphic_queues = queue_families.filter_queue_flags( VK_QUEUE_GRAPHICS_BIT ).filterPresentSupport( gpus[0], vk.surface );
+	auto compute_queues = queue_families.filterQueueFlags( VK_QUEUE_COMPUTE_BIT, VK_QUEUE_GRAPHICS_BIT );
+	auto graphic_queues = queue_families.filterQueueFlags( VK_QUEUE_GRAPHICS_BIT ).filterPresentSupport( gpus[0], vk.surface );
 
 	vk.gpu = gpus[0];
 	vk.present_queue_family_index = graphic_queues.front.family_index;

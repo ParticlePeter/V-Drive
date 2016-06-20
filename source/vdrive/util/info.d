@@ -689,7 +689,7 @@ auto listQueueFamilies( VkPhysicalDevice gpu, bool printInfo = true ) {
 //	return listQueueFamilies( vk.gpu, printInfo );
 //}
 
-auto filter_queue_flags(
+auto filterQueueFlags(
 	Array!Queue_Family family_queues, 
 	VkQueueFlags include_queue, 
 	VkQueueFlags exclude_queue = 0 ) {

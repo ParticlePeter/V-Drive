@@ -2,6 +2,13 @@
 	"folders":
 	[
 		{
+			"path"						: "D:/Code/DLang/dmd2/src/phobos",
+			"name"						: "phobos",
+			"file_exclude_patterns"		: [ ".*", "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk", "*.mak", "LICENSE*", "*.ddoc", "*.dd"  ],
+			"folder_exclude_patterns"	: [ ".dub", "lib", "Debug", "Release" ],
+		},
+
+		{
 			"path"						: "../Vulkan-Docs/src/vulkan",
 			"name"						: "c-vulkan-h",
 			"file_exclude_patterns"		: [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk" ],
