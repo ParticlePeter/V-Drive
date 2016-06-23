@@ -118,7 +118,7 @@ if( is( T == string ) | is( T == string[] ) | is( T == Array!( const( char )* ))
 	};
 
 	// Create the vulkan instance
-	vkCreateInstance( &instance_create_info, null, &vk.instance ).vk_enforce;
+	vkCreateInstance( &instance_create_info, null, &vk.instance ).vkEnforce;
 
 	// load all functions from the instance - useful for prototyping
 	loadInstanceLevelFunctions( vk.instance );
@@ -130,14 +130,14 @@ if( is( T == string ) | is( T == string[] ) | is( T == Array!( const( char )* ))
 	}
 /*
 	uint32_t gpus_count;
-	vkEnumeratePhysicalDevices( vk.instance, &gpus_count, null ).vk_enforce;
+	vkEnumeratePhysicalDevices( vk.instance, &gpus_count, null ).vkEnforce;
 
 	if( gpus_count == 0 ) {
 		stderr.writeln("No gpus found.");
 	}
 
 	vk.gpus.length = gpus_count;
-	vkEnumeratePhysicalDevices( vk.instance, &gpus_count, vk.gpus.ptr ).vk_enforce;
+	vkEnumeratePhysicalDevices( vk.instance, &gpus_count, vk.gpus.ptr ).vkEnforce;
 
 	if( verbose ) {
 		writeln;
@@ -232,7 +232,7 @@ if( is( T == string ) | is( T == string[] ) | is( T == Array!( const( char )* ))
 	};
 
 	// create the device and load all device level Vulkan functions for the device
-	vk.gpu.vkCreateDevice( &device_create_info, null, &vk.device ).vk_enforce;
+	vk.gpu.vkCreateDevice( &device_create_info, null, &vk.device ).vkEnforce;
 	loadDeviceLevelFunctions( vk.device );
 
 	// get and store the memory properties of the current gpu

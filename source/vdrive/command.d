@@ -17,7 +17,7 @@ auto createCommandPool( ref Vulkan vk, uint32_t queue_family_index, VkCommandPoo
 	};
 
 	VkCommandPool command_pool;
-	vk.device.vkCreateCommandPool( &command_pool_create_info, vk.allocator, &command_pool ).vk_enforce;
+	vk.device.vkCreateCommandPool( &command_pool_create_info, vk.allocator, &command_pool ).vkEnforce;
 	return command_pool;
 }
 

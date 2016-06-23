@@ -18,7 +18,7 @@ auto createPipeline( ref Vulkan vk, VkDescriptorSetLayout descriptor_set_layout 
 		pPushConstantRanges		: null,
 	};
 
-	vk.device.vkCreatePipelineLayout( &layout_create_info, vk.allocator, &vk.pipeline_layout ).vk_enforce;
+	vk.device.vkCreatePipelineLayout( &layout_create_info, vk.allocator, &vk.pipeline_layout ).vkEnforce;
 
 
 
@@ -189,7 +189,7 @@ auto createPipeline( ref Vulkan vk, VkDescriptorSetLayout descriptor_set_layout 
 
 
 
-	vk.device.vkCreateGraphicsPipelines( VK_NULL_ND_HANDLE, 1, &pipelineCreateInfo, vk.allocator, &vk.pipeline ).vk_enforce;
+	vk.device.vkCreateGraphicsPipelines( VK_NULL_ND_HANDLE, 1, &pipelineCreateInfo, vk.allocator, &vk.pipeline ).vkEnforce;
 
 	auto shader_modules = sizedArray!VkShaderModule( 2 );
 	shader_modules[0] = shaderStageCreateInfo[0]._module;

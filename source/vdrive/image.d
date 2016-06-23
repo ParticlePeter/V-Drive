@@ -27,7 +27,7 @@ auto ref createImage( ref Meta_Image meta, const ref VkImageCreateInfo image_cre
 	
 	// general create image function gets the image creat info as argument
 	meta.image_create_info = image_create_info;
-	meta.device.vkCreateImage( &meta.image_create_info, meta.allocator, &meta.image ).vk_enforce;
+	meta.device.vkCreateImage( &meta.image_create_info, meta.allocator, &meta.image ).vkEnforce;
 	meta.device.vkGetImageMemoryRequirements( meta.image, &meta.memory_requirements );
 	return meta;
 }
@@ -41,7 +41,7 @@ auto ref bindMemory( ref Meta_Image meta, VkMemoryPropertyFlags memory_property_
 	meta.device_memory = ( *meta.vk ).allocateMemory( meta.memory_requirements.size,
 		meta.memory_properties.memoryTypeIndex( meta.memory_requirements, memory_property_flags ));
 
-	meta.device.vkBindImageMemory( meta.image, meta.device_memory, 0 ).vk_enforce;
+	meta.device.vkBindImageMemory( meta.image, meta.device_memory, 0 ).vkEnforce;
 
 	return meta;
 }
@@ -63,7 +63,7 @@ auto ref imageView( ref Meta_Image meta, VkImageSubresourceRange subresource_ran
 			VK_COMPONENT_SWIZZLE_IDENTITY 
 		);
 
-	vkCreateImageView( meta.device, &meta.image_view_create_info, meta.allocator, &meta.image_view ).vk_enforce;
+	vkCreateImageView( meta.device, &meta.image_view_create_info, meta.allocator, &meta.image_view ).vkEnforce;
 	return meta;
 }
 

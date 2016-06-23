@@ -65,7 +65,7 @@ void initFramebuffer( ref Vulkan vk, VkImageView[] present_image_views ) {
 	render_pass_create_info.subpassCount = 1;
 	render_pass_create_info.pSubpasses = &subpass_description;
 
-	vkCreateRenderPass( vk.device, &render_pass_create_info, vk.allocator, &vk.render_pass ).vk_enforce;
+	vkCreateRenderPass( vk.device, &render_pass_create_info, vk.allocator, &vk.render_pass ).vkEnforce;
 
 
 	// create framebuffer
@@ -84,7 +84,7 @@ void initFramebuffer( ref Vulkan vk, VkImageView[] present_image_views ) {
 	vk.framebuffers.length = vk.present_images.length;
 	foreach( i, ref framebuffer; vk.framebuffers.data ) {
 	    framebuffer_attachments[0] = present_image_views[ i ];
-	    vkCreateFramebuffer( vk.device, &framebufferCreateInfo, vk.allocator, &framebuffer ).vk_enforce;
+	    vkCreateFramebuffer( vk.device, &framebufferCreateInfo, vk.allocator, &framebuffer ).vkEnforce;
 	}
 }
 

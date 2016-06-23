@@ -44,7 +44,7 @@ auto allocateMemory( ref Vulkan vk, VkDeviceSize allocation_size, uint32_t memor
 
 	// allocate device memory
 	VkDeviceMemory device_memory;
-	vkAllocateMemory( vk.device, &memory_allocate_info, vk.allocator, &device_memory ).vk_enforce;
+	vkAllocateMemory( vk.device, &memory_allocate_info, vk.allocator, &device_memory ).vkEnforce;
 
 	return device_memory;
 }

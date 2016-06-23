@@ -21,7 +21,7 @@ auto createShaderModule( ref Vulkan vk, string path ) {
 	};
 
 	VkShaderModule shader_module;
-	vk.device.vkCreateShaderModule( &shader_module_create_info, vk.allocator, &shader_module ).vk_enforce;
+	vk.device.vkCreateShaderModule( &shader_module_create_info, vk.allocator, &shader_module ).vkEnforce;
 
 	return shader_module;
 }

@@ -35,7 +35,7 @@ auto ref createBuffer( ref Meta_Buffer meta, VkBufferUsageFlags usage, VkDeviceS
 	meta.buffer_create_info.usage		= usage;
 	meta.buffer_create_info.sharingMode	= VK_SHARING_MODE_EXCLUSIVE;
 	
-	meta.device.vkCreateBuffer( &meta.buffer_create_info, meta.allocator, &meta.buffer ).vk_enforce;
+	meta.device.vkCreateBuffer( &meta.buffer_create_info, meta.allocator, &meta.buffer ).vkEnforce;
 	meta.device.vkGetBufferMemoryRequirements( meta.buffer, &meta.memory_requirements );
 
 	return meta;
@@ -57,7 +57,7 @@ auto ref bindMemory( ref Meta_Buffer meta, VkMemoryPropertyFlags memory_property
 		)
 	);
 
-	meta.device.vkBindBufferMemory( meta.buffer, meta.device_memory, 0 ).vk_enforce;
+	meta.device.vkBindBufferMemory( meta.buffer, meta.device_memory, 0 ).vkEnforce;
 
 	return meta;
 }
@@ -67,7 +67,7 @@ auto ref bindMemory( ref Meta_Buffer meta, VkMemoryPropertyFlags memory_property
 auto bufferData( Meta_Buffer meta, void[] data ) {
 
 	void* mapped_memory;
-	vkMapMemory( meta.device, meta.device_memory, 0, VK_WHOLE_SIZE, 0, &mapped_memory ).vk_enforce;
+	vkMapMemory( meta.device, meta.device_memory, 0, VK_WHOLE_SIZE, 0, &mapped_memory ).vkEnforce;
 	mapped_memory[ 0 .. data.length ] = data[];
 	vkUnmapMemory( meta.device, meta.device_memory );
 
