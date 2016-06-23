@@ -23,6 +23,11 @@ auto append( T )( Array!T array, T value )  {
 	array.insert( value );
 }
 
+auto toStringz( T )( T data ) if( is( T == enum )) {
+	import std.conv : to;
+	return data.to!string.toStringz;
+}
+
 auto toStringz( T )( T data ) if( is( T == string ) | is( T : char[] )) {
 	Array!char result;
 	result.length = data.length + 1;
