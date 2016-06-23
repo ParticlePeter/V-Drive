@@ -103,7 +103,7 @@ int main() {
 	scope( exit ) vkDestroyDebugReportCallbackEXT( vk.instance, debugReportCallback, vk.allocator );
 
 	// create the window VkSurfaceKHR with the instance, surface is stored in the state object 
-	glfwCreateWindowSurface( vk.instance, window, null, &vk.surface ).vk_enforce;
+	glfwCreateWindowSurface( vk.instance, window, null, &vk.surface ).vkEnforce;
 	scope( exit ) vk.destroy_surface;
 
 	// Set the desired surface extent, this might change at swapchain creation 
@@ -122,20 +122,21 @@ int main() {
 	// TODO(pp): find a suitable "best fit" gpu
 
 	auto queue_families = listQueueFamilies( gpus[0], false );
-	auto compute_queues = queue_families.filterQueueFlags( VK_QUEUE_COMPUTE_BIT, VK_QUEUE_GRAPHICS_BIT );
-	auto graphic_queues = queue_families.filterQueueFlags( VK_QUEUE_GRAPHICS_BIT ).filterPresentSupport( gpus[0], vk.surface );
+	auto compute_queues = queue_families.filter( VK_QUEUE_COMPUTE_BIT, VK_QUEUE_GRAPHICS_BIT );			// filterQueueFlags
+	auto graphic_queues = queue_families.filter( VK_QUEUE_GRAPHICS_BIT ).filter( gpus[0], vk.surface );	// filterQueueFlags.filterPresentSupport
 
 	vk.gpu = gpus[0];
 	vk.present_queue_family_index = graphic_queues.front.family_index;
 
 	//printf( "Graphics queue family count with presentation support: %u\n", graphics_queue.length );
 
+//*
 	// Enable graphic Queue
-	//Queue_Family[1] filtered_queues = [ graphic_queues.front ];
-	//filtered_queues[0].queueCount = 1;
-	//filtered_queues[0].priority( 0 ) = 1;
+	Queue_Family[1] filtered_queues = [ graphic_queues.front ];
+	filtered_queues[0].queueCount = 1;
+	filtered_queues[0].priority( 0 ) = 1;
 	//writeln( filtered_queues );
-
+/*/
 	// Eanable graphic and compute queue
 	Queue_Family[2] filtered_queues = [ graphic_queues.front, compute_queues.front ];
 	filtered_queues[0].queueCount = 1;
@@ -143,7 +144,7 @@ int main() {
 	filtered_queues[1].queueCount = 1;			// float[2] compute_priorities = [0.8, 0.5];
 	filtered_queues[1].priority( 0 ) = 0.8;		// filtered_queues[1].priorities = compute_priorities;
 	//writeln( filtered_queues );
-
+//*/
 
 
 	// query the device features of the gpu in question, enable shaderClipDistance if available
@@ -167,7 +168,7 @@ int main() {
 	//////////////////////////////////////////////////
 	import vdrive.swapchain;
 	Array!VkImageView present_image_views;
-	vk.init_swapchain( present_image_views ).vk_enforce;
+	vk.init_swapchain( present_image_views ).vkEnforce;
 	scope( exit ) {
 		foreach( ref image_view; present_image_views ) vk.device.vkDestroyImageView( image_view, vk.allocator );
 		vk.device.vkDestroySwapchainKHR( vk.swapchain, vk.allocator );
@@ -203,7 +204,7 @@ int main() {
 	vk.depth_image_view = depth_meta_image.image_view;
 
 	// TODO(pp): does not print struct content, probably because of the pointer member. Fix it!
-	//depth_meta_image.printStructInfo;
+	//depth_meta_image.printTypeInfo;
 
 
 
@@ -254,7 +255,7 @@ int main() {
 
 
 	// submit the command buffer with one depth image transitions
-	vkQueueSubmit( vk.present_queue, 1, &submit_info, submit_fence ).vk_enforce;
+	vkQueueSubmit( vk.present_queue, 1, &submit_info, submit_fence ).vkEnforce;
 	vkWaitForFences( vk.device, 1, &submit_fence, VK_TRUE, uint32_t.max );
 	vkResetFences( vk.device, 1, &submit_fence );
 
@@ -346,8 +347,8 @@ int main() {
 	// rendering and presenting semaphores for VkSubmitInfo, VkPresentInfoKHR and vkAcquireNextImageKHR
 	VkSemaphore	image_ready_semaphore, render_done_semaphore;
 	VkSemaphoreCreateInfo semaphore_create_info;// = VkSemaphoreCreateInfo( VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO, null, 0 );
-	vk.device.vkCreateSemaphore( &semaphore_create_info, null, &image_ready_semaphore ).vk_enforce;
-	vk.device.vkCreateSemaphore( &semaphore_create_info, null, &render_done_semaphore ).vk_enforce;
+	vk.device.vkCreateSemaphore( &semaphore_create_info, null, &image_ready_semaphore ).vkEnforce;
+	vk.device.vkCreateSemaphore( &semaphore_create_info, null, &render_done_semaphore ).vkEnforce;
 	scope( exit ) {
 		vk.device.vkDestroySemaphore( render_done_semaphore, null );
 		vk.device.vkDestroySemaphore( image_ready_semaphore, null );
@@ -444,7 +445,7 @@ int main() {
 		// submit command buffer to queue
 		vk.present_queue.vkQueueSubmit( 1, &render_submit_info[ next_image_index ], render_fence );
 		vk.device.vkWaitForFences( 1, &render_fence, VK_TRUE, uint64_t.max );
-		vk.device.vkResetFences( 1, &render_fence ).vk_enforce;
+		vk.device.vkResetFences( 1, &render_fence ).vkEnforce;
 
 
 		// present rendered image

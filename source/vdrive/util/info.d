@@ -7,9 +7,11 @@ import vdrive.util.array;
 
 import erupted;
 
+void println() { printf( "\n" ); }
+
 // TODO(pp): get rid of the GC with @nogc, remove to!string requirement
 // TODO(pp): extract function for listing available enums of possible enums
-void printStructInfo( T, size_t buffer_size = 256 )(
+void printTypeInfo( T, size_t buffer_size = 256 )(
 	T 		info,
 	bool	printStructName = true,
 	string	indent = "",
@@ -124,13 +126,13 @@ void printStructInfo( T, size_t buffer_size = 256 )(
 
 			else static if( is( member_type == struct )) {
 				print( buffer_ptr, member_type.stringof, "", "", "" );
-				member_data.printStructInfo( false, "\t", max_type_length, max_name_length, false );
+				member_data.printTypeInfo( false, "\t", max_type_length, max_name_length, false );
 			}
 
 			else static if( is( member_type : B[n], B, size_t n )) {
 				static if( is( B == struct )) {
 					foreach( item; member_data ) {
-						item.printStructInfo( false, "\t", max_type_length, max_name_length, false );
+						item.printTypeInfo( false, "\t", max_type_length, max_name_length, false );
 					}
 				}
 			}
@@ -249,26 +251,10 @@ import std.string : fromStringz;
 /// list all available ( layer per ) instance / device extensions
 auto listExtensions( VkPhysicalDevice gpu, char* layer, bool printInfo = true ) {
 
-	VkResult vkResult;
-	uint32_t extension_property_count;
-	Array!VkExtensionProperties extension_properties;
-
-	if( gpu == VK_NULL_HANDLE ) {		// list_instance_extensions
-		do {
-			vkEnumerateInstanceExtensionProperties( layer, &extension_property_count, null ).vk_enforce;
-			if( extension_property_count == 0 )  break;
-			extension_properties.length = extension_property_count;
-			vkResult = vkEnumerateInstanceExtensionProperties( layer, &extension_property_count, extension_properties.ptr );
-		} while( vkResult == VK_INCOMPLETE );
-
-	} else {				// list_gpu_extensions
-		do {
-			vkEnumerateDeviceExtensionProperties( gpu, layer, &extension_property_count, null ).vk_enforce;
-			if( extension_property_count == 0 )  break;
-			extension_properties.length = extension_property_count;
-			vkResult = vkEnumerateDeviceExtensionProperties( gpu, layer, &extension_property_count, extension_properties.ptr );
-		}	while( vkResult == VK_INCOMPLETE );
-	}
+	// Enumerate Instance or Device extensions
+	auto extension_properties = gpu == VK_NULL_HANDLE ?
+		listVulkanProperty!( VkExtensionProperties, vkEnumerateInstanceExtensionProperties, char* )( layer ) :
+		listVulkanProperty!( VkExtensionProperties, vkEnumerateDeviceExtensionProperties, VkPhysicalDevice, char* )( gpu, layer );
 
 	if( printInfo ) {
 		if(	extension_properties.length == 0 )  {
@@ -355,40 +341,10 @@ unittest {
 /// list all available instance / device layers
 auto listLayers( VkPhysicalDevice gpu, bool printInfo = true  ) {
 
-	/*
-	* It's possible, though very rare, that the number of
-	* instance layers could change. For example, installing something
-	* could include new layers that the loader would pick up
-	* between the initial query for the count and the
-	* request for VkLayerProperties. If that happens,
-	* the number of VkLayerProperties could exceed the count
-	* previously given. To alert the app to this change
-	* vkEnumerateInstanceExtensionProperties will return a VK_INCOMPLETE
-	* status.
-	* The count parameter will be updated with the number of
-	* entries actually loaded into the data pointer.
-	*/
-
-	VkResult vkResult;
-	uint32_t layer_property_count;
-	Array!VkLayerProperties layer_properties;
-
-	if( gpu == VK_NULL_HANDLE ) {		// list_instance_layers
-		do {
-			vkEnumerateInstanceLayerProperties( &layer_property_count, null ).vk_enforce;
-			if( layer_property_count == 0 )  break;
-			layer_properties.length = layer_property_count;
-			vkResult = vkEnumerateInstanceLayerProperties( &layer_property_count, layer_properties.ptr );
-		} while( vkResult == VK_INCOMPLETE );
-
-	} else {				// list_device_layers
-		do {
-			vkEnumerateDeviceLayerProperties( gpu, &layer_property_count, null ).vk_enforce;
-			if( layer_property_count == 0 )  break;
-			layer_properties.length = layer_property_count;
-			vkResult = vkEnumerateDeviceLayerProperties( gpu, &layer_property_count, layer_properties.ptr );
-		}	while( vkResult == VK_INCOMPLETE );
-	}
+	// Enumerate Instance or Device layers
+	auto layer_properties = gpu == VK_NULL_HANDLE ?
+		listVulkanProperty!( VkLayerProperties, vkEnumerateInstanceLayerProperties )() :
+		listVulkanProperty!( VkLayerProperties, vkEnumerateDeviceLayerProperties, VkPhysicalDevice )( gpu );
 
 	if( printInfo ) {
 		if(	layer_properties.length == 0 )  {
@@ -473,19 +429,16 @@ if( is( T == string )| is( T : const( char* )) | is( T : char[] )) {
 // Physical Device //
 /////////////////////
 auto listPhysicalDevices( VkInstance instance, bool printInfo = true ) {
-	uint32_t gpus_count;
-	vkEnumeratePhysicalDevices( instance, &gpus_count, null ).vk_enforce;
 
-	if( gpus_count == 0 ) {
+	auto gpus = listVulkanProperty!( VkPhysicalDevice, vkEnumeratePhysicalDevices, VkInstance )( instance );
+
+	if( gpus.length == 0 ) {
 		stderr.writeln("No gpus found.");
 	}
 
-	auto gpus = sizedArray!VkPhysicalDevice( gpus_count );
-	vkEnumeratePhysicalDevices( instance, &gpus_count, gpus.ptr ).vk_enforce;
-
 	if( printInfo ) {
 		writeln;
-		writeln( "GPU count: ", gpus_count ); 
+		writeln( "GPU count: ", gpus.length ); 
 		writeln( "============" );
 	}
 	return gpus;
@@ -512,12 +465,12 @@ auto listProperties( VkPhysicalDevice gpu, GPU_Info gpu_info = GPU_Info.none ) {
 	}
 
 	if( gpu_info & GPU_Info.limits ) {
-		gpu_properties.limits.printStructInfo;
+		gpu_properties.limits.printTypeInfo;
 		//writeln;
 	}
 	
 	if( gpu_info & GPU_Info.sparse_properties ) {
-		gpu_properties.sparseProperties.printStructInfo;
+		gpu_properties.sparseProperties.printTypeInfo;
 		//writeln;
 	}
 
@@ -529,7 +482,7 @@ auto listFeatures( VkPhysicalDevice gpu, bool printInfo = true ) {
 	VkPhysicalDeviceFeatures features;
 	vkGetPhysicalDeviceFeatures( gpu, &features );
 	if( printInfo )
-		printStructInfo( features );
+		printTypeInfo( features );
 	return features;
 }
 
@@ -538,7 +491,7 @@ auto listMemoryProperties( VkPhysicalDevice gpu, bool printInfo = true ) {
 	VkPhysicalDeviceMemoryProperties memory_properties;
 	vkGetPhysicalDeviceMemoryProperties( gpu, &memory_properties );
 	if( printInfo )
-		printStructInfo( memory_properties );
+		printTypeInfo( memory_properties );
 	return memory_properties;
 }
 
@@ -685,14 +638,9 @@ auto listQueueFamilies( VkPhysicalDevice gpu, bool printInfo = true ) {
 	return family_queues;	
 }
 
-//auto listQueueFamilies( const ref Vulkan vk, bool printInfo = true ) {
-//	return listQueueFamilies( vk.gpu, printInfo );
-//}
-
-auto filterQueueFlags(
-	Array!Queue_Family family_queues, 
-	VkQueueFlags include_queue, 
-	VkQueueFlags exclude_queue = 0 ) {
+alias filter = filterQueueFlags;
+auto filterQueueFlags( Array_T )( Array_T family_queues, VkQueueFlags include_queue, VkQueueFlags exclude_queue = 0 )
+if( is( Array_T == Array!Queue_Family ) || is( Array_T : Queue_Family[] )) {
 
 	Array!Queue_Family filtered_queues;
 	foreach( ref family_queue; family_queues ) {
@@ -701,10 +649,13 @@ auto filterQueueFlags(
 		}
 	}
 	return filtered_queues;
+
 }
 
-auto filterPresentSupport( Array!Queue_Family family_queues, VkPhysicalDevice gpu, VkSurfaceKHR surface ) {
-	
+alias filter = filterPresentSupport;
+auto filterPresentSupport( Array_T )( Array_T family_queues, VkPhysicalDevice gpu, VkSurfaceKHR surface ) 
+if( is( Array_T == Array!Queue_Family ) || is( Array_T : Queue_Family[] )) {
+
 	VkBool32 present_supported;
 	Array!Queue_Family filtered_queues;
 	foreach( ref family_queue; family_queues ) {
@@ -714,11 +665,9 @@ auto filterPresentSupport( Array!Queue_Family family_queues, VkPhysicalDevice gp
 		}
 	}
 	return filtered_queues;
+
 }
 
-//auto filterPresentSupport( Array!Queue_Family family_queues, const ref Vulkan vk ) {
-//	return filterPresentSupport( vk.gpu, vk.surface );
-//}
 
 unittest {
 
