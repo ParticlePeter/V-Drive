@@ -37,11 +37,10 @@ struct Vulkan {
 	Device_Resource		device_resource;
 	alias 				device_resource this;
 
-	VkSurfaceKHR		surface;
-	VkExtent2D			surface_extent;
-	VkSwapchainKHR		swapchain;
-	Array!VkImage		present_images;
-	VkFormat			present_image_format;
+	VkImage				color_image;
+	VkImageView			color_image_view;
+	VkFormat			color_image_format;
+
 	VkImage				depth_image;
 	VkImageView			depth_image_view;
 	VkFormat			depth_image_format;
@@ -49,11 +48,9 @@ struct Vulkan {
 	Array!VkFramebuffer	framebuffers;
 	VkRenderPass		render_pass;
 
-	VkQueue				present_queue = VK_NULL_HANDLE;
-	alias				graphic_queue = present_queue;
+	VkQueue				graphic_queue = VK_NULL_HANDLE;
+	uint32_t			graphic_queue_family_index;
 
-	uint32_t			present_queue_family_index;
-	alias				graphic_queue_family_index = present_queue_family_index;
 
 	VkPipelineLayout	pipeline_layout;
 	VkPipeline			pipeline;
@@ -160,12 +157,8 @@ void initInstance( ref Vulkan vk, const( char* )[] extensionNames, const( char* 
 	initInstance!( const( char* )[] )( vk, extensionNames, layerNames );
 }
 
-void destroy_instance( ref Vulkan vk ) {
+void destroyInstance( ref Vulkan vk ) {
 	vkDestroyInstance( vk.instance, vk.allocator );
-}
-
-void destroy_surface( ref Vulkan vk ) {
-	vkDestroySurfaceKHR( vk.instance, vk.surface, vk.allocator );
 }
 
 // TODO(pp): Create Template specialization for const( char* )[]
