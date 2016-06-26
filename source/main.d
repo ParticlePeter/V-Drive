@@ -85,11 +85,13 @@ int main() {
 		}
 	}
 
+
 	// Create vdrive vulkan state struct and initialize the instance
 	Vulkan vk;
 	vk.initInstance( extensions, layers );
 	//vk.initInstance( "VK_KHR_surface\0VK_KHR_win32_surface\0VK_EXT_debug_report\0", "VK_LAYER_LUNARG_standard_validation\0" );		//string[2] extensions = [ "VK_KHR_surface", "VK_KHR_win32_surface" ];
-	scope( exit ) vk.destroy_instance;		// destroy the instance at scope exist
+	scope( exit ) vk.destroyInstance;		// destroy the instance at scope exist
+
 
 	// setup debug report callback
 	VkDebugReportCallbackCreateInfoEXT callbackCreateInfo = {
@@ -102,12 +104,14 @@ int main() {
 	vkCreateDebugReportCallbackEXT( vk.instance, &callbackCreateInfo, vk.allocator, &debugReportCallback );
 	scope( exit ) vkDestroyDebugReportCallbackEXT( vk.instance, debugReportCallback, vk.allocator );
 
-	// create the window VkSurfaceKHR with the instance, surface is stored in the state object 
-	glfwCreateWindowSurface( vk.instance, window, null, &vk.surface ).vkEnforce;
-	scope( exit ) vk.destroy_surface;
 
-	// Set the desired surface extent, this might change at swapchain creation 
-	vk.surface_extent = VkExtent2D( win_w, win_h );
+	// create the window VkSurfaceKHR with the instance, surface is stored in the state object
+	import vdrive.swapchain;
+	Meta_Swapchain meta_swapchain = &vk;
+	glfwCreateWindowSurface( vk.instance, window, vk.allocator, &meta_swapchain.create_info.surface ).vkEnforce;
+	scope( exit ) meta_swapchain.destroySurface;
+	meta_swapchain.imageExtent = VkExtent2D( win_w, win_h );	// Set the desired surface extent, this might change at swapchain creation
+
 
 	// enumerate gpus
 	auto gpus = vk.instance.listPhysicalDevices( false );
@@ -122,11 +126,11 @@ int main() {
 	// TODO(pp): find a suitable "best fit" gpu
 
 	auto queue_families = listQueueFamilies( gpus[0], false );
-	auto compute_queues = queue_families.filter( VK_QUEUE_COMPUTE_BIT, VK_QUEUE_GRAPHICS_BIT );			// filterQueueFlags
-	auto graphic_queues = queue_families.filter( VK_QUEUE_GRAPHICS_BIT ).filter( gpus[0], vk.surface );	// filterQueueFlags.filterPresentSupport
+	auto compute_queues = queue_families.filterQueueFlags( VK_QUEUE_COMPUTE_BIT, VK_QUEUE_GRAPHICS_BIT );			// filterQueueFlags
+	auto graphic_queues = queue_families.filterQueueFlags( VK_QUEUE_GRAPHICS_BIT ).filterPresentSupport( gpus[0], meta_swapchain.surface );	// filterQueueFlags.filterPresentSupport
 
 	vk.gpu = gpus[0];
-	vk.present_queue_family_index = graphic_queues.front.family_index;
+	vk.graphic_queue_family_index = meta_swapchain.present_queue_family_index = graphic_queues.front.family_index;
 
 	//printf( "Graphics queue family count with presentation support: %u\n", graphics_queue.length );
 
@@ -160,18 +164,20 @@ int main() {
 
 	// retrieve graphic and present queues
 	// for now graphic and present queue are the same, but this might difere on diferent hardeare
-	vkGetDeviceQueue( vk.device, vk.present_queue_family_index, 0, &vk.present_queue );
+	vkGetDeviceQueue( vk.device, vk.graphic_queue_family_index, 0,   &vk.graphic_queue );
+	vkGetDeviceQueue( vk.device, meta_swapchain.present_queue_family_index, 0, &meta_swapchain.present_queue );
 
 
 	//////////////////////////////////////////////////
 	// create a swapchain for render result display //
 	//////////////////////////////////////////////////
-	import vdrive.swapchain;
-	Array!VkImageView present_image_views;
-	vk.init_swapchain( present_image_views ).vkEnforce;
+	meta_swapchain.initSwapchain( true );
+	auto present_image_views = meta_swapchain.swapchainImageViews; //Array!VkImageView;
 	scope( exit ) {
-		foreach( ref image_view; present_image_views ) vk.device.vkDestroyImageView( image_view, vk.allocator );
-		vk.device.vkDestroySwapchainKHR( vk.swapchain, vk.allocator );
+		foreach( ref image_view; present_image_views )
+			vk.device.vkDestroyImageView( image_view, vk.allocator );
+		meta_swapchain.destroySwapchain;
+		//meta_swapchain.destroyResources;
 	}
 
 
@@ -180,28 +186,53 @@ int main() {
 	// create a depth image for the framebuffers //
 	///////////////////////////////////////////////
 
-	// this subresource range is used in additional places
-	VkImageSubresourceRange depth_image_subresource_range = { VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1 };
+	// checking format support
+	//VkFormatProperties format_properties;
+	//vk.gpu.vkGetPhysicalDeviceFormatProperties( VK_FORMAT_B8G8R8A8_UNORM, &format_properties );
+	//format_properties.printTypeInfo;
 
-	// for now this is required for framebuffer creation, TODO(pp): remove dependency
-	vk.depth_image_format = VK_FORMAT_D16_UNORM;
+	// checking image format support (additional capabilities)
+	//VkImageFormatProperties image_format_properties;
+	//vk.gpu.vkGetPhysicalDeviceImageFormatProperties(
+	//	VK_FORMAT_B8G8R8A8_UNORM,
+	//	VK_IMAGE_TYPE_2D,
+	//	VK_IMAGE_TILING_OPTIMAL,
+	//	VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+	//	0,
+	//	&image_format_properties).vkEnforce;
+	//image_format_properties.printTypeInfo;
 
-	// create image with memory and view in a meta image struct
+	// this will be used for multi sampled images, framebuffer attachment and resolving and pipeline multisample state
+	VkSampleCountFlagBits sample_count = VK_SAMPLE_COUNT_4_BIT;
+
 	import vdrive.image;
-	Meta_Image depth_meta_image = &vk;
-	//depth_meta_image.createImage( depth_image_create_info );
-	depth_meta_image.createDepthBufferImage( vk.depth_image_format, vk.surface_extent );
+	VkImageSubresourceRange color_image_subresource_range = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };	// this subresource range is used in additional places
+	Meta_Image color_meta_image = &vk;																	// create image with memory and view in a meta image struct
+	color_meta_image.createImage( VK_FORMAT_B8G8R8A8_UNORM, meta_swapchain.imageExtent, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, sample_count );
+	color_meta_image.bindMemory( VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
+	color_meta_image.imageView( color_image_subresource_range );
+	scope( exit ) color_meta_image.destroyResources;
+	vk.color_image = color_meta_image.image ;
+	vk.color_image_view = color_meta_image.image_view;
+	vk.color_image_format = color_meta_image.image_create_info.format;									// for now this is required for framebuffer creation, TODO(pp): remove dependency
+	
+	VkImageSubresourceRange depth_image_subresource_range = { VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1 };	// this subresource range is used in additional places
+	Meta_Image depth_meta_image = &vk;																	// create image with memory and view in a meta image struct
+	depth_meta_image.createImage( VK_FORMAT_D16_UNORM, meta_swapchain.imageExtent, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, sample_count );
 	depth_meta_image.bindMemory( VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
 	depth_meta_image.imageView( depth_image_subresource_range );
+	scope( exit ) depth_meta_image.destroyResources;
+	vk.depth_image = depth_meta_image.image ;
+	vk.depth_image_view = depth_meta_image.image_view;
+	vk.depth_image_format = depth_meta_image.image_create_info.format;									// for now this is required for framebuffer creation, TODO(pp): remove dependency
 
-	scope( exit ) {
+	 /*{
 		vk.device.vkDestroyImage( depth_meta_image.image, vk.allocator );
 		vk.device.vkFreeMemory( depth_meta_image.device_memory, vk.allocator );
 		vk.device.vkDestroyImageView( depth_meta_image.image_view, vk.allocator );
-	}
+	}*/
 
-	vk.depth_image = depth_meta_image.image ;
-	vk.depth_image_view = depth_meta_image.image_view;
+
 
 	// TODO(pp): does not print struct content, probably because of the pointer member. Fix it!
 	//depth_meta_image.printTypeInfo;
@@ -212,7 +243,7 @@ int main() {
 	// create a command pool for drawing command buffers, will be used once for depth image transition //
 	/////////////////////////////////////////////////////////////////////////////////////////////////////
 	import vdrive.command;
-	auto command_pool = vk.createCommandPool( vk.present_queue_family_index );
+	auto command_pool = vk.createCommandPool( meta_swapchain.present_queue_family_index );
 	scope( exit ) vk.device.vkDestroyCommandPool( command_pool, vk.allocator );
 
 
@@ -241,6 +272,12 @@ int main() {
 	}
 
 	init_command_buffer.imageTransition(
+		vk.color_image, color_image_subresource_range,
+		VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+		0, VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+	);
+
+	init_command_buffer.imageTransition(
 		vk.depth_image, depth_image_subresource_range,
 		VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
 		0, VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
@@ -255,13 +292,13 @@ int main() {
 
 
 	// submit the command buffer with one depth image transitions
-	vkQueueSubmit( vk.present_queue, 1, &submit_info, submit_fence ).vkEnforce;
+	vkQueueSubmit( meta_swapchain.present_queue, 1, &submit_info, submit_fence ).vkEnforce;
 	vkWaitForFences( vk.device, 1, &submit_fence, VK_TRUE, uint32_t.max );
 	vkResetFences( vk.device, 1, &submit_fence );
 
 
 	// reset the command pool to start recording drawing commands
-	vk.device.vkResetCommandPool( command_pool, 0 );
+	vk.device.vkResetCommandPool( command_pool, 0 );	// second argument is VkCommandPoolResetFlags
 
 
 
@@ -269,7 +306,7 @@ int main() {
 	// create renderpass and framebuffer(s) //
 	//////////////////////////////////////////
 	import vdrive.framebuffer;
-	vk.initFramebuffer( present_image_views.data );
+	vk.initFramebuffer( present_image_views, meta_swapchain.imageFormat, meta_swapchain.imageExtent, sample_count );
 	scope( exit ) {
 		foreach( framebuffer; vk.framebuffers ) vk.device.vkDestroyFramebuffer( framebuffer, vk.allocator );
 		vk.device.vkDestroyRenderPass( vk.render_pass, vk.allocator );
@@ -291,7 +328,7 @@ int main() {
 	// create matrix uniform buffer //
 	//////////////////////////////////
 	import dlsl.projection;
-	auto PROJ = vkPerspective( 60, vk.surface_extent.width / vk.surface_extent.height, 1, 100 );
+	auto PROJ = vkPerspective( 60, cast( float )meta_swapchain.imageExtent.width / meta_swapchain.imageExtent.height, 1, 100 );
 	auto MOVE = mat4.translation( 0, 0, 5 );
 	auto WVPM = mat4( 1 );
 
@@ -312,7 +349,7 @@ int main() {
 	// create the pipeline //
 	/////////////////////////
 	import vdrive.pipeline;
-	auto shader_modules = vk.createPipeline( matrix_uniform_meta_descriptor.set_layout );
+	auto shader_modules = vk.createPipeline( matrix_uniform_meta_descriptor.set_layout, meta_swapchain.imageExtent, sample_count );
 	scope( exit ) {
 		vk.device.vkDestroyPipeline( vk.pipeline, vk.allocator );
 		vk.device.vkDestroyPipelineLayout( vk.pipeline_layout, vk.allocator );
@@ -333,15 +370,15 @@ int main() {
 	// render pass begin info for vkCmdBeginRenderPass
 	VkRenderPassBeginInfo renderPassBeginInfo = {
 		renderPass		: vk.render_pass,
-		renderArea		: VkRect2D( VkOffset2D( 0, 0 ), vk.surface_extent ),
+		renderArea		: VkRect2D( VkOffset2D( 0, 0 ), meta_swapchain.imageExtent ),
 		clearValueCount	: 2,
 		pClearValues	: clear_value.ptr,
 	};
 
 
 	// viewport and scissors (not so) dynamic state for vkCmdSetViewport and vkCmdSetScissor
-	auto viewport = VkViewport( 0, 0, vk.surface_extent.width, vk.surface_extent.height, 0, 1 );
-	auto scissors = VkRect2D( VkOffset2D( 0, 0 ), vk.surface_extent );
+	auto viewport = VkViewport( 0, 0, meta_swapchain.imageExtent.width, meta_swapchain.imageExtent.height, 0, 1 );
+	auto scissors = VkRect2D( VkOffset2D( 0, 0 ), meta_swapchain.imageExtent );
 
 
 	// rendering and presenting semaphores for VkSubmitInfo, VkPresentInfoKHR and vkAcquireNextImageKHR
@@ -367,7 +404,7 @@ int main() {
 		waitSemaphoreCount	: 1,
 		pWaitSemaphores		: &render_done_semaphore,
 		swapchainCount		: 1,
-		pSwapchains			: &vk.swapchain,
+		pSwapchains			: &meta_swapchain.swapchain,
 		//pImageIndices		: &next_image_index,
 		pResults			: null,
 	};
@@ -379,13 +416,13 @@ int main() {
 
 	// record command buffer for each swapchain image
 	// command_buffers is an Array!VkCommandBuffer, the array itself will be destroyd after this scope
-	auto draw_command_buffers = vk.allocateCommandBuffers( command_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, cast( uint32_t )vk.present_images.length );
+	auto draw_command_buffers = vk.allocateCommandBuffers( command_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, cast( uint32_t )present_image_views.length );
 
 	// queue submit infos for vkQueueSubmit
-	auto render_submit_info = sizedArray!VkSubmitInfo( vk.present_images.length );
+	auto render_submit_info = sizedArray!VkSubmitInfo( present_image_views.length );
 
 
-	foreach( i; 0 .. vk.present_images.length ) {
+	foreach( i; 0 .. present_image_views.length ) {
 
 		// begin command buffer recording
 		draw_command_buffers[ i ].vkBeginCommandBuffer( &draw_command_buffer_begin_info );
@@ -433,7 +470,7 @@ int main() {
 
 		uint32_t next_image_index;
 		// acquire next swapchain image - first time that VK_NULL_HANDLE is not working
-		vkAcquireNextImageKHR( vk.device, vk.swapchain, uint64_t.max, image_ready_semaphore, VK_NULL_ND_HANDLE, &next_image_index );
+		vkAcquireNextImageKHR( vk.device, meta_swapchain.swapchain, uint64_t.max, image_ready_semaphore, VK_NULL_ND_HANDLE, &next_image_index );
 
 
 		// update the matrix uniform buffer memory
@@ -443,14 +480,14 @@ int main() {
 
 
 		// submit command buffer to queue
-		vk.present_queue.vkQueueSubmit( 1, &render_submit_info[ next_image_index ], render_fence );
+		meta_swapchain.present_queue.vkQueueSubmit( 1, &render_submit_info[ next_image_index ], render_fence );
 		vk.device.vkWaitForFences( 1, &render_fence, VK_TRUE, uint64_t.max );
 		vk.device.vkResetFences( 1, &render_fence ).vkEnforce;
 
 
 		// present rendered image
 		present_info.pImageIndices = &next_image_index;
-		vk.present_queue.vkQueuePresentKHR( &present_info );
+		meta_swapchain.present_queue.vkQueuePresentKHR( &present_info );
 	}
 
 
@@ -461,8 +498,10 @@ int main() {
 		glfwSwapBuffers(window);
 		glfwPollEvents();
 	}	
+/*/
+	render;
 //*/
-	
+
 	// drain work
 	vk.device.vkDeviceWaitIdle;
 
