@@ -4,11 +4,12 @@ import core.stdc.stdio : printf;
 
 import vdrive.util;
 import vdrive.state;
+import vdrive.swapchain;
 
 import erupted;
 
 
-auto createPipeline( ref Vulkan vk, VkDescriptorSetLayout descriptor_set_layout ) {
+auto createPipeline( ref Vulkan vk, VkDescriptorSetLayout descriptor_set_layout, VkExtent2D viewport_extent, VkSampleCountFlagBits sample_count = VK_SAMPLE_COUNT_4_BIT ) {
 
 	// Create an empty pipeline
 	VkPipelineLayoutCreateInfo layout_create_info = {
@@ -73,14 +74,14 @@ auto createPipeline( ref Vulkan vk, VkDescriptorSetLayout descriptor_set_layout 
 	VkViewport viewport = {};
 	viewport.x = 0;
 	viewport.y = 0;
-	viewport.width  = vk.surface_extent.width;
-	viewport.height = vk.surface_extent.height;
+	viewport.width  = viewport_extent.width;
+	viewport.height = viewport_extent.height;
 	viewport.minDepth = 0;
 	viewport.maxDepth = 1;
 
 	VkRect2D scissors = {};
 	scissors.offset = VkOffset2D( 0, 0 );
-	scissors.extent = vk.surface_extent;
+	scissors.extent = viewport_extent;
 
 	VkPipelineViewportStateCreateInfo viewportState = {};
 	viewportState.viewportCount = 1;
@@ -105,7 +106,7 @@ auto createPipeline( ref Vulkan vk, VkDescriptorSetLayout descriptor_set_layout 
 
 	// sampling state
 	VkPipelineMultisampleStateCreateInfo multisampleState = {};
-	multisampleState.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+	multisampleState.rasterizationSamples = sample_count;
 	multisampleState.sampleShadingEnable = VK_FALSE;
 	multisampleState.minSampleShading = 0;
 	multisampleState.pSampleMask = null;
