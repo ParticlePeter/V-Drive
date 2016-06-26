@@ -15,15 +15,60 @@ import std.stdio;
 /// the struct can travel through several methods and can be filled with necessary data
 /// first thing after creation of this struct must be the assignment of the address of a valid vulkan state struct  
 struct Meta_Swapchain {
-	this( Vulkan* vk )		{  this.vk = vk;  }
-	alias 					vk this;
-	Vulkan*					vk;
+	this( Vulkan* vk )			{  this.vk = vk;  }
+	alias 						vk this;
+	Vulkan*						vk;
 
-	VkSurfaceKHR		surface;
-	VkSurfaceFormatKHR 	surface_format;
-	VkExtent2D			surface_extent;
-	VkPresentModeKHR	present_mode;
-	VkSwapchainKHR		swapchain;
+	VkQueue						present_queue = VK_NULL_HANDLE;
+	uint32_t					present_queue_family_index;
+
+	VkSwapchainKHR				swapchain;
+	VkSwapchainCreateInfoKHR	create_info;
+
+	//alias surface 			=	create_info.surface;
+	//alias min_image_count		=	create_info.minImageCount;
+	//alias format				=	create_info.imageFormat;
+	//alias color_space			=	create_info.imageColorSpace;
+	//alias extent				=	create_info.imageExtent;
+	//alias array_layers		=	create_info.imageArrayLayers;
+	//alias usage				=	create_info.imageUsage;
+	//alias sharing_mode		=	create_info.imageSharingMode;
+	//alias pre_transform		=	create_info.preTransform;
+	//alias composite_alpha		=	create_info.compositeAlpha;
+	//alias present_mode		=	create_info.presentMode;
+	//alias clipped				=	create_info.clipped;
+
+	// forward all members of vk and create_info to Meta_Swapchain
+	auto opDispatch( string member, Args... )( Args args ) /*pure nothrow*/ {
+		static if( args.length == 0 ) {
+			static if( __traits( compiles, __traits( getMember, vk, member ))) {
+				return __traits( getMember, vk, member );
+			} else {
+				return __traits( getMember, create_info, member );
+			}
+		} else	static if( args.length == 1 )  { 
+			__traits( getMember, create_info, member ) = args[0];
+		} else {
+			assert( 0, "Meta_Swapchain only one argument allowed for dispatching to VkSwapchainCreateInfoKHR" );
+		}
+	}
+
+	// convenience to get VkSurfaceFormatKHR from VkSwapchainCreateInfoKHR.imageFormat and .imageColorSpace and set vice versa
+	auto surfaceFormat() { return VkSurfaceFormatKHR( create_info.imageFormat, create_info.imageColorSpace ); }
+	void surfaceFormat( VkSurfaceFormatKHR surface_format ) {
+		create_info.imageFormat = surface_format.format;
+		create_info.imageColorSpace = surface_format.colorSpace;
+	}
+
+	// two different resource destroy functions for two distinct places
+	void destroySurface() { instance.vkDestroySurfaceKHR( create_info.surface, vk.allocator ); }
+	void destroySwapchain() { device.vkDestroySwapchainKHR( swapchain, vk.allocator ); }
+
+	// try to destroy together
+	void destroyResources() {
+		destroySwapchain;
+		destroySurface;
+	}
 }
 
 
@@ -32,142 +77,132 @@ struct Meta_Swapchain {
 
 
 auto ref selectSurfaceFormat( ref Meta_Swapchain meta, VkFormat[] include_formats, bool first_available_as_fallback = true ) {
-	meta.surface_format = meta.gpu.listSurfaceFormats( meta.surface, false ).filter( include_formats );
+	meta.surfaceFormat = meta.gpu.listSurfaceFormats( meta.surface, false ).filter( include_formats );
 	return meta;
 }
 
 auto ref selectPresentMode( ref Meta_Swapchain meta, VkPresentModeKHR[] include_modes, bool first_available_as_fallback = true ) {
-	meta.present_mode = meta.gpu.listPresentModes( meta.surface, false ).filter( include_modes );
+	meta.presentMode = meta.gpu.listPresentModes( meta.surface, false ).filter( include_modes );
 	return meta;
 }
 
+auto ref createSwapchain( ref Meta_Swapchain meta ) {
 
-
-auto init_swapchain( ref Vulkan vk, ref Array!VkImageView present_image_views ) {
-
-	//VkFormat[4] request_format = [ VK_FORMAT_R8G8B8_UNORM, VK_FORMAT_B8G8R8_UNORM, VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_B8G8R8A8_UNORM ];
-	//VkPresentModeKHR[2] request_mode = [ VK_PRESENT_MODE_MAILBOX_KHR, VK_PRESENT_MODE_FIFO_KHR ];
-	//meta.selectSurfaceFormat( request_format );
-	//meta.selectPresentMode( request_mode );
-
-	// Get GPU surface formats
-	auto surface_formats = listSurfaceFormats( vk.gpu, vk.surface, false );
-	//foreach( ref format; surface_formats ) { format.printTypeInfo;
-
-	if( surface_formats.length == 0 ) { 
-		printf( "No surface format available!\n" );
-		return VK_ERROR_FEATURE_NOT_PRESENT;
+	// request different count of images dependent on selected present mode
+	if( meta.minImageCount == 0 ) {
+		switch( meta.presentMode ) {
+			case VK_PRESENT_MODE_MAILBOX_KHR		: meta.minImageCount = 3; break;
+			case VK_PRESENT_MODE_FIFO_KHR 			:
+			case VK_PRESENT_MODE_FIFO_RELAXED_KHR	: meta.minImageCount = 2; break;
+			default									: meta.minImageCount = 1; break;		// VK_PRESENT_MODE_IMMEDIATE_KHR
+		}
 	}
-
-	// Select surface format
-
-	VkFormat[4] request_format = [ VK_FORMAT_R8G8B8_UNORM, VK_FORMAT_B8G8R8_UNORM, VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_B8G8R8A8_UNORM ];
-	auto present_surface_format = surface_formats.filterSurfaceFormats( request_format );
-	vk.present_image_format = present_surface_format.format;
-	//present_surface_format.printTypeInfo;
-
-	
-	// Get GPU present modes
-	VkPresentModeKHR[2] request_mode = [ VK_PRESENT_MODE_MAILBOX_KHR, VK_PRESENT_MODE_FIFO_KHR ];
-	auto present_mode = vk.gpu.listPresentModes( vk.surface, false ).filter( request_mode );
-	printf( "Selected Present Mode: %s\n", present_mode.toStringz.ptr );
-
 
 	// Get GPU surface capabilities
 	VkSurfaceCapabilitiesKHR surface_capabilities;
-	vkGetPhysicalDeviceSurfaceCapabilitiesKHR( vk.gpu, vk.surface, &surface_capabilities );
-	//surface_capabilities.printTypeInfo;
+	vkGetPhysicalDeviceSurfaceCapabilitiesKHR( meta.gpu, meta.surface, &surface_capabilities );
 
-
-
-	// Try to get 2 images for double buffered presentation
 	import std.algorithm : clamp;
-	uint32_t image_count;// = present_mode == VK_PRESENT_MODE_MAILBOX_KHR ? 3 : 2;	// request 3, 2 or 1 image(s)
-	switch( present_mode ) {
-		case VK_PRESENT_MODE_MAILBOX_KHR		: image_count = 3; break;
-		case VK_PRESENT_MODE_FIFO_KHR 			:
-		case VK_PRESENT_MODE_FIFO_RELAXED_KHR	: image_count = 2; break;
-		default									: image_count = 1; break;		// VK_PRESENT_MODE_IMMEDIATE_KHR
-	}
-
-	image_count = image_count.clamp( surface_capabilities.minImageCount, surface_capabilities.maxImageCount );
-	if( image_count == 0 ) {
+	meta.minImageCount = meta.minImageCount.clamp( surface_capabilities.minImageCount, surface_capabilities.maxImageCount );
+	if( meta.minImageCount == 0 ) {
 		printf( "Need at least one image in the swap chain, but max count is: %u", surface_capabilities.maxImageCount );
-		return VK_ERROR_FEATURE_NOT_PRESENT;
+		VK_ERROR_FEATURE_NOT_PRESENT.vkEnforce;
+		return meta;
 	}
 	
 	//printf( "\nImage Count: %u\n", image_count );
 
 	// Determine surface resolution
 	if( surface_capabilities.currentExtent.width == -1 ) {
-		vk.surface_extent.width  = vk.surface_extent.width.clamp(  surface_capabilities.minImageExtent.width,  surface_capabilities.maxImageExtent.width  );
-		vk.surface_extent.height = vk.surface_extent.height.clamp( surface_capabilities.minImageExtent.height, surface_capabilities.maxImageExtent.height );
+		meta.imageExtent.width  = meta.imageExtent.width.clamp(  surface_capabilities.minImageExtent.width,  surface_capabilities.maxImageExtent.width  );
+		meta.imageExtent.height = meta.imageExtent.height.clamp( surface_capabilities.minImageExtent.height, surface_capabilities.maxImageExtent.height );
 	} else {
-		vk.surface_extent = surface_capabilities.currentExtent;
+		meta.imageExtent = surface_capabilities.currentExtent;
 	}
 
-
-
-	// Try to use identity transform, othrewise the surface_capabilities.currentTransform
-	VkSurfaceTransformFlagBitsKHR pre_transform = surface_capabilities.currentTransform;
+	// Try to use identity transform, otherwise the surface_capabilities.currentTransform
 	if( surface_capabilities.supportedTransforms & VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR ) {
-		pre_transform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+		meta.preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+	} else {
+		meta.preTransform = surface_capabilities.currentTransform;
 	}
 
+	vkCreateSwapchainKHR( meta.vk.device, &meta.create_info, meta.allocator, &meta.swapchain ).vkEnforce;
+	return meta;
+}
 
 
-	// Create the swapchain
-	VkSwapchainCreateInfoKHR swapchain_create_info = {
-		surface 			: vk.surface,
-		minImageCount		: image_count,
-		imageFormat			: vk.present_image_format,
-		imageColorSpace		: present_surface_format.colorSpace,
-		imageExtent			: vk.surface_extent,
-		imageArrayLayers	: 1,
-		imageUsage			: VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-		imageSharingMode	: VK_SHARING_MODE_EXCLUSIVE,
-		preTransform		: pre_transform,
-		compositeAlpha		: VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
-		presentMode			: present_mode,
-		clipped				: true,     // If we want clipping outside the extents (remember our device features?)
-	};
 
-	auto vkResult = vkCreateSwapchainKHR( vk.device, &swapchain_create_info, vk.allocator, &vk.swapchain );
-	if( vkResult != VK_SUCCESS ) return vkResult;
+auto ref initSwapchain( 
+	ref Meta_Swapchain 			meta,
+	bool						clipped,
+	VkSharingMode				image_sharing_mode = VK_SHARING_MODE_EXCLUSIVE,
+	VkImageUsageFlagBits		image_usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+	VkCompositeAlphaFlagBitsKHR	composite_alpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR ) {
 
-	// Get the swapchain images
-	uint32_t present_image_count = 0;
-	vkGetSwapchainImagesKHR( vk.device, vk.swapchain, &present_image_count, null );
-	vk.present_images.length = present_image_count;
-	vkGetSwapchainImagesKHR( vk.device, vk.swapchain, &present_image_count, vk.present_images.ptr );
+	VkFormat[4] request_format = [ VK_FORMAT_R8G8B8_UNORM, VK_FORMAT_B8G8R8_UNORM, VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_B8G8R8A8_UNORM ];
+	VkPresentModeKHR[2] request_mode = [ VK_PRESENT_MODE_MAILBOX_KHR, VK_PRESENT_MODE_FIFO_KHR ];
+	meta.selectSurfaceFormat( request_format );
+	meta.selectPresentMode( request_mode );
 
-	// Create image views of the swapchain images in the passed in argument present_image_views
-	VkImageSubresourceRange present_image_subresource_range = {
+
+	meta.imageArrayLayers 	= 1;
+	meta.imageUsage 		= image_usage;
+	meta.imageSharingMode 	= image_sharing_mode;
+	meta.compositeAlpha 	= composite_alpha;
+	meta.clipped 			= clipped;
+
+	meta.createSwapchain;
+	return meta;
+
+}
+
+
+auto swapchainImageViews( ref Meta_Swapchain meta, VkImageAspectFlags subrecource_aspect_mask = VK_IMAGE_ASPECT_COLOR_BIT, VkImageViewType image_view_type = VK_IMAGE_VIEW_TYPE_2D ) {
+	VkImageSubresourceRange image_subresource_range = {
 		aspectMask 		: VK_IMAGE_ASPECT_COLOR_BIT,
 		baseMipLevel	: 0,
 		levelCount		: 1,
 		baseArrayLayer	: 0,
 		layerCount		: 1,
 	};
+	return swapchainImageViews( meta, image_subresource_range, image_view_type );
+}
 
-	VkImageViewCreateInfo present_image_view_create_info = {
-		viewType 			: VK_IMAGE_VIEW_TYPE_2D,
-		format				: vk.present_image_format,
+
+auto swapchainImageViews( ref Meta_Swapchain meta, VkImageSubresourceRange image_subresource_range, VkImageViewType image_view_type = VK_IMAGE_VIEW_TYPE_2D ) {
+	VkImageViewCreateInfo image_view_create_info = {
+		viewType 			: image_view_type,
+		format				: meta.imageFormat,
 		components			: { VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY },
-		subresourceRange	: present_image_subresource_range,
+		subresourceRange	: image_subresource_range,
 	};
+	return swapchainImageViews( meta, image_view_create_info );
+}
 
 
-	present_image_views.length = vk.present_images.length;
-	foreach( i; 0 .. vk.present_images.length ) {
+auto swapchainImageViews( ref Meta_Swapchain meta, VkImageViewCreateInfo image_view_create_info ) {
+
+	// Get the swapchain images
+	//uint32_t present_image_count = 0;
+	//vkGetSwapchainImagesKHR( vk.device, vk.swapchain, &present_image_count, null );
+	//vk.present_images.length = present_image_count;
+	//vkGetSwapchainImagesKHR( vk.device, vk.swapchain, &present_image_count, vk.present_images.ptr );
+
+	// Create image views of the swapchain images in the passed in argument present_image_views
+	auto present_images = listVulkanProperty!( VkImage, vkGetSwapchainImagesKHR, VkDevice, VkSwapchainKHR )( meta.device, meta.swapchain );
+
+	Array!VkImageView present_image_views;
+	present_image_views.length = present_images.length;
+	foreach( i; 0 .. present_image_views.length ) {
 		// complete VkImageViewCreateInfo with image i:
-		present_image_view_create_info.image = vk.present_images[i];
+		image_view_create_info.image = present_images[i];
 
 		// create the view for the ith swapchain image
-		vkCreateImageView( vk.device, &present_image_view_create_info, vk.allocator, &present_image_views[i] ).vkEnforce;
+		vkCreateImageView( meta.device, &image_view_create_info, meta.allocator, &present_image_views[i] ).vkEnforce;
 	}
 
-	return vkResult;
+	return present_image_views;
 }
 
 
@@ -255,14 +290,3 @@ if( is( Array_T == Array!VkPresentModeKHR ) || is( Array_T : VkPresentModeKHR[] 
 
 	return result_mode;
 }
-/*
-auto ref selectSurfaceFormat( ref Meta_Swapchain meta, VkFormat[] include_formats, bool first_available_as_fallback = true ) {
-	meta.surface_format = meta.gpu.listSurfaceFormats( meta.surface, false ).filter( include_formats );
-	return meta;
-}
-
-auto ref selectPresentMode( ref Meta_Swapchain meta, VkPresentModeKHR[] include_modes, bool first_available_as_fallback = true ) {
-	meta.present_mode = meta.gpu.listPresentModes( meta.surface, false ).filter( include_modes );
-	return meta;
-}
-*/
