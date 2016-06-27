@@ -18,6 +18,12 @@ void vkEnforce( VkResult vkResult ) {
 }
 
 
+alias toUint = toUint32_t;
+uint32_t toUint32_t( T )( T integral ) if( __traits( isIntegral, T )) { 
+	return cast( uint32_t )integral;
+}
+
+
 
 auto listVulkanProperty( ReturnType, alias vkFunc, Args... )( Args args ) {
 
