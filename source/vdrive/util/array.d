@@ -19,7 +19,7 @@ auto data( T )( Array!T array )  {
 	return array.ptr[ 0..array.length ];
 }
 
-auto append( T )( Array!T array, T value )  {
+auto append( T )( ref Array!T array, T value )  {
 	array.insert( value );
 }
 
