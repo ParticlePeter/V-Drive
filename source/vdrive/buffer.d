@@ -12,9 +12,7 @@ import erupted;
 /// the struct can travel through several methods and can be filled with necessary data
 /// first thing after creation of this struct must be the assignment of the address of a valid vulkan state struct  
 struct Meta_Buffer {
-	this( Vulkan* vk )		{  this.vk = vk;  }
-	alias 					vk this;
-	Vulkan*					vk;
+	mixin 					Vulkan_State_Pointer;
 	VkBuffer				buffer;
 	VkDeviceSize			buffer_offset;
 	VkBufferCreateInfo		buffer_create_info;

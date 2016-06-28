@@ -15,13 +15,9 @@ import std.stdio;
 /// the struct can travel through several methods and can be filled with necessary data
 /// first thing after creation of this struct must be the assignment of the address of a valid vulkan state struct  
 struct Meta_Swapchain {
-	this( Vulkan* vk )			{  this.vk = vk;  }
-	alias 						vk this;
-	Vulkan*						vk;
-
+	mixin 						Vulkan_State_Pointer;
 	VkQueue						present_queue = VK_NULL_HANDLE;
 	uint32_t					present_queue_family_index;
-
 	VkSwapchainKHR				swapchain;
 	VkSwapchainCreateInfoKHR	create_info;
 

@@ -10,9 +10,7 @@ import erupted;
 
 /// container for buffer related data
 struct Meta_Image {
-	this( Vulkan* vk )		{  this.vk = vk;  }
-	alias 					vk this;
-	Vulkan*					vk;
+	mixin 					Vulkan_State_Pointer;
 	VkImage					image;
 	VkImageCreateInfo		image_create_info;
 	VkImageView				image_view;

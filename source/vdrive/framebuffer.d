@@ -11,13 +11,9 @@ import erupted;
 
 
 struct Meta_Framebuffer {
-	this( Vulkan* vk )			{  this.vk = vk;  }
-	alias 						vk this;
-	Vulkan*						vk;
-
+	mixin 							Vulkan_State_Pointer;
 	Array!VkAttachmentDescription	attachment_descriptions;
 	Array!VkAttachmentReference		attachment_references;
-
 }
 
 
