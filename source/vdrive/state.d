@@ -42,17 +42,6 @@ struct Vulkan {
 	Device_Resource		device_resource;
 	alias 				device_resource this;
 
-	VkImage				color_image;
-	VkImageView			color_image_view;
-	VkFormat			color_image_format;
-
-	VkImage				depth_image;
-	VkImageView			depth_image_view;
-	VkFormat			depth_image_format;
-
-	Array!VkFramebuffer	framebuffers;
-	VkRenderPass		render_pass;
-
 	VkQueue				graphic_queue = VK_NULL_HANDLE;
 	uint32_t			graphic_queue_family_index;
 
