@@ -35,19 +35,7 @@ struct Meta_Swapchain {
 	//alias clipped				=	create_info.clipped;
 
 	// forward all members of vk and create_info to Meta_Swapchain
-	auto opDispatch( string member, Args... )( Args args ) /*pure nothrow*/ {
-		static if( args.length == 0 ) {
-			static if( __traits( compiles, __traits( getMember, vk, member ))) {
-				return __traits( getMember, vk, member );
-			} else {
-				return __traits( getMember, create_info, member );
-			}
-		} else	static if( args.length == 1 )  { 
-			__traits( getMember, create_info, member ) = args[0];
-		} else {
-			assert( 0, "Meta_Swapchain only one argument allowed for dispatching to VkSwapchainCreateInfoKHR" );
-		}
-	}
+	mixin Dispatch_To_Inner_Struct!create_info;
 
 	// convenience to get VkSurfaceFormatKHR from VkSwapchainCreateInfoKHR.imageFormat and .imageColorSpace and set vice versa
 	auto surfaceFormat() { return VkSurfaceFormatKHR( create_info.imageFormat, create_info.imageColorSpace ); }

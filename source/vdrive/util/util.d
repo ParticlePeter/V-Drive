@@ -59,6 +59,22 @@ auto listVulkanProperty( ReturnType, alias vkFunc, Args... )( Args args ) {
 }
 
 
+mixin template Dispatch_To_Inner_Struct( alias inner_struct ) {
+	auto opDispatch( string member, Args... )( Args args ) /*pure nothrow*/ {
+		static if( args.length == 0 ) {
+			static if( __traits( compiles, __traits( getMember, vk, member ))) {
+				return __traits( getMember, vk, member );
+			} else {
+				return __traits( getMember, inner_struct, member );
+			}
+		} else static if( args.length == 1 )  { 
+			__traits( getMember, inner_struct, member ) = args[0];
+		} else {
+			foreach( arg; args ) writeln( arg );
+			assert( 0, "Only one optional argument allowed for dispatching to inner struct: " ~ inner_struct.stringof );
+		}
+	}
+}
 
 /+
 mixin template listVulkanTemplate( ReturnType, alias vkFunc, Args... ) {
