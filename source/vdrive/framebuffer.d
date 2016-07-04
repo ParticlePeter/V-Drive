@@ -9,16 +9,41 @@ import erupted;
 
 
 
+///////////////////////////////////////
+// Meta_Subpass and Meta_Render_Pass //
+///////////////////////////////////////
 
-struct Meta_Framebuffer {
-	mixin 							Vulkan_State_Pointer;
-	Array!VkAttachmentDescription	attachment_descriptions;
-	Array!VkAttachmentReference		attachment_references;
+
+/// struct to collect
+private struct Meta_Subpass {
+	VkSubpassDescriptionFlags	flags;
+	VkPipelineBindPoint			pipeline_bind_point = VK_PIPELINE_BIND_POINT_GRAPHICS;
+	Array!VkAttachmentReference	input_reference;
+	Array!VkAttachmentReference	color_reference;
+	Array!VkAttachmentReference	resolve_reference;
+	Array!VkAttachmentReference	preserve_reference;
+	VkAttachmentReference		depth_stencil_reference;
 }
 
 
-auto ref appendAttachInfo(
-	ref Meta_Framebuffer	meta,
+struct Meta_Render_Pass {
+	mixin 							Vulkan_State_Pointer;
+	VkRenderPass					render_pass() { return begin_info.renderPass; }
+	VkRenderPassBeginInfo			begin_info;		// the actual renderpass is stored in a member of this struct
+	Array!VkAttachmentDescription	attachment_descriptions;
+	Array!Meta_Subpass				subpasses;
+	private Meta_Subpass*			subpass;
+
+	//mixin Dispatch_To_Inner_Struct!begin_info;	// Does not work because it has precedence over UFCS
+	
+	void destroyResources() {
+		vk.device.vkDestroyRenderPass( render_pass, vk.allocator );
+	}
+}
+
+
+auto ref renderPassAttachment(
+	ref Meta_Render_Pass	meta,
 	VkFormat				image_format,
 	VkSampleCountFlagBits	sample_count,
 	VkAttachmentLoadOp		load_op,
@@ -26,13 +51,7 @@ auto ref appendAttachInfo(
 	VkAttachmentLoadOp		stencil_load_op,
 	VkAttachmentStoreOp		stencil_store_op,
 	VkImageLayout			initial_layout,
-	VkImageLayout			render_layout	= VK_IMAGE_LAYOUT_MAX_ENUM,
 	VkImageLayout			final_layout	= VK_IMAGE_LAYOUT_MAX_ENUM ) {
-
-	VkAttachmentReference attachment_reference = {
-		attachment	: meta.attachment_references.length.toUint,
-		layout		: render_layout == VK_IMAGE_LAYOUT_MAX_ENUM ? initial_layout : render_layout,
-	};
 
 	VkAttachmentDescription attachment_description = {
 		format			: image_format,
@@ -42,116 +61,381 @@ auto ref appendAttachInfo(
 		stencilLoadOp	: stencil_load_op,
 		stencilStoreOp	: stencil_store_op,
 		initialLayout	: initial_layout,
-		finalLayout		: final_layout == VK_IMAGE_LAYOUT_MAX_ENUM ? attachment_reference.layout : final_layout,
+		finalLayout		: final_layout,
 	};
 
-	meta.attachment_references.append( attachment_reference );
 	meta.attachment_descriptions.append( attachment_description );
 	return meta;
 }
 
 
-auto ref appendAttachInfo(
-	ref Meta_Framebuffer	meta,
+auto ref renderPassAttachment(
+	ref Meta_Render_Pass	meta,
 	VkFormat				image_format,
 	VkSampleCountFlagBits	sample_count,
 	VkAttachmentLoadOp		load_op,
 	VkAttachmentStoreOp		store_op,
 	VkImageLayout			initial_layout,
-	VkImageLayout			render_layout	= VK_IMAGE_LAYOUT_MAX_ENUM,
 	VkImageLayout			final_layout	= VK_IMAGE_LAYOUT_MAX_ENUM ) {
 
-	return meta.appendAttachInfo( image_format, sample_count, load_op, store_op,
-		VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_STORE_OP_DONT_CARE, initial_layout, render_layout, final_layout );
+	return renderPassAttachment( meta, image_format, sample_count, load_op, store_op,
+		VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_STORE_OP_DONT_CARE, initial_layout, final_layout );
 };
 
 
-auto ref appendAttachInfoSpecial( alias load_op, alias store_op )(
-	ref Meta_Framebuffer	meta,
+auto ref renderPassAttachImpl( alias load_op, alias store_op )(
+	ref Meta_Render_Pass	meta,
 	VkFormat				image_format,
 	VkSampleCountFlagBits	sample_count,
 	VkImageLayout			initial_layout,
-	VkImageLayout			render_layout	= VK_IMAGE_LAYOUT_MAX_ENUM,
 	VkImageLayout			final_layout	= VK_IMAGE_LAYOUT_MAX_ENUM ) {
 
-	return meta.appendAttachInfo( image_format, sample_count, load_op, store_op,
-		VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_STORE_OP_DONT_CARE, initial_layout, render_layout, final_layout );
+	return renderPassAttachment( meta, image_format, sample_count, load_op, store_op,
+		VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_STORE_OP_DONT_CARE, initial_layout, final_layout );
 };
 
 
-alias appendAttachInfo_Load_None	= appendAttachInfoSpecial!( VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_STORE_OP_DONT_CARE );
-alias appendAttachInfo_Load_Store	= appendAttachInfoSpecial!( VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_STORE_OP_STORE );
-alias appendAttachInfo_Clear_None	= appendAttachInfoSpecial!( VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_DONT_CARE );
-alias appendAttachInfo_Clear_Store	= appendAttachInfoSpecial!( VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE );
-alias appendAttachInfo_None_None	= appendAttachInfoSpecial!( VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_STORE_OP_DONT_CARE );
-alias appendAttachInfo_None_Store	= appendAttachInfoSpecial!( VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_STORE_OP_STORE );
+alias renderPassAttachment_Load_None	= renderPassAttachImpl!( VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_STORE_OP_DONT_CARE );
+alias renderPassAttachment_Load_Store	= renderPassAttachImpl!( VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_STORE_OP_STORE );
+alias renderPassAttachment_Clear_None	= renderPassAttachImpl!( VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_DONT_CARE );
+alias renderPassAttachment_Clear_Store	= renderPassAttachImpl!( VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE );
+alias renderPassAttachment_None_None	= renderPassAttachImpl!( VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_STORE_OP_DONT_CARE );
+alias renderPassAttachment_None_Store	= renderPassAttachImpl!( VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_STORE_OP_STORE );
 
 
+// cannot use subpassReference as function overload as aliases bellow cannot be set for function overloads with diferent args
+auto ref firstSubpassReference( string reference )( ref Meta_Render_Pass meta, VkImageLayout render_layout = VK_IMAGE_LAYOUT_MAX_ENUM ) {
+	assert( meta.attachment_descriptions.length > 0 );
+	return subpassReference!reference( meta, toUint( meta.attachment_descriptions.length - 1 ), render_layout );
+}
+
+alias subpassRefInput			= firstSubpassReference!( "input" );
+alias subpassRefColor			= firstSubpassReference!( "color" );
+alias subpassRefResolve			= firstSubpassReference!( "resolve" );
+alias subpassRefPreserve		= firstSubpassReference!( "preserve" );
+alias subpassRefDepthStencil	= firstSubpassReference!( "depth_stencil" );
 
 
+auto ref subpassReference( string reference )( ref Meta_Render_Pass meta, uint32_t attachment_index, VkImageLayout render_layout = VK_IMAGE_LAYOUT_MAX_ENUM ) {
 
-void initFramebuffer( Array_T )(
-	ref Vulkan				vk,
-	Array_T					present_image_views,
-	VkFormat				present_image_format,
-	VkExtent2D				framebuffer_extent,
-	VkSampleCountFlagBits	sample_count = VK_SAMPLE_COUNT_4_BIT )
-if( is( Array_T == Array!VkImageView ) || is( Array_T : VkImageView[] )) {
+	if( meta.subpasses.length == 0 )
+		meta.appendSubpass;
 
-	Meta_Framebuffer meta = &vk;
-	meta.appendAttachInfo_Clear_Store( vk.color_image_format, sample_count, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL );
-	meta.appendAttachInfo_Clear_None( vk.depth_image_format, sample_count, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL );
-	meta.appendAttachInfo_None_Store( present_image_format, VK_SAMPLE_COUNT_1_BIT,
-		VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR );
-
-	//writeln( meta.attachment_descriptions.length );
-	//writeln( meta.attachment_references.length );
-
-	// create subpass
-	VkSubpassDescription subpass_description = {
-		pipelineBindPoint		: VK_PIPELINE_BIND_POINT_GRAPHICS,
-		colorAttachmentCount	: 1,
-		pColorAttachments		: &meta.attachment_references[0],
-		pResolveAttachments		: &meta.attachment_references[2],
-		pDepthStencilAttachment	: &meta.attachment_references[1],
+	VkAttachmentReference attachment_reference = {
+		attachment	: ( meta.attachment_descriptions.length - 1 ).toUint,
+		layout		: render_layout == VK_IMAGE_LAYOUT_MAX_ENUM ? meta.attachment_descriptions[$-1].initialLayout : render_layout,
 	};
 
+	// if attachment_descriptions[$-1].finalLayout is VK_IMAGE_LAYOUT_MAX_ENUM this means it is supposed to be the same as render_layout
+	if( meta.attachment_descriptions[$-1].finalLayout == VK_IMAGE_LAYOUT_MAX_ENUM )
+		meta.attachment_descriptions[$-1].finalLayout = attachment_reference.layout;
 
-	// renderpass create info
+			static if ( reference == "input" ) 			meta.subpass.input_reference.insert( attachment_reference );
+	else	static if ( reference == "color" ) 			meta.subpass.color_reference.insert( attachment_reference );
+	else	static if ( reference == "resolve" ) 		meta.subpass.resolve_reference.insert( attachment_reference );
+	else	static if ( reference == "preserve" ) 		meta.subpass.preserve_reference.insert( attachment_reference );
+	else	static if ( reference == "depth_stencil" ) 	meta.subpass.depth_stencil_reference = attachment_reference;
+
+	return meta;
+}
+
+alias subpassRefInput			= subpassReference!( "input" );
+alias subpassRefColor			= subpassReference!( "color" );
+alias subpassRefResolve			= subpassReference!( "resolve" );
+alias subpassRefPreserve		= subpassReference!( "preserve" );
+alias subpassRefDepthStencil	= subpassReference!( "depth_stencil" );
+
+
+
+
+private auto ref mayAliasOrBindPoint( alias value )( ref Meta_Render_Pass meta, size_t index = size_t.max )
+if( is( typeof( value ) == VkPipelineBindPoint ) || is( typeof( value ) == VkAttachmentDescriptionFlagBits ))
+{
+	assert( meta.subpasses.length > 0 );
+	if( index == size_t.max ) {
+		static if( is( typeof( value ) == VkPipelineBindPoint ))	meta.subpasses[ $-1 ].pipeline_bind_point = value;
+		else static if( is( typeof( value ) == VkAttachmentDescriptionFlagBits ))	meta.subpasses[ $-1 ].flags = value;
+	} else {
+		assert( index < meta.subpasses.length );
+		static if( is( typeof( value ) == VkPipelineBindPoint ))	meta.subpasses[ $-1 ].pipeline_bind_point = value;
+		else static if( is( typeof( value ) == VkAttachmentDescriptionFlagBits ))	meta.subpasses[ $-1 ].flags = value;
+	}
+	return meta;
+}
+
+auto ref mayAlias( ref Meta_Render_Pass meta, size_t index = size_t.max ) { return mayAliasOrBindPoint!VK_ATTACHMENT_DESCRIPTION_MAY_ALIAS_BIT( meta, index ); }
+auto ref graphicBindPoint( ref Meta_Render_Pass meta, size_t index = size_t.max ) { return mayAliasOrBindPoint!VK_PIPELINE_BIND_POINT_GRAPHICS( meta, index ); }	// for sake of completeness
+auto ref computeBindPoint( ref Meta_Render_Pass meta, size_t index = size_t.max ) { return mayAliasOrBindPoint!VK_PIPELINE_BIND_POINT_COMPUTE(  meta, index ); }
+
+
+
+///	append a Meta_Subpass to the subpasses array of Meta_Render_Pass
+/// consecutive subpass related function calls will create resources for this Meta_Structure if no index is specified
+///	Params:
+///		meta = reference to a Meta_Render_Pass struct
+///	Returns: the passed in Meta_Structure for function chaining 
+auto ref appendSubpass( ref Meta_Render_Pass meta ) {
+	meta.subpasses.length = meta.subpasses.length + 1;
+	meta.subpass = &meta.subpasses[ $-1 ];
+	return meta; 
+}
+
+
+///	construct a VkRenderPass from specified resources of Meta_Render_Pass structure and store it there as well
+///	Params:
+///		meta = reference to a Meta_Render_Pass struct
+///	Returns: the passed in Meta_Structure for function chaining 
+auto ref createRenderPass( ref Meta_Render_Pass meta ) {
+
+	// extract VkSubpassDescription from Meta_Subpass
+	auto subpass_descriptions = sizedArray!VkSubpassDescription( meta.subpasses.length );
+	foreach( i, ref subpass; meta.subpasses.data ) {
+
+		// assert that resolve references length is less or equal to color references length
+		// do nothing if resolve references length is 0, but if reference length is strictly less then color reference length
+		// fill resolve reference length with VkAttachmentReference( VK_ATTACHMENT_UNUSED, layout arbitrary ) 
+		assert( subpass.resolve_reference.length <= subpass.color_reference.length );
+		if( subpass.resolve_reference.length > 0 && subpass.resolve_reference.length < subpass.color_reference.length ) {
+			//subpass.resolve_reference.reserve( subpass.color_reference.length );
+			//foreach( j; subpass.resolve_reference.length .. subpass.color_reference.length )
+			//	subpass.resolve_reference.append( VkAttachmentReference( VK_ATTACHMENT_UNUSED, VK_IMAGE_LAYOUT_UNDEFINED ));
+			auto old_length = subpass.resolve_reference.length;
+			subpass.resolve_reference.length = subpass.color_reference.length;
+			subpass.resolve_reference[ old_length .. subpass.resolve_reference.length ] = VkAttachmentReference( VK_ATTACHMENT_UNUSED, VK_IMAGE_LAYOUT_UNDEFINED );
+		}
+
+		// fill the current VkSubpassDescription with data from coresponding Meta_Subpass
+		subpass_descriptions[i].pipelineBindPoint		=  subpass.pipeline_bind_point;
+		subpass_descriptions[i].inputAttachmentCount	=  subpass.input_reference.length.toUint;
+		subpass_descriptions[i].pInputAttachments		=  subpass.input_reference.ptr;
+		subpass_descriptions[i].colorAttachmentCount	=  subpass.color_reference.length.toUint;
+		subpass_descriptions[i].pColorAttachments		=  subpass.color_reference.ptr;
+		subpass_descriptions[i].pResolveAttachments		=  subpass.resolve_reference.ptr;
+		subpass_descriptions[i].pDepthStencilAttachment	= &subpass.depth_stencil_reference;
+	}
+
+
+	// use the new Array!VkSubpassDescription to create the VkRenderPass
 	VkRenderPassCreateInfo render_pass_create_info = {
 		attachmentCount	: meta.attachment_descriptions.length.toUint,
 		pAttachments	: meta.attachment_descriptions.ptr,
-		subpassCount	: 1,
-		pSubpasses		: &subpass_description,
+		subpassCount	: subpass_descriptions.length.toUint,
+		pSubpasses		: subpass_descriptions.ptr,
 	};
 
-	vkCreateRenderPass( vk.device, &render_pass_create_info, vk.allocator, &vk.render_pass ).vkEnforce;
+	vkCreateRenderPass( meta.device, &render_pass_create_info, meta.allocator, &meta.begin_info.renderPass ).vkEnforce;
+	return meta;
+}
+
+
+
+
+//////////////////////
+// Meta_Framebuffer //
+//////////////////////
+
+/// aggregate to manage one framebuffer and the related resources aka render area and clear values of the attachments
+struct Meta_Framebuffer {
+	mixin 					Vulkan_State_Pointer;
+	VkFramebuffer			framebuffer;
+	VkRect2D				render_area;
+	Array!VkClearValue		clear_values;	// coresponds to Meta_Render_Pass.attachment_Descriptions
+
+	void destroyResources() {
+		vk.device.vkDestroyFramebuffer( framebuffer, vk.allocator );
+	}
+}
+
+/// aggregate to manage multiple framebuffers sharing same frambuffer resources aka render area and clear values of the attachments 
+struct Meta_Framebuffers {
+	mixin 					Vulkan_State_Pointer;
+	Array!VkFramebuffer		framebuffers;
+	VkRect2D				render_area;
+	Array!VkClearValue		clear_values;	// coresponds to Meta_Render_Pass.attachment_Descriptions
+
+	void destroyResources() {
+		foreach( framebuffer; framebuffers ) vk.device.vkDestroyFramebuffer( framebuffer, vk.allocator );
+	}
+}
+
+/// Set or append an attachment specific clear value, several overloads exist
+/// The last argument is an optional attachment index:
+///		if it is not provided the clear value gets appended
+///		else if the clear value array is too short it is expanded, new entries filled with default values
+///		and the passed in clear value is set at the specified index
+/// Three overloads exist, each with first param of Meta_Framebuffer and an additional optional attachment index:
+///		1.: 4 (+1) parameters each of type float, int32_t or uint32_t to set color clear values (at specified index)
+///		2.: 2 (+1) parameters, float and uint32_t specifying depth and stencil (at specified index)
+///		3.: 1 (+1) parameter of type VkClearValue setting directly the Vulkan clear value (at specified index)
+///	Params:
+///		meta = reference to a Meta_Framebuffer or Meta_Framebuffers struct
+///		args = Arguments as described above
+///	Returns: the passed in Meta_Structure for function chaining 
+auto ref clearValue( META_FB, Args... )( ref META_FB meta, Args args )
+if(( is( META_FB == Meta_Framebuffer ) || is( META_FB == Meta_Framebuffers )) && Args.length > 0 && Args.length < 6 ) {
+
+	// clear values [r, g, b, a] and optional array index
+	static if( Args.length > 3 && is( Args[0] == Args[1] ) && is( Args[0] == Args[2] ) && is( Args[0] == Args[3] )) {
+		VkClearValue clear_value;
+		Args[0][4] clear_data = [ args[0], args[1], args[2], args[3] ]; 
+				static if( is( Args[0] == float ))		clear_value.color.float32	= clear_data;
+		else	static if( is( Args[0] == int32_t ))	clear_value.color.int32		= clear_data;
+		else	static if( is( Args[0] == uint32_t ))	clear_value.color.uint32	= clear_data;
+
+		return clearValue( meta, clear_value, args[4..$] );		// last argument yields zero or one argument which is the index 
+	}
+
+	// clear values depth and stencil and optional index, first arg must not be VkClearValue
+	else static if( Args.length > 1 && is( Args[0] == float ) && is( Args[1] : uint32_t )) {
+		VkClearValue clear_value = { depthStencil : VkClearDepthStencilValue( args[0], args[1].toUint ) };
+		return clearValue( meta, clear_value, args[2..$] );
+	}
+
+	// direct clear value struct, implemented logic for setting, extending and/or appending
+	else static if( is( Args[0] == VkClearValue )) {
+		static if( Args.length == 2 && is( args[1] : size_t )) {
+			size_t index = args[1];
+			if( meta.clear_values.length <= index )
+				meta.clear_values.length  = index + 1;
+			meta.clear_values[ index ] = args[0];
+		} else {
+			meta.clear_values.append( args[0] );
+		}
+		return meta;
+	}
+
+	else {	// should not reach here
+		pragma( msg, "\n" );
+		pragma( msg, META_FB );
+		foreach( Arg; Args )	pragma( msg, Arg );
+		static assert( 0 );
+	} 
+}
+
+///	set the render area offset seperate from the extent
+/// the render area is passed into a VkRenderPassBeginInfo when the appropriate attachFramebuffer (see bellow) overload is called
+///	for Vulkan itself this parameter is just an optimazation hint and must be properly set as scissor paramerter of VkPipelineViewportStateCreateInfo
+///	Params:
+///		meta   = reference to a Meta_Framebuffer or Meta_Framebuffers
+///		offset = the offset of the render area
+///	Returns: the passed in Meta_Structure for function chaining 
+auto ref renderAreaOffset( META_FB )( ref META_FB meta, VkOffset2D offset ) if( is( META_FB == Meta_Framebuffer ) || is( META_FB == Meta_Framebuffers )) {
+	meta.render_area.offset = offset;
+	return meta;
+}
+
+///	set the render area extent seperate from the extent
+/// the render area is passed into a VkRenderPassBeginInfo when the appropriate attachFramebuffer (see bellow) overload is called
+///	for Vulkan itself this parameter is just an optimazation hint and must be properly set as scissor paramerter of VkPipelineViewportStateCreateInfo
+///	Params:
+///		meta   = reference to a Meta_Framebuffer or Meta_Framebuffers
+///		extent = the extent of the render area
+///	Returns: the passed in Meta_Structure for function chaining
+auto ref renderAreaExtent( META_FB )( ref META_FB meta, VkExtent2D extent ) if( is( META_FB == Meta_Framebuffer ) || is( META_FB == Meta_Framebuffers )) {
+	meta.render_area.extent = extent;
+	return meta;
+}
+
+
+
+//////////////////////////////////////////////////
+// connect Meta_Framebuffer to Meta_Render_Pass //
+//////////////////////////////////////////////////
+
+///	set members of a Meta_Render_Pass.VkRenderPassBeginInfo with the coresponding members of a Meta_Framebuffer structure
+/// this should be called once if the framebuffer related members of the VkRenderPassBeginInfo are not changing later on
+/// or before vkCmdBeginRenderPass to switch frambuffer, render area (hint, see renderAreaOffset/Extent) and clear values
+///	Params:
+///		meta_render_pass = reference to a Meta_Render_Pass structure holding the VkRenderPassBeginInfo
+///		meta_framebuffer = the Meta_Framebuffer structure whose frambuffer and resources will be attached
+///	Returns: the passed in Meta_Structure for function chaining
+auto ref attachFramebuffer( ref Meta_Render_Pass meta_render_pass, ref Meta_Framebuffer meta_framebuffer ) {
+	meta_render_pass.begin_info.framebuffer = meta_framebuffer.framebuffer;
+	meta_render_pass.begin_info.renderArea = meta_framebuffer.render_area;
+	meta_render_pass.begin_info.pClearValues = meta_framebuffer.clear_values.ptr;
+	meta_render_pass.begin_info.clearValueCount = meta_framebuffer.clear_values.length.toUint;
+	return meta_render_pass;
+}
+
+///	set members of a Meta_Render_Pass.VkRenderPassBeginInfo with the coresponding members of a Meta_Framebuffers structure
+/// this should be called once if the framebuffer related members of the VkRenderPassBeginInfo are not changing later on
+/// or before vkCmdBeginRenderPass to switch frambuffer, render area (hint, see renderAreaOffset/Extent) and clear values
+///	Params:
+///		meta_render_pass  = reference to a Meta_Render_Pass structure holding the VkRenderPassBeginInfo
+///		meta_framebuffers = reference to the Meta_Framebuffer structure whose frambuffer and resources will be attached
+///		framebuffer_index = the index to select a frambuffer from the member framebuffer array
+///	Returns: the passed in Meta_Structure for function chaining
+auto ref attachFramebuffer( ref Meta_Render_Pass meta_render_pass, ref Meta_Framebuffers meta_framebuffers, size_t framebuffer_index ) {
+	meta_render_pass.begin_info.framebuffer = meta_framebuffers.framebuffers[ framebuffer_index ];
+	meta_render_pass.begin_info.renderArea = meta_framebuffers.render_area;
+	meta_render_pass.begin_info.pClearValues = meta_framebuffers.clear_values.ptr;
+	meta_render_pass.begin_info.clearValueCount = meta_framebuffers.clear_values.length.toUint;
+	return meta_render_pass;
+}
+
+///	set framebuffer member of a Meta_Render_Pass.VkRenderPassBeginInfo with a freambuffer not changing its framebuffer related resources
+///	Params:
+///		meta_render_pass = reference to a Meta_Render_Pass structure holding the VkRenderPassBeginInfo
+///		framebuffer      = the VkFramebuffer to attach to VkRenderPassBeginInfo
+///	Returns: the passed in Meta_Structure for function chaining
+auto ref attachFramebuffer( ref Meta_Render_Pass meta_render_pass, VkFramebuffer framebuffer ) {
+	meta_render_pass.begin_info.framebuffer = framebuffer;
+	return meta_render_pass;
+}
+
+
+
+////////////////////////////////
+// use vdrive meta structures //
+////////////////////////////////
+
+/// temp function to initialize a render pass, only here for demonstration purpose 
+auto initRenderPass( ref Vulkan vk, const ref VkFormat[3] image_formats, VkSampleCountFlagBits sample_count = VK_SAMPLE_COUNT_4_BIT ) {
+	Meta_Render_Pass meta = &vk;
+	meta.renderPassAttachment_Clear_Store( image_formats[0], sample_count, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL ).subpassRefColor;
+	meta.renderPassAttachment_Clear_None( image_formats[1], sample_count, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL ).subpassRefDepthStencil;
+	meta.renderPassAttachment_None_Store( image_formats[2], VK_SAMPLE_COUNT_1_BIT,
+		VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR ).subpassRefResolve( VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL );
+	meta.createRenderPass;
+	return meta;
+}
+
+/// temp function to initialize a framebuffers, only here for demonstration purpose 
+auto initFramebuffer( ref Meta_Render_Pass meta_render_pass, VkExtent2D framebuffer_extent, VkImageView[] static_image_views, VkImageView[] dynamic_image_views ) {
+
+	Meta_Framebuffers meta = meta_render_pass.vk;
+	meta.clearValue( 0.3f, 0.3f, 0.3f, 1.0f ).clearValue( 1.0f, 0 ).renderAreaExtent( framebuffer_extent );
 
 
 	// create framebuffer
-	VkImageView[3] framebuffer_attachments;
-	framebuffer_attachments[0] = vk.color_image_view;
-	framebuffer_attachments[1] = vk.depth_image_view;
+	auto framebuffer_image_views = sizedArray!VkImageView( static_image_views.length + 1 );
+	foreach( i, static_image_view; static_image_views )
+		framebuffer_image_views[i] = static_image_view;
 
-	VkFramebufferCreateInfo framebufferCreateInfo = {
-		renderPass		: vk.render_pass,
-		attachmentCount	: framebuffer_attachments.length.toUint,  // must be equal to the attachment count on render pass
-		pAttachments	: framebuffer_attachments.ptr,
+	VkFramebufferCreateInfo framebuffer_create_info = {
+		renderPass		: meta_render_pass.begin_info.renderPass,	// this defines render pass COMPATIBILITY	
+		attachmentCount	: framebuffer_image_views.length.toUint,	// must be equal to the attachment count on render pass
+		pAttachments	: framebuffer_image_views.ptr,
 		width			: framebuffer_extent.width,
 		height			: framebuffer_extent.height,
 		layers			: 1,
 	};
 
 	// create a framebuffer per swapchain imageView:
-	vk.framebuffers.length = present_image_views.length;
-	foreach( i, ref framebuffer; vk.framebuffers.data ) {
-	    framebuffer_attachments[2] = present_image_views[ i ];
-	    vkCreateFramebuffer( vk.device, &framebufferCreateInfo, vk.allocator, &framebuffer ).vkEnforce;
+	//vk.framebuffers.length = dynamic_image_views.length;
+	meta.framebuffers.length = dynamic_image_views.length;
+	foreach( i, ref framebuffer; meta.framebuffers.data ) {
+	    framebuffer_image_views[2] = dynamic_image_views[ i ];
+	    vkCreateFramebuffer( meta.device, &framebuffer_create_info, meta.allocator, &framebuffer ).vkEnforce;
 	}
+
+	meta_render_pass.attachFramebuffer( meta, cast( size_t )0 );
+
+	return meta;
 }
 
 
-// code reference not using Meta_Framebuffer
+// code reference not using Meta_Render_Pass
 /*
 	// create attachment description
 	VkAttachmentDescription[3] attachment_description; 

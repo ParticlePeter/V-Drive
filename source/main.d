@@ -212,9 +212,6 @@ int main() {
 	color_meta_image.bindMemory( VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
 	color_meta_image.imageView( color_image_subresource_range );
 	scope( exit ) color_meta_image.destroyResources;
-	vk.color_image = color_meta_image.image ;
-	vk.color_image_view = color_meta_image.image_view;
-	vk.color_image_format = color_meta_image.image_create_info.format;									// for now this is required for framebuffer creation, TODO(pp): remove dependency
 	
 	VkImageSubresourceRange depth_image_subresource_range = { VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1 };	// this subresource range is used in additional places
 	Meta_Image depth_meta_image = &vk;																	// create image with memory and view in a meta image struct
@@ -222,15 +219,28 @@ int main() {
 	depth_meta_image.bindMemory( VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
 	depth_meta_image.imageView( depth_image_subresource_range );
 	scope( exit ) depth_meta_image.destroyResources;
-	vk.depth_image = depth_meta_image.image ;
-	vk.depth_image_view = depth_meta_image.image_view;
-	vk.depth_image_format = depth_meta_image.image_create_info.format;									// for now this is required for framebuffer creation, TODO(pp): remove dependency
 
-	 /*{
-		vk.device.vkDestroyImage( depth_meta_image.image, vk.allocator );
-		vk.device.vkFreeMemory( depth_meta_image.device_memory, vk.allocator );
-		vk.device.vkDestroyImageView( depth_meta_image.image_view, vk.allocator );
-	}*/
+
+
+	//////////////////////////////////////////
+	// create renderpass and framebuffer(s) //
+	//////////////////////////////////////////
+
+	// pass this into initRenderPass function
+	VkFormat[3] render_pass_formats = [ color_meta_image.image_create_info.format, depth_meta_image.image_create_info.format, meta_swapchain.imageFormat ];
+
+	// pass this into initFramebuffer function
+	VkImageView[2] render_targets = [ color_meta_image.image_view, depth_meta_image.image_view ];
+
+	import vdrive.framebuffer;
+	auto meta_render_pass = vk.initRenderPass( render_pass_formats, sample_count );
+	auto meta_framebuffer = meta_render_pass.initFramebuffer( meta_swapchain.imageExtent, render_targets, present_image_views.data );
+	scope( exit ) {
+		//foreach( framebuffer; vk.framebuffers ) vk.device.vkDestroyFramebuffer( framebuffer, vk.allocator );
+		//vk.device.vkDestroyRenderPass( vk.render_pass, vk.allocator );
+		meta_framebuffer.destroyResources;
+		meta_render_pass.destroyResources;
+	}
 
 
 
@@ -272,13 +282,13 @@ int main() {
 	}
 
 	init_command_buffer.imageTransition(
-		vk.color_image, color_image_subresource_range,
+		color_meta_image.image, color_image_subresource_range,
 		VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 		0, VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
 	);
 
 	init_command_buffer.imageTransition(
-		vk.depth_image, depth_image_subresource_range,
+		depth_meta_image.image, depth_image_subresource_range,
 		VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
 		0, VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
 	);
@@ -300,17 +310,6 @@ int main() {
 	// reset the command pool to start recording drawing commands
 	vk.device.vkResetCommandPool( command_pool, 0 );	// second argument is VkCommandPoolResetFlags
 
-
-
-	//////////////////////////////////////////
-	// create renderpass and framebuffer(s) //
-	//////////////////////////////////////////
-	import vdrive.framebuffer;
-	vk.initFramebuffer( present_image_views, meta_swapchain.imageFormat, meta_swapchain.imageExtent, sample_count );
-	scope( exit ) {
-		foreach( framebuffer; vk.framebuffers ) vk.device.vkDestroyFramebuffer( framebuffer, vk.allocator );
-		vk.device.vkDestroyRenderPass( vk.render_pass, vk.allocator );
-	}
 
 
 	///////////////////////////////////
@@ -349,7 +348,8 @@ int main() {
 	// create the pipeline //
 	/////////////////////////
 	import vdrive.pipeline;
-	auto shader_modules = vk.createPipeline( matrix_uniform_meta_descriptor.set_layout, meta_swapchain.imageExtent, sample_count );
+	auto shader_modules = vk.createPipeline( 
+		matrix_uniform_meta_descriptor.set_layout, meta_render_pass.render_pass, meta_swapchain.imageExtent, sample_count );
 	scope( exit ) {
 		vk.device.vkDestroyPipeline( vk.pipeline, vk.allocator );
 		vk.device.vkDestroyPipelineLayout( vk.pipeline_layout, vk.allocator );
@@ -360,7 +360,7 @@ int main() {
 	///////////////////////////
 	// prepare for rendering //
 	///////////////////////////
-
+/*
 	// create render pass clear values for VkRenderPassBeginInfo
 	VkClearValue[2] clear_value;
 	clear_value[0].color.float32 = [ 0.3f, 0.3f, 0.3f, 1.0f ];
@@ -368,13 +368,13 @@ int main() {
 
 
 	// render pass begin info for vkCmdBeginRenderPass
-	VkRenderPassBeginInfo renderPassBeginInfo = {
+	VkRenderPassBeginInfo render_pass_begin_info = {
 		renderPass		: vk.render_pass,
 		renderArea		: VkRect2D( VkOffset2D( 0, 0 ), meta_swapchain.imageExtent ),
 		clearValueCount	: 2,
 		pClearValues	: clear_value.ptr,
 	};
-
+*/
 
 	// viewport and scissors (not so) dynamic state for vkCmdSetViewport and vkCmdSetScissor
 	auto viewport = VkViewport( 0, 0, meta_swapchain.imageExtent.width, meta_swapchain.imageExtent.height, 0, 1 );
@@ -429,8 +429,9 @@ int main() {
 
 
 		// begin the render_pass
-		renderPassBeginInfo.framebuffer = vk.framebuffers[ i ];
-		draw_command_buffers[ i ].vkCmdBeginRenderPass( &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE );
+		//render_pass_begin_info.framebuffer = vk.framebuffers[ i ];
+		meta_render_pass.attachFramebuffer( meta_framebuffer.framebuffers[ i ] );
+		draw_command_buffers[ i ].vkCmdBeginRenderPass( &meta_render_pass.begin_info, VK_SUBPASS_CONTENTS_INLINE );
 
 
 		// bind graphics pipeline
@@ -473,12 +474,6 @@ int main() {
 		vkAcquireNextImageKHR( vk.device, meta_swapchain.swapchain, uint64_t.max, image_ready_semaphore, VK_NULL_ND_HANDLE, &next_image_index );
 
 
-		// update the matrix uniform buffer memory
-		import vdrive.buffer : bufferData;
-		WVPM = PROJ * MOVE * mat4.rotationY( glfwGetTime() );
-		matrix_meta_buffer.bufferData( WVPM );
-
-
 		// submit command buffer to queue
 		meta_swapchain.present_queue.vkQueueSubmit( 1, &render_submit_info[ next_image_index ], render_fence );
 		vk.device.vkWaitForFences( 1, &render_fence, VK_TRUE, uint64_t.max );
@@ -488,6 +483,12 @@ int main() {
 		// present rendered image
 		present_info.pImageIndices = &next_image_index;
 		meta_swapchain.present_queue.vkQueuePresentKHR( &present_info );
+
+
+		// update the matrix uniform buffer memory for the next frame render
+		import vdrive.buffer : bufferData;
+		WVPM = PROJ * MOVE * mat4.rotationY( glfwGetTime() );
+		matrix_meta_buffer.bufferData( WVPM );
 	}
 
 
