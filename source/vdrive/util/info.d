@@ -17,7 +17,7 @@ void printTypeInfo( T, size_t buffer_size = 256 )(
 	string	indent = "",
 	size_t	max_type_length = 0,
 	size_t	max_name_length = 0,
-	bool	newline = true ) if( is( T == struct )) /*@nogc nothrow*/ {
+	bool	newline = true ) if( is( T == struct ) || is( T == union )) /*@nogc nothrow*/ {
 
 	// struct name
 	import std.conv : to;
@@ -124,13 +124,13 @@ void printTypeInfo( T, size_t buffer_size = 256 )(
 
 			//else static if( member_type!isPointer ) {}
 
-			else static if( is( member_type == struct )) {
+			else static if( is( member_type == struct ) || is( member_type == union )) {
 				print( buffer_ptr, member_type.stringof, "", "", "" );
 				member_data.printTypeInfo( false, "\t", max_type_length, max_name_length, false );
 			}
 
 			else static if( is( member_type : B[n], B, size_t n )) {
-				static if( is( B == struct )) {
+				static if( is( B == struct ) || is( B == union )) {
 					foreach( item; member_data ) {
 						item.printTypeInfo( false, "\t", max_type_length, max_name_length, false );
 					}
