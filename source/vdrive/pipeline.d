@@ -9,7 +9,12 @@ import vdrive.swapchain;
 import erupted;
 
 
-auto createPipeline( ref Vulkan vk, VkDescriptorSetLayout descriptor_set_layout, VkExtent2D viewport_extent, VkSampleCountFlagBits sample_count = VK_SAMPLE_COUNT_4_BIT ) {
+auto createPipeline(
+	ref Vulkan 				vk,
+	VkDescriptorSetLayout	descriptor_set_layout,
+	VkRenderPass			render_pass,
+	VkExtent2D				viewport_extent,
+	VkSampleCountFlagBits	sample_count = VK_SAMPLE_COUNT_4_BIT ) {
 
 	// Create an empty pipeline
 	VkPipelineLayoutCreateInfo layout_create_info = {
@@ -94,7 +99,7 @@ auto createPipeline( ref Vulkan vk, VkDescriptorSetLayout descriptor_set_layout,
 	VkPipelineRasterizationStateCreateInfo rasterizationState = {};
 	rasterizationState.depthClampEnable = VK_FALSE;
 	rasterizationState.rasterizerDiscardEnable = VK_FALSE;
-	rasterizationState.polygonMode = VK_POLYGON_MODE_FILL;
+	rasterizationState.polygonMode = VK_POLYGON_MODE_LINE;
 	rasterizationState.cullMode = VK_CULL_MODE_NONE;
 	rasterizationState.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 	rasterizationState.depthBiasEnable = VK_FALSE;
@@ -183,7 +188,7 @@ auto createPipeline( ref Vulkan vk, VkDescriptorSetLayout descriptor_set_layout,
 	pipelineCreateInfo.pColorBlendState = &colorBlendState;
 	pipelineCreateInfo.pDynamicState = &dynamicStateCreateInfo;
 	pipelineCreateInfo.layout = vk.pipeline_layout;
-	pipelineCreateInfo.renderPass = vk.render_pass;
+	pipelineCreateInfo.renderPass = render_pass;
 	pipelineCreateInfo.subpass = 0;
 	pipelineCreateInfo.basePipelineHandle = VK_NULL_ND_HANDLE;
 	pipelineCreateInfo.basePipelineIndex = 0;
