@@ -6,26 +6,10 @@ import std.string : fromStringz;
 
 import erupted;
 
-//import vdrive.glfw.vulkan_glfw3;
-import derelict.glfw3;
 import vdrive.util;
 
-/*
-mixin DerelictGLFW3_VulkanBind;
 
-// Initialize basic vulkan functions at module import
-static this() {
 
-	//DerelictErupted.load();
-	//VulkanGLFW3.load;
-	DerelictGLFW3.load;
-	DerelictGLFW3_loadVulkan();
-
-	glfwInit();
-	loadGlobalLevelFunctions( cast( typeof( vkGetInstanceProcAddr ))
-		glfwGetInstanceProcAddress( null, "vkGetInstanceProcAddr" ));
-}
-*/
 bool verbose = true;
 
 
