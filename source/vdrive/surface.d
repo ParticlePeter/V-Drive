@@ -1,4 +1,4 @@
-module vdrive.swapchain;
+module vdrive.surface;
 
 import core.stdc.stdio : printf;
 
@@ -14,7 +14,7 @@ import std.stdio;
 /// struct to capture buffer and memory creation as well as binding
 /// the struct can travel through several methods and can be filled with necessary data
 /// first thing after creation of this struct must be the assignment of the address of a valid vulkan state struct  
-struct Meta_Swapchain {
+struct Meta_Surface {
 	mixin 						Vulkan_State_Pointer;
 	VkQueue						present_queue = VK_NULL_HANDLE;
 	uint32_t					present_queue_family_index;
@@ -34,7 +34,7 @@ struct Meta_Swapchain {
 	//alias present_mode		=	create_info.presentMode;
 	//alias clipped				=	create_info.clipped;
 
-	// forward all members of vk and create_info to Meta_Swapchain
+	// forward all members of vk and create_info to Meta_Surface
 	mixin Dispatch_To_Inner_Struct!create_info;
 
 	// convenience to get VkSurfaceFormatKHR from VkSwapchainCreateInfoKHR.imageFormat and .imageColorSpace and set vice versa
@@ -60,17 +60,17 @@ struct Meta_Swapchain {
 
 
 
-auto ref selectSurfaceFormat( ref Meta_Swapchain meta, VkFormat[] include_formats, bool first_available_as_fallback = true ) {
+auto ref selectSurfaceFormat( ref Meta_Surface meta, VkFormat[] include_formats, bool first_available_as_fallback = true ) {
 	meta.surfaceFormat = meta.gpu.listSurfaceFormats( meta.surface, false ).filter( include_formats );
 	return meta;
 }
 
-auto ref selectPresentMode( ref Meta_Swapchain meta, VkPresentModeKHR[] include_modes, bool first_available_as_fallback = true ) {
+auto ref selectPresentMode( ref Meta_Surface meta, VkPresentModeKHR[] include_modes, bool first_available_as_fallback = true ) {
 	meta.presentMode = meta.gpu.listPresentModes( meta.surface, false ).filter( include_modes );
 	return meta;
 }
 
-auto ref createSwapchain( ref Meta_Swapchain meta ) {
+auto ref createSwapchain( ref Meta_Surface meta ) {
 
 	// request different count of images dependent on selected present mode
 	if( meta.minImageCount == 0 ) {
@@ -118,7 +118,7 @@ auto ref createSwapchain( ref Meta_Swapchain meta ) {
 
 
 auto ref initSwapchain( 
-	ref Meta_Swapchain 			meta,
+	ref Meta_Surface 			meta,
 	bool						clipped,
 	VkSharingMode				image_sharing_mode = VK_SHARING_MODE_EXCLUSIVE,
 	VkImageUsageFlagBits		image_usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
@@ -142,7 +142,7 @@ auto ref initSwapchain(
 }
 
 
-auto swapchainImageViews( ref Meta_Swapchain meta, VkImageAspectFlags subrecource_aspect_mask = VK_IMAGE_ASPECT_COLOR_BIT, VkImageViewType image_view_type = VK_IMAGE_VIEW_TYPE_2D ) {
+auto swapchainImageViews( ref Meta_Surface meta, VkImageAspectFlags subrecource_aspect_mask = VK_IMAGE_ASPECT_COLOR_BIT, VkImageViewType image_view_type = VK_IMAGE_VIEW_TYPE_2D ) {
 	VkImageSubresourceRange image_subresource_range = {
 		aspectMask 		: VK_IMAGE_ASPECT_COLOR_BIT,
 		baseMipLevel	: 0,
@@ -154,7 +154,7 @@ auto swapchainImageViews( ref Meta_Swapchain meta, VkImageAspectFlags subrecourc
 }
 
 
-auto swapchainImageViews( ref Meta_Swapchain meta, VkImageSubresourceRange image_subresource_range, VkImageViewType image_view_type = VK_IMAGE_VIEW_TYPE_2D ) {
+auto swapchainImageViews( ref Meta_Surface meta, VkImageSubresourceRange image_subresource_range, VkImageViewType image_view_type = VK_IMAGE_VIEW_TYPE_2D ) {
 	VkImageViewCreateInfo image_view_create_info = {
 		viewType 			: image_view_type,
 		format				: meta.imageFormat,
@@ -165,7 +165,7 @@ auto swapchainImageViews( ref Meta_Swapchain meta, VkImageSubresourceRange image
 }
 
 
-auto swapchainImageViews( ref Meta_Swapchain meta, VkImageViewCreateInfo image_view_create_info ) {
+auto swapchainImageViews( ref Meta_Surface meta, VkImageViewCreateInfo image_view_create_info ) {
 
 	// Get the swapchain images
 	//uint32_t present_image_count = 0;
