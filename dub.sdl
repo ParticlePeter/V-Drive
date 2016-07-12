@@ -1,0 +1,16 @@
+
+name				"v-drive"
+targetName			"V-Drive"
+targetType			"sourceLibrary"
+description			"D Creative Coding"
+homepage			""
+copyright			"Copyright (c) 2016 Peter Particle"
+authors				"Peter Particle"
+license				"MIT"
+
+dependencies		"erupted" version = "~>1.3.10"
+
+buildRequirements	"allowWarnings"
+
+
+
