@@ -23,6 +23,13 @@
 		},
 
 		{
+			"path"						: "E:/Code/DLang/projects/DLTF",
+			"name"						: "DLTF",
+			"file_exclude_patterns"		: [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk" ],
+			"folder_exclude_patterns"	: [ ".dub", "lib", "Debug", "Release" ],
+		},
+
+		{
 			"path"						: "../ErupteD",
 			"name"						: "ErupteD",
 			"file_exclude_patterns"		: [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk" ],
@@ -39,6 +46,13 @@
 		{
 			"path"						: "E:/Code/DLang/projects/DLSL/source/dlsl",
 			"name"						: "dlsl",
+			"file_exclude_patterns"		: [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk" ],
+			"folder_exclude_patterns"	: [ ".dub", "lib", "Debug", "Release" ],
+		},
+
+		{
+			"path"						: "E:/Code/DLang/projects/DLTF/source/dltf",
+			"name"						: "dltf",
 			"file_exclude_patterns"		: [ "*.exe", "*.exe_cv", "*.visualdproj", "*.lnk" ],
 			"folder_exclude_patterns"	: [ ".dub", "lib", "Debug", "Release" ],
 		},
