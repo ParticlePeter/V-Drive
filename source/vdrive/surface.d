@@ -116,32 +116,6 @@ auto ref createSwapchain( ref Meta_Surface meta ) {
 }
 
 
-
-auto ref initSwapchain( 
-	ref Meta_Surface 			meta,
-	bool						clipped,
-	VkSharingMode				image_sharing_mode = VK_SHARING_MODE_EXCLUSIVE,
-	VkImageUsageFlagBits		image_usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-	VkCompositeAlphaFlagBitsKHR	composite_alpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR ) {
-
-	VkFormat[4] request_format = [ VK_FORMAT_R8G8B8_UNORM, VK_FORMAT_B8G8R8_UNORM, VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_B8G8R8A8_UNORM ];
-	VkPresentModeKHR[2] request_mode = [ VK_PRESENT_MODE_MAILBOX_KHR, VK_PRESENT_MODE_FIFO_KHR ];
-	meta.selectSurfaceFormat( request_format );
-	meta.selectPresentMode( request_mode );
-
-
-	meta.imageArrayLayers 	= 1;
-	meta.imageUsage 		= image_usage;
-	meta.imageSharingMode 	= image_sharing_mode;
-	meta.compositeAlpha 	= composite_alpha;
-	meta.clipped 			= clipped;
-
-	meta.createSwapchain;
-	return meta;
-
-}
-
-
 auto swapchainImageViews( ref Meta_Surface meta, VkImageAspectFlags subrecource_aspect_mask = VK_IMAGE_ASPECT_COLOR_BIT, VkImageViewType image_view_type = VK_IMAGE_VIEW_TYPE_2D ) {
 	VkImageSubresourceRange image_subresource_range = {
 		aspectMask 		: VK_IMAGE_ASPECT_COLOR_BIT,
