@@ -36,12 +36,12 @@ auto allocateCommandBuffer( ref Vulkan vk, VkCommandPool command_pool, VkCommand
 }
 
 
-auto allocateCommandBuffers( ref Vulkan vk, VkCommandPool command_pool, VkCommandBufferLevel command_buffer_level, uint32_t command_buffer_count ) {
+auto allocateCommandBuffers( ref Vulkan vk, VkCommandPool command_pool, VkCommandBufferLevel command_buffer_level, size_t command_buffer_count ) {
 
 	VkCommandBufferAllocateInfo command_buffer_allocation_info = {
 		commandPool			: command_pool,
 		level				: command_buffer_level,
-		commandBufferCount	: command_buffer_count,
+		commandBufferCount	: command_buffer_count.toUint,
 	};
 
 	import vdrive.util.array;
