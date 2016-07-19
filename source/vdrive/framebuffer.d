@@ -181,6 +181,20 @@ auto ref appendSubpass( ref Meta_Render_Pass meta ) {
 }
 
 
+///	set clear values into the render pass begin info
+/// usage of either this function or attachFramebuffer(s) is required to set clear values for the later used VkRenderPassBeginInfo
+///	Params:
+///		meta = reference to a Meta_Render_Pass struct
+///		clear_values = will be set into the meta render pass VkRenderPassBeginInfo. Storage must be managed outside
+///	Returns: the passed in Meta_Structure for function chaining
+auto ref clearValues( Array_T )( ref Meta_Render_Pass meta, Array_T clear_values )
+if( is( Array_T == Array!VkClearValue ) || is( Array_T : VkClearValue[] )) {
+	meta.begin_info.pClearValues = clear_values.ptr;
+	meta.begin_info.clearValueCount = clear_values.length.toUint;
+	return meta;
+}
+
+
 ///	construct a VkRenderPass from specified resources of Meta_Render_Pass structure and store it there as well
 ///	Params:
 ///		meta = reference to a Meta_Render_Pass struct
@@ -384,12 +398,119 @@ auto ref attachFramebuffer( ref Meta_Render_Pass meta_render_pass, VkFramebuffer
 }
 
 
+///	create the VkFramebuffer and store them in the meta structure
+///	Params:
+///		meta				= reference to a Meta_Framebuffer or Meta_Framebuffers
+///		render_pass			= required for VkFramebufferCreateInfo to specify COMPATIBLE renderpasses
+///		framebuffer_extent	= the extent of the frambuffer, this is not(!) the render area
+///		static_image_views	= these will be attached to each of the VkFramebuffer(s) attachments 0 .. static_image_view.length
+///		dynamic_image_views = the count of these specifies the count if VkFramebuffers(s), dynamic_imag_views[i] will be attached to framebuffer[i] attachment[static_image_view.length] 
+///	Returns: the passed in Meta_Structure for function chaining
+auto createFramebuffer( ref Meta_Framebuffer meta, VkRenderPass render_pass, VkExtent2D framebuffer_extent, VkImageView[] image_views ) {
+
+	// the framebuffer_extent is not(!) the render_area, but rather a specification of how big the framebuffer is
+	// the render area specifies a renderable window into this frambuffer
+	// this window must alos be set as scissors in the VkPipeline
+	// here, if no render area was specified use the full framebuffer extent
+	if( meta.render_area.extent.width == 0 || meta.render_area.extent.height == 0 )
+		meta.renderAreaExtent( framebuffer_extent );
+
+	VkFramebufferCreateInfo framebuffer_create_info = {
+		renderPass		: render_pass,					// this defines render pass COMPATIBILITY	
+		attachmentCount	: image_views.length.toUint,	// must be equal to the attachment count on render pass
+		pAttachments	: image_views.ptr,
+		width			: framebuffer_extent.width,
+		height			: framebuffer_extent.height,
+		layers			: 1,
+	};
+
+	// create the VkFramebuffer
+	vkCreateFramebuffer( meta.device, &framebuffer_create_info, meta.allocator, &meta.framebuffer ).vkEnforce;
+
+	return meta;
+}
+
+
+///	create the VkFramebuffer and store them in the meta structure
+///	Params:
+///		meta				= reference to a Meta_Framebuffer or Meta_Framebuffers
+///		meta_render_pass	= the render_pass member is required for VkFramebufferCreateInfo to specify COMPATIBLE renderpasses,
+///								additionally framebuffer[0], clear_values and extent are set into the VkRenderPassBeginInfo member  
+///		framebuffer_extent	= the extent of the render area
+///		image_views	= these will be attached to each of the VkFramebuffer(s) attachments 0 .. static_image_view.length
+///	Returns: the passed in Meta_Structure for function chaining
+auto createFramebuffer( ref Meta_Framebuffer meta, ref Meta_Render_Pass meta_render_pass, VkExtent2D framebuffer_extent, VkImageView[] image_views ) {
+	meta.createFramebuffer( meta_render_pass.begin_info.renderPass, framebuffer_extent, image_views );
+	meta_render_pass.attachFramebuffer( meta );
+	return meta;
+}
+
+
+///	create the VkFramebuffer(s) and store them in the meta structure
+///	Params:
+///		meta				= reference to a Meta_Framebuffer or Meta_Framebuffers
+///		render_pass			= required for VkFramebufferCreateInfo to specify COMPATIBLE renderpasses
+///		framebuffer_extent	= the extent of the frambuffer, this is not(!) the render area
+///		static_image_views	= these will be attached to each of the VkFramebuffer(s) attachments 0 .. static_image_view.length
+///		dynamic_image_views = the count of these specifies the count if VkFramebuffers(s), dynamic_imag_views[i] will be attached to framebuffer[i] attachment[static_image_view.length] 
+///	Returns: the passed in Meta_Structure for function chaining
+auto createFramebuffers( ref Meta_Framebuffers meta, VkRenderPass render_pass, VkExtent2D framebuffer_extent, VkImageView[] static_image_views, VkImageView[] dynamic_image_views ) {
+
+	// the framebuffer_extent is not(!) the render_area, but rather a specification of how big the framebuffer is
+	// the render area specifies a renderable window into this frambuffer
+	// this window must alos be set as scissors in the VkPipeline
+	// here, if no render area was specified use the full framebuffer extent
+	if( meta.render_area.extent.width == 0 || meta.render_area.extent.height == 0 )
+		meta.renderAreaExtent( framebuffer_extent );
+
+	// copy the static imag views and add another image to the back
+	// this will be filled with one of the dynamic_image_viewes in the framebuffer create loop
+	auto image_views = sizedArray!VkImageView( static_image_views.length + 1 );
+	foreach( i, static_image_view; static_image_views )
+		image_views[i] = static_image_view;
+
+	VkFramebufferCreateInfo framebuffer_create_info = {
+		renderPass		: render_pass,								// this defines render pass COMPATIBILITY	
+		attachmentCount	: image_views.length.toUint,	// must be equal to the attachment count on render pass
+		pAttachments	: image_views.ptr,
+		width			: framebuffer_extent.width,
+		height			: framebuffer_extent.height,
+		layers			: 1,
+	};
+
+	// create a framebuffer per dynamic_image_view (e.g. for each swapchain image view)
+	meta.framebuffers.length = dynamic_image_views.length;
+	foreach( i, ref framebuffer; meta.framebuffers.data ) {
+		image_views[2] = dynamic_image_views[ i ];
+		vkCreateFramebuffer( meta.device, &framebuffer_create_info, meta.allocator, &framebuffer ).vkEnforce;
+	}
+
+	return meta;
+}
+
+
+///	create the VkFramebuffer(s) and store them in the meta structure
+///	Params:
+///		meta				= reference to a Meta_Framebuffer or Meta_Framebuffers
+///		meta_render_pass	= the render_pass member is required for VkFramebufferCreateInfo to specify COMPATIBLE renderpasses,
+///								additionally framebuffer[0], clear_values and extent are set into the VkRenderPassBeginInfo member  
+///		extent				= the extent of the render area
+///		static_image_views	= these will be attached to each of the VkFramebuffer(s) attachments 0 .. static_image_view.length
+///		dynamic_image_views = the count of these specifies the count if VkFramebuffers(s), dynamic_imag_views[i] will be attached to framebuffer[i] attachment[static_image_view.length] 
+///	Returns: the passed in Meta_Structure for function chaining
+auto createFramebuffers( ref Meta_Framebuffers meta, ref Meta_Render_Pass meta_render_pass, VkExtent2D framebuffer_extent, VkImageView[] static_image_views, VkImageView[] dynamic_image_views ) {
+	meta.createFramebuffers( meta_render_pass.begin_info.renderPass, framebuffer_extent, static_image_views, dynamic_image_views );
+	meta_render_pass.attachFramebuffer( meta, 0 );
+	return meta;
+}
+
+
 
 ////////////////////////////////
 // use vdrive meta structures //
 ////////////////////////////////
 
-/// temp function to initialize a render pass, only here for demonstration purpose 
+/// temp function to initialize a meta render pass structure, only here for demonstration purpose 
 auto initRenderPass( ref Vulkan vk, const ref VkFormat[3] image_formats, VkSampleCountFlagBits sample_count = VK_SAMPLE_COUNT_4_BIT ) {
 	Meta_Render_Pass meta = &vk;
 	meta.renderPassAttachment_Clear_Store( image_formats[0], sample_count, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL ).subpassRefColor;
@@ -400,39 +521,9 @@ auto initRenderPass( ref Vulkan vk, const ref VkFormat[3] image_formats, VkSampl
 	return meta;
 }
 
-/// temp function to initialize a framebuffers, only here for demonstration purpose 
-auto initFramebuffer( ref Meta_Render_Pass meta_render_pass, VkExtent2D framebuffer_extent, VkImageView[] static_image_views, VkImageView[] dynamic_image_views ) {
-
-	Meta_Framebuffers meta = meta_render_pass.vk;
-	meta.clearValue( 0.3f, 0.3f, 0.3f, 1.0f ).clearValue( 1.0f, 0 ).renderAreaExtent( framebuffer_extent );
 
 
-	// create framebuffer
-	auto framebuffer_image_views = sizedArray!VkImageView( static_image_views.length + 1 );
-	foreach( i, static_image_view; static_image_views )
-		framebuffer_image_views[i] = static_image_view;
 
-	VkFramebufferCreateInfo framebuffer_create_info = {
-		renderPass		: meta_render_pass.begin_info.renderPass,	// this defines render pass COMPATIBILITY	
-		attachmentCount	: framebuffer_image_views.length.toUint,	// must be equal to the attachment count on render pass
-		pAttachments	: framebuffer_image_views.ptr,
-		width			: framebuffer_extent.width,
-		height			: framebuffer_extent.height,
-		layers			: 1,
-	};
-
-	// create a framebuffer per swapchain imageView:
-	//vk.framebuffers.length = dynamic_image_views.length;
-	meta.framebuffers.length = dynamic_image_views.length;
-	foreach( i, ref framebuffer; meta.framebuffers.data ) {
-	    framebuffer_image_views[2] = dynamic_image_views[ i ];
-	    vkCreateFramebuffer( meta.device, &framebuffer_create_info, meta.allocator, &framebuffer ).vkEnforce;
-	}
-
-	meta_render_pass.attachFramebuffer( meta, cast( size_t )0 );
-
-	return meta;
-}
 
 
 // code reference not using Meta_Render_Pass
