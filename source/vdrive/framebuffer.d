@@ -33,6 +33,7 @@ struct Meta_Render_Pass {
 	Array!VkAttachmentDescription	attachment_descriptions;
 	Array!Meta_Subpass				subpasses;
 	private Meta_Subpass*			subpass;
+	Array!VkSubpassDependency		subpass_dependencies;
 
 	//mixin Dispatch_To_Inner_Struct!begin_info;	// Does not work because it has precedence over UFCS
 	
@@ -163,9 +164,10 @@ if( is( typeof( value ) == VkPipelineBindPoint ) || is( typeof( value ) == VkAtt
 	return meta;
 }
 
+// Per Spec v1.0.21 p.118 valid usage of a VkSubpassDescription "pipelineBindPoint must be VK_PIPELINE_BIND_POINT_GRAPHICS" 
+//auto ref graphicBindPoint( ref Meta_Render_Pass meta, size_t index = size_t.max ) { return mayAliasOrBindPoint!VK_PIPELINE_BIND_POINT_GRAPHICS( meta, index ); }	// for sake of completeness
+//auto ref computeBindPoint( ref Meta_Render_Pass meta, size_t index = size_t.max ) { return mayAliasOrBindPoint!VK_PIPELINE_BIND_POINT_COMPUTE(  meta, index ); }
 auto ref mayAlias( ref Meta_Render_Pass meta, size_t index = size_t.max ) { return mayAliasOrBindPoint!VK_ATTACHMENT_DESCRIPTION_MAY_ALIAS_BIT( meta, index ); }
-auto ref graphicBindPoint( ref Meta_Render_Pass meta, size_t index = size_t.max ) { return mayAliasOrBindPoint!VK_PIPELINE_BIND_POINT_GRAPHICS( meta, index ); }	// for sake of completeness
-auto ref computeBindPoint( ref Meta_Render_Pass meta, size_t index = size_t.max ) { return mayAliasOrBindPoint!VK_PIPELINE_BIND_POINT_COMPUTE(  meta, index ); }
 
 
 
@@ -235,6 +237,8 @@ auto ref createRenderPass( ref Meta_Render_Pass meta ) {
 		pAttachments	: meta.attachment_descriptions.ptr,
 		subpassCount	: subpass_descriptions.length.toUint,
 		pSubpasses		: subpass_descriptions.ptr,
+		dependencyCount	: meta.subpass_dependencies.length.toUint,
+		pDependencies	: meta.subpass_dependencies.ptr,
 	};
 
 	vkCreateRenderPass( meta.device, &render_pass_create_info, meta.allocator, &meta.begin_info.renderPass ).vkEnforce;
