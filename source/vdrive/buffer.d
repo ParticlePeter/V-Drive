@@ -20,6 +20,19 @@ struct Meta_Buffer {
 	VkBufferViewCreateInfo	buffer_view_create_info;
 	VkMemoryRequirements	memory_requirements;
 	VkDeviceMemory			device_memory;
+
+	private bool			owns_device_memory = false;
+
+	// bulk destroy the resources belonging to this meta struct
+	void destroyResources() {
+		vk.device.vkDestroyBuffer( buffer, vk.allocator );
+
+		if( buffer_view != VK_NULL_ND_HANDLE )
+			vk.device.vkDestroyBufferView( buffer_view, vk.allocator );
+		
+		if( owns_device_memory )
+			vk.device.vkFreeMemory( device_memory, vk.allocator );
+	}
 }
 
 
@@ -48,6 +61,7 @@ auto ref createBuffer( ref Meta_Buffer meta, VkBufferUsageFlags usage, VkDeviceS
 auto ref bindMemory( ref Meta_Buffer meta, VkMemoryPropertyFlags memory_property_flags ) {
 
 	import vdrive.memory;
+	meta.owns_device_memory = true;
 	meta.device_memory = ( *meta.vk ).allocateMemory(
 		meta.memory_requirements.size,
 		meta.memory_properties.memoryTypeIndex( 
