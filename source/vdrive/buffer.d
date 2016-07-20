@@ -20,8 +20,11 @@ struct Meta_Buffer {
 	VkBufferViewCreateInfo	buffer_view_create_info;
 	VkMemoryRequirements	memory_requirements;
 	VkDeviceMemory			device_memory;
-
+	private VkDeviceSize	device_memory_offset;
 	private bool			owns_device_memory = false;
+
+	VkDeviceSize offset()	{ return device_memory_offset; }
+	VkDeviceSize size()		{ return memory_requirements.size; }
 
 	// bulk destroy the resources belonging to this meta struct
 	void destroyResources() {
@@ -52,6 +55,21 @@ auto ref createBuffer( ref Meta_Buffer meta, VkBufferUsageFlags usage, VkDeviceS
 	return meta;
 }
 
+auto initBuffer( ref Vulkan vk, VkBufferUsageFlags usage, VkDeviceSize size ) {
+	Meta_Buffer meta = vk;
+	return meta.createBuffer( VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, size );
+}
+
+
+auto memoryTypeIndex( ref Meta_Buffer meta, VkMemoryPropertyFlags memory_property_flags ) {
+	import vdrive.memory : memoryTypeIndex;
+	return memoryTypeIndex( meta.memory_properties, meta.memory_requirements, memory_property_flags );
+}
+
+auto requiredMemorySize( ref Meta_Buffer meta ) {
+	return meta.memory_requirements.size;
+}
+
 
 /// allocate and bind a VkDeviceMemory object to the VkBuffer (which must have been created beforehand) in the Meta_Buffer struct
 /// the memory properties of the underlying VkPhysicalDevicethe are used and the resulting memory object is stored
@@ -59,29 +77,29 @@ auto ref createBuffer( ref Meta_Buffer meta, VkBufferUsageFlags usage, VkDeviceS
 /// for an existing memory object where the buffer is supposed to suballocate its memory from
 /// the Meta_Buffer struct is returned for function chaining
 auto ref bindMemory( ref Meta_Buffer meta, VkMemoryPropertyFlags memory_property_flags ) {
-
-	import vdrive.memory;
 	meta.owns_device_memory = true;
-	meta.device_memory = ( *meta.vk ).allocateMemory(
-		meta.memory_requirements.size,
-		meta.memory_properties.memoryTypeIndex( 
-			meta.memory_requirements, memory_property_flags 
-		)
-	);
-
+	import vdrive.memory : allocateMemory;
+	meta.device_memory = ( *meta.vk ).allocateMemory( meta.memory_requirements.size, meta.memoryTypeIndex( memory_property_flags ));
 	meta.device.vkBindBufferMemory( meta.buffer, meta.device_memory, 0 ).vkEnforce;
+	return meta;
+}
 
+
+auto ref bindMemory( ref Meta_Buffer meta, VkDeviceMemory device_memory, VkDeviceSize memory_offset = 0 ) {
+	meta.owns_device_memory = false;
+	meta.device_memory = device_memory;
+	meta.device_memory_offset = memory_offset;
+	meta.device.vkBindBufferMemory( meta.buffer, meta.device_memory, meta.device_memory_offset ).vkEnforce;
 	return meta;
 }
 
 
 /// upload data to the VkDeviceMemory object of the coresponding buffer through memory mapping
 auto bufferData( Meta_Buffer meta, void[] data ) {
-
 	void* mapped_memory;
-	vkMapMemory( meta.device, meta.device_memory, 0, VK_WHOLE_SIZE, 0, &mapped_memory ).vkEnforce;
+	//vkMapMemory( meta.device, meta.device_memory, 0, VK_WHOLE_SIZE, 0, &mapped_memory ).vkEnforce;
+	vkMapMemory( meta.device, meta.device_memory, meta.offset, meta.size, 0, &mapped_memory ).vkEnforce;
 	mapped_memory[ 0 .. data.length ] = data[];
 	vkUnmapMemory( meta.device, meta.device_memory );
-
 	return meta;
 }
