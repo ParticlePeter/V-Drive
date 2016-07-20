@@ -27,7 +27,7 @@ private struct Meta_Subpass {
 
 
 struct Meta_Render_Pass {
-	mixin 							Vulkan_State_Pointer;
+	mixin							Vulkan_State_Pointer;
 	VkRenderPass					render_pass() { return begin_info.renderPass; }
 	VkRenderPassBeginInfo			begin_info;		// the actual renderpass is stored in a member of this struct
 	Array!VkAttachmentDescription	attachment_descriptions;
@@ -164,7 +164,7 @@ if( is( typeof( value ) == VkPipelineBindPoint ) || is( typeof( value ) == VkAtt
 	return meta;
 }
 
-// Per Spec v1.0.21 p.118 valid usage of a VkSubpassDescription "pipelineBindPoint must be VK_PIPELINE_BIND_POINT_GRAPHICS" 
+// Per Spec v1.0.21 p.118 valid usage of a VkSubpassDescription: "pipelineBindPoint must be VK_PIPELINE_BIND_POINT_GRAPHICS" 
 //auto ref graphicBindPoint( ref Meta_Render_Pass meta, size_t index = size_t.max ) { return mayAliasOrBindPoint!VK_PIPELINE_BIND_POINT_GRAPHICS( meta, index ); }	// for sake of completeness
 //auto ref computeBindPoint( ref Meta_Render_Pass meta, size_t index = size_t.max ) { return mayAliasOrBindPoint!VK_PIPELINE_BIND_POINT_COMPUTE(  meta, index ); }
 auto ref mayAlias( ref Meta_Render_Pass meta, size_t index = size_t.max ) { return mayAliasOrBindPoint!VK_ATTACHMENT_DESCRIPTION_MAY_ALIAS_BIT( meta, index ); }
@@ -516,7 +516,7 @@ auto createFramebuffers( ref Meta_Framebuffers meta, ref Meta_Render_Pass meta_r
 
 /// temp function to initialize a meta render pass structure, only here for demonstration purpose 
 auto initRenderPass( ref Vulkan vk, const ref VkFormat[3] image_formats, VkSampleCountFlagBits sample_count = VK_SAMPLE_COUNT_4_BIT ) {
-	Meta_Render_Pass meta = &vk;
+	Meta_Render_Pass meta = vk;
 	meta.renderPassAttachment_Clear_Store( image_formats[0], sample_count, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL ).subpassRefColor;
 	meta.renderPassAttachment_Clear_None( image_formats[1], sample_count, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL ).subpassRefDepthStencil;
 	meta.renderPassAttachment_None_Store( image_formats[2], VK_SAMPLE_COUNT_1_BIT,

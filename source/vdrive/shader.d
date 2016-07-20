@@ -116,9 +116,7 @@ auto createDescriptorSetLayout( ref Vulkan vk, const VkDescriptorSetLayoutBindin
 
 import vdrive.util.array;
 struct Meta_Descriptor {
-	this( Vulkan* vk )			{  this.vk = vk;  }
-	alias 						vk this;
-	Vulkan*						vk;
+	mixin					Vulkan_State_Pointer;
 
 /*	struct Meta_Descriptor_Set_Layout {
 		Array!VkDescriptorSetLayoutBinding	set_layout_bindings;
@@ -138,7 +136,7 @@ struct Meta_Descriptor {
 auto createMatrixBuffer( ref Vulkan vk, void[] data ) {
 
 	import vdrive.buffer;
-	Meta_Buffer meta_buffer = &vk;
+	Meta_Buffer meta_buffer = vk;
 	meta_buffer.createBuffer( VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, data.length );
 	meta_buffer.bindMemory( VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT );
 	meta_buffer.bufferData( data );
@@ -149,7 +147,7 @@ auto createMatrixBuffer( ref Vulkan vk, void[] data ) {
 
 auto createMatrixUniform( ref Vulkan vk, VkBuffer buffer, VkDescriptorPool descriptor_pool ) {
 
-	Meta_Descriptor meta_descriptor = &vk;
+	Meta_Descriptor meta_descriptor = vk;
 	meta_descriptor.set_layout = vk.createDescriptorSetLayout( 
 		0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT, null );
 
