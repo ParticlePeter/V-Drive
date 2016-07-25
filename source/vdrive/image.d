@@ -4,31 +4,23 @@ import core.stdc.stdio : printf;
 
 import vdrive.util;
 import vdrive.state;
+public import vdrive.memory;
 
 
 import erupted;
 
-/// container for buffer related data
-struct Meta_Image {
-	mixin 					Vulkan_State_Pointer;
+
+mixin template Meta_Image_Members() {
 	VkImage					image;
 	VkImageCreateInfo		image_create_info;
 	VkImageView				image_view;
 	VkImageViewCreateInfo	image_view_create_info;
-	VkMemoryRequirements	memory_requirements;
-	VkDeviceMemory			device_memory;
 
-	private bool			owns_device_memory = true;
-
-	// bulk destroy the resources belonging to this meta struct
-	void destroyResources() {
+	private void destroyObjects() {
 		vk.device.vkDestroyImage( image, vk.allocator );
-
-		if( image_view != VK_NULL_ND_HANDLE )
+		if( image_view != VK_NULL_ND_HANDLE ) {
 			vk.device.vkDestroyImageView( image_view, vk.allocator );
-
-		if( owns_device_memory )
-			vk.device.vkFreeMemory( device_memory, vk.allocator );
+		}
 	}
 }
 
@@ -63,7 +55,6 @@ auto ref createImage(
 
 /// create a VkImage, store vulkan data in argument meta image container, return container for piping
 auto ref createImage( ref Meta_Image meta, const ref VkImageCreateInfo image_create_info ) {
-	
 	// general create image function gets the image creat info as argument
 	meta.image_create_info = image_create_info;
 	meta.device.vkCreateImage( &meta.image_create_info, meta.allocator, &meta.image ).vkEnforce;
@@ -71,20 +62,6 @@ auto ref createImage( ref Meta_Image meta, const ref VkImageCreateInfo image_cre
 	return meta;
 }
 
-
-/// allocate required VkDeviceMemory and bind to VkImage
-/// store vulkan data in argument meta image container, return container for piping 
-auto ref bindMemory( ref Meta_Image meta, VkMemoryPropertyFlags memory_property_flags ) {
-
-	import vdrive.memory;
-	meta.owns_device_memory = true;
-	meta.device_memory = ( *meta.vk ).allocateMemory( meta.memory_requirements.size,
-		meta.memory_properties.memoryTypeIndex( meta.memory_requirements, memory_property_flags ));
-
-	meta.device.vkBindImageMemory( meta.image, meta.device_memory, 0 ).vkEnforce;
-
-	return meta;
-}
 
 
 /// create a VkImageView which closely coresponds to the underlying VkImage type
@@ -126,9 +103,9 @@ auto ref imageView( ref Meta_Image meta, VkImageSubresourceRange subresource_ran
 
 
 /// records a VkImage transition command in argument command buffer 
-void imageTransition(
+void recordTransition(
+	VkImage 				image,
 	VkCommandBuffer			command_buffer,
-	VkImage 				image, 
 	VkImageSubresourceRange	subresource_range,
 	VkImageLayout 			old_layout,
 	VkImageLayout 			new_layout,
