@@ -14,9 +14,9 @@ bool verbose = true;
 
 
 mixin template Vulkan_State_Pointer() {
-	this( ref Vulkan vk )	{  this.vk = &vk;  }
-	alias 				vk this;
-	Vulkan*				vk;
+	this( ref Vulkan vk ) { this.vk = &vk; }
+	alias 	vk this;
+	Vulkan*	vk;
 }
 
 struct Vulkan {
