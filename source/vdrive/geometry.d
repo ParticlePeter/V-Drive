@@ -9,11 +9,16 @@ import vdrive.buffer;
 import erupted;
 
 
-// stub for geometry managmenet
+mixin template Meta_Geometry_Alias_This() {
+	this( ref Vulkan vk )	{	meta_geometry.meta_buffer.vk = &vk;  }
+	alias						meta_geometry this;
+	Meta_Geometry				meta_geometry;
+}
+
 
 struct Meta_Geometry {
 	this( ref Vulkan vk )			{  this.meta_buffer.vk = &vk;  }
-	alias 									meta_buffer this;
+	alias									meta_buffer this;
 	Meta_Buffer								meta_buffer;
 
 	Array!VkVertexInputBindingDescription	binding_descriptions;
