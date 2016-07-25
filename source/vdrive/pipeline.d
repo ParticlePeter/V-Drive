@@ -5,12 +5,15 @@ import core.stdc.stdio : printf;
 import vdrive.util;
 import vdrive.state;
 import vdrive.surface;
+import vdrive.geometry;
 
 import erupted;
 
 
+
 auto createPipeline(
 	ref Vulkan 				vk,
+	ref Meta_Geometry		meta_geometry,
 	VkDescriptorSetLayout	descriptor_set_layout,
 	VkRenderPass			render_pass,
 	VkExtent2D				viewport_extent,
@@ -33,47 +36,9 @@ auto createPipeline(
 	// TODO(pp): use OS process and glslangValidator to compile the shaders and load the binary version
 	import vdrive.shader;
 	VkPipelineShaderStageCreateInfo[2] shaderStageCreateInfo = [
-		vk.createPipelineShaderStageCreateInfo( VK_SHADER_STAGE_VERTEX_BIT, "shader/simple_vert.spv" ),
-		vk.createPipelineShaderStageCreateInfo( VK_SHADER_STAGE_FRAGMENT_BIT, "shader/simple_frag.spv" )
+		vk.createPipelineShaderStageCreateInfo( VK_SHADER_STAGE_VERTEX_BIT, "shader/simple_normal_vert.spv" ),
+		vk.createPipelineShaderStageCreateInfo( VK_SHADER_STAGE_FRAGMENT_BIT, "shader/simple_normal_frag.spv" )
 	];
-
-	//VkPipelineShaderStageCreateInfo[2] shaderStageCreateInfo;
-	//shaderStageCreateInfo[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
-	//shaderStageCreateInfo[0]._module = vk.createShaderModule( "shader/simple_vert.spv" );
-	//shaderStageCreateInfo[0].pName = "main";        // shader entry point function name
-	//shaderStageCreateInfo[0].pSpecializationInfo = null;
-	//
-	//shaderStageCreateInfo[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-	//shaderStageCreateInfo[1]._module = vk.createShaderModule( "shader/simple_frag.spv" );
-	//shaderStageCreateInfo[1].pName = "main";        // shader entry point function name
-	//shaderStageCreateInfo[1].pSpecializationInfo = null;
-
-
-
-	// describe vertex shader stage
-	VkVertexInputBindingDescription vertexBindingDescription = {};
-	vertexBindingDescription.binding = 0;
-	vertexBindingDescription.stride = cast( uint32_t )( 4 * float.sizeof ); //sizeof(vertex);
-	vertexBindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-
-	VkVertexInputAttributeDescription vertexAttributeDescritpion = {};
-	vertexAttributeDescritpion.location = 0;
-	vertexAttributeDescritpion.binding = 0;
-	vertexAttributeDescritpion.format = VK_FORMAT_R32G32B32A32_SFLOAT;
-	vertexAttributeDescritpion.offset = 0;
-
-	VkPipelineVertexInputStateCreateInfo vertexInputStateCreateInfo = {};
-	vertexInputStateCreateInfo.vertexBindingDescriptionCount = 1;
-	vertexInputStateCreateInfo.pVertexBindingDescriptions = &vertexBindingDescription;
-	vertexInputStateCreateInfo.vertexAttributeDescriptionCount = 1;
-	vertexInputStateCreateInfo.pVertexAttributeDescriptions = &vertexAttributeDescritpion;
-
-	// vertex topology config
-	VkPipelineInputAssemblyStateCreateInfo inputAssemblyStateCreateInfo = {};
-	inputAssemblyStateCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-	inputAssemblyStateCreateInfo.primitiveRestartEnable = VK_FALSE;
-
-
 
 	// viewport state
 	VkViewport viewport = {};
@@ -99,7 +64,7 @@ auto createPipeline(
 	VkPipelineRasterizationStateCreateInfo rasterizationState = {};
 	rasterizationState.depthClampEnable = VK_FALSE;
 	rasterizationState.rasterizerDiscardEnable = VK_FALSE;
-	rasterizationState.polygonMode = VK_POLYGON_MODE_LINE;
+	rasterizationState.polygonMode = VK_POLYGON_MODE_FILL;
 	rasterizationState.cullMode = VK_CULL_MODE_NONE;
 	rasterizationState.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 	rasterizationState.depthBiasEnable = VK_FALSE;
@@ -178,8 +143,8 @@ auto createPipeline(
 	VkGraphicsPipelineCreateInfo pipelineCreateInfo = {};
 	pipelineCreateInfo.stageCount = 2;
 	pipelineCreateInfo.pStages = shaderStageCreateInfo.ptr;
-	pipelineCreateInfo.pVertexInputState = &vertexInputStateCreateInfo;
-	pipelineCreateInfo.pInputAssemblyState = &inputAssemblyStateCreateInfo;
+	pipelineCreateInfo.pVertexInputState = &meta_geometry.vertex_input_create_info;
+	pipelineCreateInfo.pInputAssemblyState = &meta_geometry.input_assembly_create_info;
 	pipelineCreateInfo.pTessellationState = null;
 	pipelineCreateInfo.pViewportState = &viewportState;
 	pipelineCreateInfo.pRasterizationState = &rasterizationState;
