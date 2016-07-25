@@ -135,10 +135,10 @@ struct Meta_Descriptor {
 
 auto createMatrixBuffer( ref Vulkan vk, void[] data ) {
 
-	import vdrive.buffer;
+	import vdrive.buffer, vdrive.memory;
 	Meta_Buffer meta_buffer = vk;
 	meta_buffer.createBuffer( VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, data.length );
-	meta_buffer.bindMemory( VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT );
+	meta_buffer.createMemory( VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT );
 	meta_buffer.bufferData( data );
 
 	return meta_buffer;
