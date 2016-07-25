@@ -485,7 +485,7 @@ auto createFramebuffers( ref Meta_Framebuffers meta, VkRenderPass render_pass, V
 	// create a framebuffer per dynamic_image_view (e.g. for each swapchain image view)
 	meta.framebuffers.length = dynamic_image_views.length;
 	foreach( i, ref framebuffer; meta.framebuffers.data ) {
-		image_views[2] = dynamic_image_views[ i ];
+		image_views[ $-1 ] = dynamic_image_views[ i ];
 		vkCreateFramebuffer( meta.device, &framebuffer_create_info, meta.allocator, &framebuffer ).vkEnforce;
 	}
 
