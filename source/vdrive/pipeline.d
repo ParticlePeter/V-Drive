@@ -11,13 +11,14 @@ import erupted;
 
 
 
-auto createPipeline(
-	ref Vulkan 				vk,
-	ref Meta_Geometry		meta_geometry,
-	VkDescriptorSetLayout	descriptor_set_layout,
-	VkRenderPass			render_pass,
-	VkExtent2D				viewport_extent,
-	VkSampleCountFlagBits	sample_count = VK_SAMPLE_COUNT_4_BIT ) {
+void createPipeline(
+	ref Vulkan 							vk,
+	ref Meta_Geometry					meta_geometry,
+	VkPipelineShaderStageCreateInfo[]	shader_stage_create_infos,
+	VkDescriptorSetLayout				descriptor_set_layout,
+	VkRenderPass						render_pass,
+	VkExtent2D							viewport_extent,
+	VkSampleCountFlagBits				sample_count = VK_SAMPLE_COUNT_4_BIT ) {
 
 	// Create an empty pipeline
 	VkPipelineLayoutCreateInfo layout_create_info = {
@@ -29,16 +30,6 @@ auto createPipeline(
 
 	vk.device.vkCreatePipelineLayout( &layout_create_info, vk.allocator, &vk.pipeline_layout ).vkEnforce;
 
-
-
-	// describe shaders
-	// git repo has only the shader sources, they must be manually converted to spv files for now(!)
-	// TODO(pp): use OS process and glslangValidator to compile the shaders and load the binary version
-	import vdrive.shader;
-	VkPipelineShaderStageCreateInfo[2] shaderStageCreateInfo = [
-		vk.createPipelineShaderStageCreateInfo( VK_SHADER_STAGE_VERTEX_BIT, "shader/simple_normal_vert.spv" ),
-		vk.createPipelineShaderStageCreateInfo( VK_SHADER_STAGE_FRAGMENT_BIT, "shader/simple_normal_frag.spv" )
-	];
 
 	// viewport state
 	VkViewport viewport = {};
@@ -65,8 +56,8 @@ auto createPipeline(
 	rasterizationState.depthClampEnable = VK_FALSE;
 	rasterizationState.rasterizerDiscardEnable = VK_FALSE;
 	rasterizationState.polygonMode = VK_POLYGON_MODE_FILL;
-	rasterizationState.cullMode = VK_CULL_MODE_NONE;
-	rasterizationState.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+	rasterizationState.cullMode = VK_CULL_MODE_BACK_BIT;
+	rasterizationState.frontFace = VK_FRONT_FACE_CLOCKWISE;
 	rasterizationState.depthBiasEnable = VK_FALSE;
 	rasterizationState.depthBiasConstantFactor = 0;
 	rasterizationState.depthBiasClamp = 0;
@@ -141,8 +132,8 @@ auto createPipeline(
 
 	// create the pipeline object
 	VkGraphicsPipelineCreateInfo pipelineCreateInfo = {};
-	pipelineCreateInfo.stageCount = 2;
-	pipelineCreateInfo.pStages = shaderStageCreateInfo.ptr;
+	pipelineCreateInfo.stageCount = shader_stage_create_infos.length.toUint;
+	pipelineCreateInfo.pStages = shader_stage_create_infos.ptr;
 	pipelineCreateInfo.pVertexInputState = &meta_geometry.vertex_input_create_info;
 	pipelineCreateInfo.pInputAssemblyState = &meta_geometry.input_assembly_create_info;
 	pipelineCreateInfo.pTessellationState = null;
@@ -158,16 +149,7 @@ auto createPipeline(
 	pipelineCreateInfo.basePipelineHandle = VK_NULL_ND_HANDLE;
 	pipelineCreateInfo.basePipelineIndex = 0;
 
-
-
 	vk.device.vkCreateGraphicsPipelines( VK_NULL_ND_HANDLE, 1, &pipelineCreateInfo, vk.allocator, &vk.pipeline ).vkEnforce;
-
-	auto shader_modules = sizedArray!VkShaderModule( 2 );
-	shader_modules[0] = shaderStageCreateInfo[0]._module;
-	shader_modules[1] = shaderStageCreateInfo[1]._module;
-
-	return shader_modules;
-
 
 }
 
