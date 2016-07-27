@@ -19,8 +19,13 @@ void vkEnforce( VkResult vkResult ) {
 
 
 alias toUint = toUint32_t;
-uint32_t toUint32_t( T )( T integral ) if( __traits( isIntegral, T )) { 
-	return cast( uint32_t )integral;
+uint32_t toUint32_t( T )( T value ) if( __traits( isScalar, T )) { 
+	return cast( uint32_t )value;
+}
+
+alias toInt = toInt32_t;
+uint32_t toInt32_t( T )( T value ) if( __traits( isScalar, T )) { 
+	return cast( int32_t )value;
 }
 
 
@@ -75,6 +80,38 @@ mixin template Dispatch_To_Inner_Struct( alias inner_struct ) {
 		}
 	}
 }
+
+
+// helper template for skipping members
+template skipper( string target ) { enum shouldSkip( string s ) = ( s == target ); }
+
+// function which creates to inner struct forwarding functions	
+auto Forward_To_Inner_Struct( outer, inner, string path, ignore... )() {
+	// import helper template from std.meta to decide if member is found in ignore list
+	import std.meta : anySatisfy;
+	string result;
+	foreach( member; __traits( allMembers, inner )) {
+		// https://forum.dlang.org/post/hucredzrhbbjzcesjqbg@forum.dlang.org
+		enum skip = anySatisfy!( skipper!( member ).shouldSkip, ignore );		// evaluate if member is in ignore list
+		static if( !skip && member != "sType" && member != "pNext" && member != "flags" ) {		// skip, also these
+			import vdrive.util.string : snakeCaseCT;							// convertor from camel to snake case
+			enum member_snake = member.snakeCaseCT;								// convert to snake case
+			//enum result = "\n"												// enum string wich will be mixed in
+			result ~= "\n"
+				~ "/// forward member " ~ member ~ " of inner " ~ inner.stringof ~ " as function to " ~ outer.stringof ~ "\n"
+				~ "/// Params:\n"
+				~ "/// \tmeta = reference to a " ~ outer.stringof ~ " struct\n"
+				~ "/// \t" ~ member_snake ~ " = the value forwarded to the inner struct\n"
+				~ "/// Returns: the passed in Meta_Structure for function chaining\n"
+				~ "auto ref " ~ member ~ "( ref " ~ outer.stringof ~ " meta, "
+				~ typeof( __traits( getMember,  inner, member )).stringof ~ " " ~ member_snake ~ " ) {\n"
+				~ "\t" ~ path ~ "." ~ member ~ " = " ~ member_snake ~ ";\n\treturn meta;\n}\n";
+			//pragma( msg, result );
+			//mixin( result );
+		}
+	} return result;
+}
+
 
 /+
 mixin template listVulkanTemplate( ReturnType, alias vkFunc, Args... ) {
