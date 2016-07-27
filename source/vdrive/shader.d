@@ -64,7 +64,7 @@ auto createShaderModule( ref Vulkan vk, string path ) {
 	return shader_module;
 }
 
-auto createPipelineShaderStageCreateInfo(
+auto createPipelineShaderStage(
 	ref Vulkan vk,
 	VkShaderStageFlagBits shader_stage,
 	VkShaderModule shader_module,
@@ -83,14 +83,14 @@ auto createPipelineShaderStageCreateInfo(
 
 
 
-auto createPipelineShaderStageCreateInfo(
+auto createPipelineShaderStage(
 	ref Vulkan vk,
 	VkShaderStageFlagBits shader_stage,
 	string spirv_path,
 	const( VkSpecializationInfo )* specialization_info = null,
 	const( char )* shader_entry_point = "main" ) {
 
-	return createPipelineShaderStageCreateInfo(
+	return createPipelineShaderStage(
 		vk, shader_stage, vk.createShaderModule( spirv_path ), specialization_info, shader_entry_point
 	);
 }
