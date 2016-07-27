@@ -11,146 +11,465 @@ import erupted;
 
 
 
-void createPipeline(
-	ref Vulkan 							vk,
-	ref Meta_Geometry					meta_geometry,
-	VkPipelineShaderStageCreateInfo[]	shader_stage_create_infos,
-	VkDescriptorSetLayout				descriptor_set_layout,
-	VkRenderPass						render_pass,
-	VkExtent2D							viewport_extent,
-	VkSampleCountFlagBits				sample_count = VK_SAMPLE_COUNT_4_BIT ) {
 
-	// Create an empty pipeline
-	VkPipelineLayoutCreateInfo layout_create_info = {
-		setLayoutCount			: 1,
-		pSetLayouts				: &descriptor_set_layout,
-		pushConstantRangeCount	: 0,
-		pPushConstantRanges		: null,
-	};
+struct Meta_Pipeline {
+	mixin										Vulkan_State_Pointer;
 
-	vk.device.vkCreatePipelineLayout( &layout_create_info, vk.allocator, &vk.pipeline_layout ).vkEnforce;
+	VkPipeline									pipeline;
+	VkPipelineCreateFlags						pipeline_create_flags;
+	Array!VkPipelineShaderStageCreateInfo		shader_stages;
 
+	//VkPipelineVertexInputStateCreateInfo		vertex_input_state_create_info;
+	Array!VkVertexInputBindingDescription		vertex_input_binding_descriptions;
+	Array!VkVertexInputAttributeDescription		vertex_input_attribute_descriptions;
+	VkPipelineInputAssemblyStateCreateInfo		input_assembly_state;
 
-	// viewport state
-	VkViewport viewport = {};
-	viewport.x = 0;
-	viewport.y = 0;
-	viewport.width  = viewport_extent.width;
-	viewport.height = viewport_extent.height;
-	viewport.minDepth = 0;
-	viewport.maxDepth = 1;
+	//VkPipelineTessellationStateCreateInfo		tessellation_state_create_info;
+	uint32_t									tesselation_patch_control_points;
 
-	VkRect2D scissors = {};
-	scissors.offset = VkOffset2D( 0, 0 );
-	scissors.extent = viewport_extent;
+	//VkPipelineViewportStateCreateInfo			viewport_state_create_info;
+	Array!VkViewport							viewports;
+	Array!VkRect2D								scissors;
 
-	VkPipelineViewportStateCreateInfo viewportState = {};
-	viewportState.viewportCount = 1;
-	viewportState.pViewports = &viewport;
-	viewportState.scissorCount = 1;
-	viewportState.pScissors = &scissors;
+	VkPipelineRasterizationStateCreateInfo		rasterization_state	= { frontFace : VK_FRONT_FACE_CLOCKWISE, depthBiasConstantFactor : 0, depthBiasClamp : 0, depthBiasSlopeFactor : 0, lineWidth : 1 }; 
+	VkPipelineMultisampleStateCreateInfo		multisample_state	= { rasterizationSamples : VK_SAMPLE_COUNT_1_BIT, minSampleShading : 0 };
+	VkPipelineDepthStencilStateCreateInfo		depth_stencil_state	= { minDepthBounds : 0, maxDepthBounds : 0 };
+	VkPipelineColorBlendStateCreateInfo			color_blend_state	= { blendConstants : [ 0, 0, 0, 0 ] }; 
+	Array!VkPipelineColorBlendAttachmentState	color_blend_states;
 
+	//VkPipelineDynamicStateCreateInfo			dynamic_state_create_info;
+	Array!VkDynamicState						dynamic_states;
 
-	// rasterisation state
-	VkPipelineRasterizationStateCreateInfo rasterizationState = {};
-	rasterizationState.depthClampEnable = VK_FALSE;
-	rasterizationState.rasterizerDiscardEnable = VK_FALSE;
-	rasterizationState.polygonMode = VK_POLYGON_MODE_FILL;
-	rasterizationState.cullMode = VK_CULL_MODE_BACK_BIT;
-	rasterizationState.frontFace = VK_FRONT_FACE_CLOCKWISE;
-	rasterizationState.depthBiasEnable = VK_FALSE;
-	rasterizationState.depthBiasConstantFactor = 0;
-	rasterizationState.depthBiasClamp = 0;
-	rasterizationState.depthBiasSlopeFactor = 0;
-	rasterizationState.lineWidth = 1;
+	//VkPipelineLayoutCreateInfo				pipeline_layout_create_info
+	VkPipelineLayout							pipeline_layout;
+	Array!VkDescriptorSetLayout					descriptor_set_layouts;
+	Array!VkPushConstantRange					push_constant_ranges;
 
+	VkRenderPass								render_pass;
+	uint32_t									subpass;
+	VkPipeline									base_pipeline = VK_NULL_ND_HANDLE;
+	int32_t										base_pipeline_index;
 
-	// sampling state
-	VkPipelineMultisampleStateCreateInfo multisampleState = {};
-	multisampleState.rasterizationSamples = sample_count;
-	multisampleState.sampleShadingEnable = VK_FALSE;
-	multisampleState.minSampleShading = 0;
-	multisampleState.pSampleMask = null;
-	multisampleState.alphaToCoverageEnable = VK_FALSE;
-	multisampleState.alphaToOneEnable = VK_FALSE;
-
-
-
-	// depth stencil state
-	VkStencilOpState noOPStencilState = {};
-	noOPStencilState.failOp = VK_STENCIL_OP_KEEP;
-	noOPStencilState.passOp = VK_STENCIL_OP_KEEP;
-	noOPStencilState.depthFailOp = VK_STENCIL_OP_KEEP;
-	noOPStencilState.compareOp = VK_COMPARE_OP_ALWAYS;
-	noOPStencilState.compareMask = 0;
-	noOPStencilState.writeMask = 0;
-	noOPStencilState.reference = 0;
-
-	VkPipelineDepthStencilStateCreateInfo depthState = {};
-	depthState.depthTestEnable = VK_TRUE;
-	depthState.depthWriteEnable = VK_TRUE;
-	depthState.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
-	depthState.depthBoundsTestEnable = VK_FALSE;
-	depthState.stencilTestEnable = VK_FALSE;
-	depthState.front = noOPStencilState;
-	depthState.back = noOPStencilState;
-	depthState.minDepthBounds = 0;
-	depthState.maxDepthBounds = 0;
-
-
-
-	// color blend state
-	VkPipelineColorBlendAttachmentState colorBlendAttachmentState = {};
-	colorBlendAttachmentState.blendEnable = VK_FALSE;
-	colorBlendAttachmentState.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_COLOR;
-	colorBlendAttachmentState.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_DST_COLOR;
-	colorBlendAttachmentState.colorBlendOp = VK_BLEND_OP_ADD;
-	colorBlendAttachmentState.srcAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-	colorBlendAttachmentState.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-	colorBlendAttachmentState.alphaBlendOp = VK_BLEND_OP_ADD;
-	colorBlendAttachmentState.colorWriteMask = 0xf;
-
-	VkPipelineColorBlendStateCreateInfo colorBlendState = {};
-	colorBlendState.logicOpEnable = VK_FALSE;
-	colorBlendState.logicOp = VK_LOGIC_OP_CLEAR;
-	colorBlendState.attachmentCount = 1;
-	colorBlendState.pAttachments = &colorBlendAttachmentState;
-	colorBlendState.blendConstants = [ 0.0f, 0.0f, 0.0f, 0.0f ];
-	//colorBlendState.blendConstants[0] = 0.0;
-	//colorBlendState.blendConstants[1] = 0.0;
-	//colorBlendState.blendConstants[2] = 0.0;
-	//colorBlendState.blendConstants[3] = 0.0;
-
-
-	// describe dynamic states
-	VkDynamicState[2] dynamicState = [ VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR ];
-	VkPipelineDynamicStateCreateInfo dynamicStateCreateInfo;
-	dynamicStateCreateInfo.dynamicStateCount = 2;
-	dynamicStateCreateInfo.pDynamicStates = dynamicState.ptr;
-
-
-
-	// create the pipeline object
-	VkGraphicsPipelineCreateInfo pipelineCreateInfo = {};
-	pipelineCreateInfo.stageCount = shader_stage_create_infos.length.toUint;
-	pipelineCreateInfo.pStages = shader_stage_create_infos.ptr;
-	pipelineCreateInfo.pVertexInputState = &meta_geometry.vertex_input_create_info;
-	pipelineCreateInfo.pInputAssemblyState = &meta_geometry.input_assembly_create_info;
-	pipelineCreateInfo.pTessellationState = null;
-	pipelineCreateInfo.pViewportState = &viewportState;
-	pipelineCreateInfo.pRasterizationState = &rasterizationState;
-	pipelineCreateInfo.pMultisampleState = &multisampleState;
-	pipelineCreateInfo.pDepthStencilState = &depthState;
-	pipelineCreateInfo.pColorBlendState = &colorBlendState;
-	pipelineCreateInfo.pDynamicState = &dynamicStateCreateInfo;
-	pipelineCreateInfo.layout = vk.pipeline_layout;
-	pipelineCreateInfo.renderPass = render_pass;
-	pipelineCreateInfo.subpass = 0;
-	pipelineCreateInfo.basePipelineHandle = VK_NULL_ND_HANDLE;
-	pipelineCreateInfo.basePipelineIndex = 0;
-
-	vk.device.vkCreateGraphicsPipelines( VK_NULL_ND_HANDLE, 1, &pipelineCreateInfo, vk.allocator, &vk.pipeline ).vkEnforce;
-
+	void destroyResources() {
+		vk.device.vkDestroyPipeline( pipeline, vk.allocator );
+		vk.device.vkDestroyPipelineLayout( pipeline_layout, vk.allocator );
+		foreach( ref shader_stage; shader_stages )
+			vk.device.vkDestroyShaderModule( shader_stage._module, vk.allocator );
+	}
 }
 
 
+/////////////////////////////
+// get empty meta pipeline //
+/////////////////////////////
+auto initPipeline( ref Vulkan vk ) {
+	Meta_Pipeline meta = vk;
+	return meta;
+}
+
+
+
+///////////////////////////
+// pipeline create flags //
+///////////////////////////
+auto ref pipelineCreateFlags( ref Meta_Pipeline meta, VkPipelineCreateFlags pipeline_create_flags ) {
+	meta.pipeline_create_flags = pipeline_create_flags;
+	return meta;
+}
+
+
+
+//////////////////////////////
+// shader stage create info //
+//////////////////////////////
+auto ref addShaderStageCreateInfo( ref Meta_Pipeline meta, VkPipelineShaderStageCreateInfo shader_stage_create_info ) {
+	meta.shader_stages.append = shader_stage_create_info;
+	return meta;
+}
+
+
+
+////////////////////////////////////////////////////////
+// vertex input, input assembly and tesselation state //
+////////////////////////////////////////////////////////
+auto ref addBindingDescription( ref Meta_Pipeline meta, size_t binding, size_t stride, VkVertexInputRate input_rate = VK_VERTEX_INPUT_RATE_VERTEX ) {
+	meta.vertex_input_binding_descriptions.append( VkVertexInputBindingDescription( binding.toUint, stride.toUint, input_rate ));
+	return meta;
+}
+
+auto ref addAttributeDescription( ref Meta_Pipeline meta, size_t location, size_t binding, VkFormat format, size_t offset = 0 ) {
+	meta.vertex_input_attribute_descriptions.append( VkVertexInputAttributeDescription( location.toUint, binding.toUint, format, offset.toUint ));
+	return meta;
+}
+
+auto ref inputAssembly( ref Meta_Pipeline meta, VkPrimitiveTopology primitive_topology, VkBool32 primitive_restart_enable = VK_FALSE ) {
+	meta.input_assembly_state.topology = primitive_topology;
+	meta.input_assembly_state.primitiveRestartEnable = primitive_restart_enable;
+	return meta;
+}
+
+auto ref patchControlPoints( ref Meta_Pipeline meta, uint32_t patch_control_points ) {
+	meta.tesselation_patch_control_points = patch_control_points;
+	return meta;
+}
+
+
+
+////////////////////////////////
+// viewport and scissor state //
+////////////////////////////////
+auto ref addViewport( ref Meta_Pipeline meta, float x, float y, float width, float height, float minDepth = 0, float maxDepth = 1 ) {
+	meta.viewports.append = VkViewport( x, y, width, height, minDepth, maxDepth );
+	return meta;
+}
+
+auto ref addViewport( ref Meta_Pipeline meta, VkOffset2D offset, VkExtent2D extent, float minDepth = 0, float maxDepth = 1 ) {
+	return meta.addViewport( offset.x, offset.y, extent.width, extent.height, minDepth, maxDepth );
+}
+
+auto ref addViewport( ref Meta_Pipeline meta, VkRect2D rect, float minDepth = 0, float maxDepth = 1 ) {
+	return meta.addViewport( rect.offset.x, rect.offset.y, rect.extent.width, rect.extent.height, minDepth, maxDepth );
+}
+
+auto ref addScissors( ref Meta_Pipeline meta, int32_t x, int32_t y, uint32_t width, uint32_t height ) {
+	return meta.addScissors( VkRect2D( VkOffset2D( x, y ), VkExtent2D( width, height )));
+}
+
+auto ref addScissors( ref Meta_Pipeline meta, VkOffset2D offset, VkExtent2D extent ) {
+	return meta.addScissors( VkRect2D( offset, extent ));
+}
+
+auto ref addScissors( ref Meta_Pipeline meta, VkRect2D rect ) {
+	meta.scissors.append = rect;
+	return meta;
+}
+
+auto ref addViewportAndScissors( ref Meta_Pipeline meta, float x, float y, float width, float height, float minDepth = 0, float maxDepth = 1 ) {
+	return meta.addViewport( x, y, width, height, minDepth, maxDepth ).addScissors( x.toInt32_t, y.toInt32_t, width.toInt32_t, height.toInt32_t );
+}
+
+auto ref addViewportAndScissors( ref Meta_Pipeline meta, VkOffset2D offset, VkExtent2D extent, float minDepth = 0, float maxDepth = 1 ) {
+	return meta.addViewport( offset, extent, minDepth, maxDepth ).addScissors( offset, extent );
+}
+
+auto ref addViewportAndScissors( ref Meta_Pipeline meta, VkRect2D rect, float minDepth = 0, float maxDepth = 1 ) {
+	return meta.addViewport( rect, minDepth, maxDepth ).addScissors( rect );
+}
+
+
+
+/////////////////////////
+// rasterization state //
+/////////////////////////
+mixin( Forward_To_Inner_Struct!( Meta_Pipeline, VkPipelineRasterizationStateCreateInfo, "meta.rasterization_state" ));
+
+auto ref depthBias(
+	ref Meta_Pipeline	meta,
+	float 				constant_factor,
+	float				clamp,
+	float				slope_factor,
+	VkBool32			enable = VK_TRUE ) {
+	return meta
+		.depthBiasConstantFactor( constant_factor )
+		.depthBiasClamp( clamp )
+		.depthBiasSlopeFactor( slope_factor )
+		.depthBiasEnable( enable );
+}
+
+
+
+///////////////////////
+// multisample state //
+///////////////////////
+mixin( Forward_To_Inner_Struct!( Meta_Pipeline, VkPipelineMultisampleStateCreateInfo, "meta.multisample_state" ));
+
+auto ref multisampleShading(
+	ref Meta_Pipeline		meta,
+	float					min_sample_shading,
+	const( VkSampleMask )*	sample_mask = null,
+	VkBool32				enable = VK_TRUE ) {
+	return meta.minSampleShading( min_sample_shading ).pSampleMask( sample_mask ).sampleShadingEnable( enable );
+}
+
+auto ref multisampleAlpha( ref Meta_Pipeline meta, VkBool32 to_coverage, VkBool32 to_one ) {
+	return meta.alphaToCoverageEnable( to_coverage ).alphaToOneEnable( to_one );
+}
+
+
+
+/////////////////
+// depth state //
+/////////////////
+mixin( Forward_To_Inner_Struct!( Meta_Pipeline, VkPipelineDepthStencilStateCreateInfo, "meta.depth_stencil_state", "front", "back" ));
+
+auto ref depthState(
+	ref Meta_Pipeline	meta,
+	VkCompareOp 		compare_op		= VK_COMPARE_OP_LESS_OR_EQUAL,
+	VkBool32			write_enable	= VK_TRUE,
+	VkBool32			test_enable		= VK_TRUE ) {
+	return meta
+		.depthCompareOp( compare_op )
+		.depthWriteEnable( write_enable )
+		.depthTestEnable( test_enable );
+}
+
+
+
+///////////////////
+// stencil state //
+///////////////////
+auto ref stencilState(
+	ref Meta_Pipeline	meta,
+	VkStencilOpState	front_op_state,
+	VkStencilOpState	back_op_state,
+	VkBool32			stencil_test_enable = VK_TRUE ) {
+	meta.depth_stencil_state.stencilTestEnable = stencil_test_enable;
+	meta.depth_stencil_state.front = front_op_state;
+	meta.depth_stencil_state.back = back_op_state;
+	return meta;
+}
+
+auto ref stencilStateFront(
+	ref Meta_Pipeline	meta,
+	VkStencilOpState	stencil_op_state,
+	VkBool32			stencil_test_enable = VK_TRUE ) {
+	meta.depth_stencil_state.stencilTestEnable = stencil_test_enable;
+	meta.depth_stencil_state.front = stencil_op_state;
+	return meta;
+}
+
+auto ref stencilStateBack(
+	ref Meta_Pipeline	meta,
+	VkStencilOpState	stencil_op_state,
+	VkBool32			stencil_test_enable = VK_TRUE ) {
+	meta.depth_stencil_state.stencilTestEnable = stencil_test_enable;
+	meta.depth_stencil_state.back = stencil_op_state;
+	return meta;
+}
+
+auto ref stencilStateFront(
+	ref Meta_Pipeline	meta, 
+	VkStencilOp			fail_op,
+	VkStencilOp			pass_op,
+	VkStencilOp			depth_fail_op,
+	VkCompareOp			compare_op,
+	uint32_t			compare_mask,
+	uint32_t			write_mask,
+	uint32_t			reference,
+	VkBool32 			stencil_test_enable = VK_TRUE ) {
+	return meta.stencilStateFront(
+		VkStencilOpState( fail_op, pass_op, depth_fail_op, compare_op, compare_mask, write_mask, reference ), 
+		stencil_test_enable
+	);
+}
+
+auto ref stencilStateBack(
+	ref Meta_Pipeline	meta, 
+	VkStencilOp			fail_op,
+	VkStencilOp			pass_op,
+	VkStencilOp			depth_fail_op,
+	VkCompareOp			compare_op,
+	uint32_t			compare_mask,
+	uint32_t			write_mask,
+	uint32_t			reference,
+	VkBool32 			stencil_test_enable = VK_TRUE ) {
+	return meta.stencilStateBack(
+		VkStencilOpState(
+			fail_op, pass_op, depth_fail_op, compare_op, compare_mask, write_mask, reference ),
+		stencil_test_enable
+	);
+}
+
+
+
+////////////////////////
+// color blend states //
+////////////////////////
+mixin( Forward_To_Inner_Struct!( Meta_Pipeline, VkPipelineColorBlendStateCreateInfo, "meta.color_blend_state", "attachmentCount", "pAttachments" ));
+
+auto ref colorBlendLogicOp( ref Meta_Pipeline meta, VkLogicOp logic_op, VkBool32 enable = VK_TRUE ) {
+	return meta.logicOp( logic_op ).logicOpEnable( enable );
+}
+
+auto ref addColorBlendState( ref Meta_Pipeline meta, VkPipelineColorBlendAttachmentState color_blend_attachment_state ) {
+	meta.color_blend_states.append( color_blend_attachment_state );
+	return meta;
+}
+
+auto ref addColorBlendState(
+	ref Meta_Pipeline		meta,
+	VkBool32				blendEnable,
+	VkBlendFactor			srcColorBlendFactor	= VK_BLEND_FACTOR_SRC_COLOR,
+	VkBlendFactor			dstColorBlendFactor	= VK_BLEND_FACTOR_ONE_MINUS_DST_COLOR,
+	VkBlendOp				colorBlendOp		= VK_BLEND_OP_ADD,
+	VkBlendFactor			srcAlphaBlendFactor	= VK_BLEND_FACTOR_SRC_ALPHA,
+	VkBlendFactor			dstAlphaBlendFactor	= VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA,
+	VkBlendOp				alphaBlendOp		= VK_BLEND_OP_ADD,
+	VkColorComponentFlags	colorWriteMask		= VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT ) {
+	return meta.addColorBlendState( 
+		VkPipelineColorBlendAttachmentState(
+			blendEnable, srcColorBlendFactor, dstColorBlendFactor, colorBlendOp, srcAlphaBlendFactor, dstAlphaBlendFactor, alphaBlendOp, colorWriteMask
+		)
+	);
+}
+
+auto ref setColorBlendState(
+	ref Meta_Pipeline	meta,
+	VkBlendFactor		src_blend_factor,
+	VkBlendFactor		dst_blend_factor,
+	VkBlendOp			blend_op		= VK_BLEND_OP_ADD,
+	VkBool32			blend_enable	= VK_TRUE ) {
+	if( meta.color_blend_states.length == 0 )
+		meta.addColorBlendState( VK_TRUE );
+	meta.color_blend_states[ $-1 ].srcColorBlendFactor = src_blend_factor;
+	meta.color_blend_states[ $-1 ].dstColorBlendFactor = dst_blend_factor;
+	meta.color_blend_states[ $-1 ].colorBlendOp	= blend_op;
+	meta.color_blend_states[ $-1 ].blendEnable	= blend_enable;
+	return meta;
+}
+
+auto ref setAlphaBlendState(
+	ref Meta_Pipeline	meta,
+	VkBlendFactor		src_blend_factor,
+	VkBlendFactor		dst_blend_factor,
+	VkBlendOp			blend_op		= VK_BLEND_OP_ADD,
+	VkBool32			blend_enable	= VK_TRUE ) {
+	if( meta.color_blend_states.length == 0 )
+		meta.addColorBlendState( VK_TRUE );
+	meta.color_blend_states[ $-1 ].srcAlphaBlendFactor = src_blend_factor;
+	meta.color_blend_states[ $-1 ].dstAlphaBlendFactor = dst_blend_factor;
+	meta.color_blend_states[ $-1 ].alphaBlendOp = blend_op;
+	meta.color_blend_states[ $-1 ].blendEnable	= blend_enable;
+	return meta;
+}
+
+auto ref setColorWriteMask( ref Meta_Pipeline meta, VkColorComponentFlags color_write_mask ) {
+	if( meta.color_blend_states.length == 0 )
+		meta.addColorBlendState( VK_FALSE );
+	meta.color_blend_states[ $-1 ].colorWriteMask = color_write_mask;
+	return meta;
+}
+
+auto ref setColorBlendEnable( ref Meta_Pipeline meta, VkBool32 blend_enable ) {
+	if( meta.color_blend_states.length == 0 )
+		meta.addColorBlendState( blend_enable );
+	else
+		meta.color_blend_states[ $-1 ].blendEnable = blend_enable;
+	return meta;
+}
+
+
+
+///////////////////
+// Dynamic State //
+///////////////////
+auto ref addDynamicState( ref Meta_Pipeline meta, VkDynamicState dynamic_state ) {
+	meta.dynamic_states.append = dynamic_state;
+	return meta;
+}
+
+
+
+/////////////////////
+// pipeline layout //
+/////////////////////
+auto ref addDescriptorSetLayout( ref Meta_Pipeline meta, VkDescriptorSetLayout descriptor_set_layout ) {
+	meta.descriptor_set_layouts.append = descriptor_set_layout;
+	return meta;
+}
+
+auto ref addPushConstantRange( ref Meta_Pipeline meta, VkPushConstantRange push_constant_range ) {
+	meta.push_constant_ranges.append = push_constant_range;
+	return meta;
+}
+
+auto ref addPushConstantRange( ref Meta_Pipeline meta, VkShaderStageFlags stage_flags, size_t offset, size_t size ) {
+	return meta.addPushConstantRange( VkPushConstantRange( stage_flags, offset.toUint, size.toUint ));
+}
+
+
+
+////////////////////////////////////////////
+// render pass, subpass and base pipeline //
+////////////////////////////////////////////
+auto ref renderPass( ref Meta_Pipeline meta, VkRenderPass render_pass, size_t subpass = 0 ) {
+	meta.render_pass = render_pass;
+	meta.subpass = subpass.toUint;
+	return meta;
+}
+
+auto ref basePipeline( ref Meta_Pipeline meta, VkPipeline base_pipeline, int32_t base_pipeline_index = 0 ) {
+	meta.base_pipeline = base_pipeline;
+	meta.base_pipeline_index = base_pipeline_index;
+	return meta;
+}
+
+
+
+/////////////////////////////////////////
+// construct the pipeline state object //
+/////////////////////////////////////////
+auto ref createPipeline( ref Meta_Pipeline meta ) {
+
+	VkPipelineVertexInputStateCreateInfo vertex_input_state_create_info = {
+		vertexBindingDescriptionCount	: meta.vertex_input_binding_descriptions.length.toUint,
+		pVertexBindingDescriptions		: meta.vertex_input_binding_descriptions.ptr,
+		vertexAttributeDescriptionCount	: meta.vertex_input_attribute_descriptions.length.toUint,
+		pVertexAttributeDescriptions	: meta.vertex_input_attribute_descriptions.ptr,
+	};
+
+	VkPipelineTessellationStateCreateInfo tessellation_state_create_info = {
+		patchControlPoints 				: meta.tesselation_patch_control_points,
+	};
+
+	VkPipelineViewportStateCreateInfo viewport_state_create_info = {
+		viewportCount					: meta.viewports.length.toUint,
+		pViewports						: meta.viewports.ptr,
+		scissorCount					: meta.scissors.length.toUint,
+		pScissors						: meta.scissors.ptr,
+	};
+
+	if( meta.color_blend_states.length == 0 )
+		meta.addColorBlendState( VK_FALSE );
+
+	meta.color_blend_state.attachmentCount	= meta.color_blend_states.length.toUint;
+	meta.color_blend_state.pAttachments		= meta.color_blend_states.ptr;
+
+
+	VkPipelineDynamicStateCreateInfo dynamic_state_create_info = {
+		dynamicStateCount				: meta.dynamic_states.length.toUint,
+		pDynamicStates					: meta.dynamic_states.ptr,
+	};
+
+	VkPipelineLayoutCreateInfo pipeline_layout_create_info = {
+		setLayoutCount					: meta.descriptor_set_layouts.length.toUint,
+		pSetLayouts						: meta.descriptor_set_layouts.ptr,
+		pushConstantRangeCount			: meta.push_constant_ranges.length.toUint,
+		pPushConstantRanges				: meta.push_constant_ranges.ptr,
+	};
+
+	meta.device.vkCreatePipelineLayout( &pipeline_layout_create_info, meta.allocator, &meta.pipeline_layout ).vkEnforce;
+
+	// create the pipeline object
+	VkGraphicsPipelineCreateInfo pipeline_create_info = {
+		stageCount			: meta.shader_stages.length.toUint,
+		pStages				: meta.shader_stages.ptr,
+		pVertexInputState	: & vertex_input_state_create_info,
+		pInputAssemblyState	: & meta.input_assembly_state,
+		pTessellationState	: & tessellation_state_create_info,
+		pViewportState		: & viewport_state_create_info,
+		pRasterizationState	: & meta.rasterization_state,
+		pMultisampleState	: & meta.multisample_state,
+		pDepthStencilState	: & meta.depth_stencil_state,
+		pColorBlendState	: & meta.color_blend_state,
+		pDynamicState		: & dynamic_state_create_info,
+		layout				: meta.pipeline_layout,
+		renderPass			: meta.render_pass,
+		subpass				: meta.subpass,
+		basePipelineHandle	: meta.base_pipeline,
+		basePipelineIndex	: meta.base_pipeline_index,
+	};
+
+	meta.device.vkCreateGraphicsPipelines( VK_NULL_ND_HANDLE, 1, &pipeline_create_info, meta.allocator, &meta.pipeline ).vkEnforce;
+	return meta;
+}
