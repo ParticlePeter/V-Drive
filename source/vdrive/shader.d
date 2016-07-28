@@ -1,11 +1,15 @@
 module vdrive.shader;
 
-import core.stdc.stdio : printf;
+import erupted;
 
 import vdrive.util;
 import vdrive.state;
 
-import erupted;
+import core.stdc.stdio : printf;
+
+
+
+
 
 
 auto createShaderModule( ref Vulkan vk, string path ) {
@@ -173,7 +177,7 @@ struct Meta_Descriptor {
 
 auto createMatrixBuffer( ref Vulkan vk, void[] data ) {
 
-	import vdrive.buffer, vdrive.memory;
+	import vdrive.memory;
 	Meta_Buffer meta_buffer = vk;
 	meta_buffer.createBuffer( VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, data.length );
 	meta_buffer.createMemory( VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT );
