@@ -19,8 +19,9 @@ auto data( T )( Array!T array )  {
 	return array.ptr[ 0..array.length ];
 }
 
-auto append( T )( ref Array!T array, T value )  {
+auto ref append( T )( ref Array!T array, T value )  {
 	array.insert( value );
+	return array.data[ $-1 ];
 }
 
 auto toStringz( T )( T data ) if( is( T == enum )) {
