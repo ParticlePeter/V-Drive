@@ -14,9 +14,11 @@ bool verbose = true;
 
 
 mixin template Vulkan_State_Pointer() {
-	this( ref Vulkan vk )	{  this.vk = &vk;  }
-	alias 							vk this;
-	Vulkan*							vk;
+	this( ref Vulkan vk ) { vk_ptr = &vk; }
+	private Vulkan*			vk_ptr;
+	alias 					vk this;
+	ref Vulkan vk() { return * vk_ptr; }
+	void vk( ref Vulkan vk ) { vk_ptr = &vk; }
 }
 
 struct Vulkan {
@@ -28,12 +30,8 @@ struct Vulkan {
 
 	VkQueue				graphic_queue = VK_NULL_HANDLE;
 	uint32_t			graphic_queue_family_index;
-
-
-	VkPipelineLayout	pipeline_layout;
-	VkPipeline			pipeline;
-
 }
+
 
 
 private struct Device_Resource {
@@ -42,10 +40,10 @@ private struct Device_Resource {
 	VkPhysicalDevice	gpu = VK_NULL_HANDLE;
 	VkPhysicalDeviceMemoryProperties memory_properties;
 
-
-
 	// Queues
 }
+
+
 
 // TODO(pp): Create Template specialization for const( char* )[]
 //const( char* )[2] ext = [ "VK_KHR_surface", "VK_KHR_win32_surface" ]; foreach( e; ext ) printf( "%s\n", e );
