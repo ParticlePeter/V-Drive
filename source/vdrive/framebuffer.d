@@ -43,6 +43,12 @@ struct Meta_Render_Pass {
 }
 
 
+auto initRenderPass( ref Vulkan vk ) {
+	return Meta_Render_Pass( vk );
+}
+
+
+
 auto ref renderPassAttachment(
 	ref Meta_Render_Pass	meta,
 	VkFormat				image_format,
@@ -264,6 +270,12 @@ struct Meta_Framebuffer {
 	}
 }
 
+
+auto initFramebuffer( ref Vulkan vk ) {
+	return Meta_Framebuffer( vk );
+}
+
+
 /// aggregate to manage multiple framebuffers sharing same frambuffer resources aka render area and clear values of the attachments 
 struct Meta_Framebuffers {
 	mixin 					Vulkan_State_Pointer;
@@ -274,6 +286,11 @@ struct Meta_Framebuffers {
 	void destroyResources() {
 		foreach( framebuffer; framebuffers ) vk.device.vkDestroyFramebuffer( framebuffer, vk.allocator );
 	}
+}
+
+
+auto initFramebuffers( ref Vulkan vk ) {
+	return Meta_Framebuffers( vk );
 }
 
 /// Set or append an attachment specific clear value, several overloads exist
@@ -407,10 +424,9 @@ auto ref attachFramebuffer( ref Meta_Render_Pass meta_render_pass, VkFramebuffer
 ///		meta				= reference to a Meta_Framebuffer or Meta_Framebuffers
 ///		render_pass			= required for VkFramebufferCreateInfo to specify COMPATIBLE renderpasses
 ///		framebuffer_extent	= the extent of the frambuffer, this is not(!) the render area
-///		static_image_views	= these will be attached to each of the VkFramebuffer(s) attachments 0 .. static_image_view.length
-///		dynamic_image_views = the count of these specifies the count if VkFramebuffers(s), dynamic_imag_views[i] will be attached to framebuffer[i] attachment[static_image_view.length] 
+///		image_views			= these will be attached to each of the VkFramebuffer(s) attachments 0 .. static_image_view.length
 ///	Returns: the passed in Meta_Structure for function chaining
-auto createFramebuffer( ref Meta_Framebuffer meta, VkRenderPass render_pass, VkExtent2D framebuffer_extent, VkImageView[] image_views ) {
+auto ref createFramebuffer( ref Meta_Framebuffer meta, VkRenderPass render_pass, VkExtent2D framebuffer_extent, VkImageView[] image_views ) {
 
 	// the framebuffer_extent is not(!) the render_area, but rather a specification of how big the framebuffer is
 	// the render area specifies a renderable window into this frambuffer
@@ -435,6 +451,13 @@ auto createFramebuffer( ref Meta_Framebuffer meta, VkRenderPass render_pass, VkE
 }
 
 
+auto initFramebuffer( ref Vulkan vk, VkRenderPass render_pass, VkExtent2D framebuffer_extent, VkImageView[] image_views ) {
+	Meta_Framebuffer meta = vk;
+	return meta.createFramebuffer( render_pass, framebuffer_extent, image_views );
+}
+
+
+
 ///	create the VkFramebuffer and store them in the meta structure
 ///	Params:
 ///		meta				= reference to a Meta_Framebuffer or Meta_Framebuffers
@@ -443,10 +466,17 @@ auto createFramebuffer( ref Meta_Framebuffer meta, VkRenderPass render_pass, VkE
 ///		framebuffer_extent	= the extent of the render area
 ///		image_views	= these will be attached to each of the VkFramebuffer(s) attachments 0 .. static_image_view.length
 ///	Returns: the passed in Meta_Structure for function chaining
-auto createFramebuffer( ref Meta_Framebuffer meta, ref Meta_Render_Pass meta_render_pass, VkExtent2D framebuffer_extent, VkImageView[] image_views ) {
+auto ref createFramebuffer( ref Meta_Framebuffer meta, ref Meta_Render_Pass meta_render_pass, VkExtent2D framebuffer_extent, VkImageView[] image_views ) {
 	meta.createFramebuffer( meta_render_pass.begin_info.renderPass, framebuffer_extent, image_views );
 	meta_render_pass.attachFramebuffer( meta );
 	return meta;
+}
+
+
+
+auto initFramebuffer( ref Vulkan vk, ref Meta_Render_Pass meta_render_pass, VkExtent2D framebuffer_extent, VkImageView[] image_views ) {
+	Meta_Framebuffer meta = vk;
+	return meta.createFramebuffer( meta_render_pass, framebuffer_extent, image_views );
 }
 
 
@@ -458,7 +488,7 @@ auto createFramebuffer( ref Meta_Framebuffer meta, ref Meta_Render_Pass meta_ren
 ///		static_image_views	= these will be attached to each of the VkFramebuffer(s) attachments 0 .. static_image_view.length
 ///		dynamic_image_views = the count of these specifies the count if VkFramebuffers(s), dynamic_imag_views[i] will be attached to framebuffer[i] attachment[static_image_view.length] 
 ///	Returns: the passed in Meta_Structure for function chaining
-auto createFramebuffers( ref Meta_Framebuffers meta, VkRenderPass render_pass, VkExtent2D framebuffer_extent, VkImageView[] static_image_views, VkImageView[] dynamic_image_views ) {
+auto ref createFramebuffers( ref Meta_Framebuffers meta, VkRenderPass render_pass, VkExtent2D framebuffer_extent, VkImageView[] static_image_views, VkImageView[] dynamic_image_views ) {
 
 	// the framebuffer_extent is not(!) the render_area, but rather a specification of how big the framebuffer is
 	// the render area specifies a renderable window into this frambuffer
@@ -493,6 +523,13 @@ auto createFramebuffers( ref Meta_Framebuffers meta, VkRenderPass render_pass, V
 }
 
 
+
+auto initFramebuffers( ref Vulkan vk, VkRenderPass render_pass, VkExtent2D framebuffer_extent, VkImageView[] static_image_views, VkImageView[] dynamic_image_views ) {
+	Meta_Framebuffers meta = vk;
+	return meta.createFramebuffers( render_pass, framebuffer_extent, static_image_views, dynamic_image_views );
+}
+
+
 ///	create the VkFramebuffer(s) and store them in the meta structure
 ///	Params:
 ///		meta				= reference to a Meta_Framebuffer or Meta_Framebuffers
@@ -502,10 +539,17 @@ auto createFramebuffers( ref Meta_Framebuffers meta, VkRenderPass render_pass, V
 ///		static_image_views	= these will be attached to each of the VkFramebuffer(s) attachments 0 .. static_image_view.length
 ///		dynamic_image_views = the count of these specifies the count if VkFramebuffers(s), dynamic_imag_views[i] will be attached to framebuffer[i] attachment[static_image_view.length] 
 ///	Returns: the passed in Meta_Structure for function chaining
-auto createFramebuffers( ref Meta_Framebuffers meta, ref Meta_Render_Pass meta_render_pass, VkExtent2D framebuffer_extent, VkImageView[] static_image_views, VkImageView[] dynamic_image_views ) {
+auto ref createFramebuffers( ref Meta_Framebuffers meta, ref Meta_Render_Pass meta_render_pass, VkExtent2D framebuffer_extent, VkImageView[] static_image_views, VkImageView[] dynamic_image_views ) {
 	meta.createFramebuffers( meta_render_pass.begin_info.renderPass, framebuffer_extent, static_image_views, dynamic_image_views );
 	meta_render_pass.attachFramebuffer( meta, 0 );
 	return meta;
+}
+
+
+
+auto initFramebuffers( ref Vulkan vk, ref Meta_Render_Pass meta_render_pass, VkExtent2D framebuffer_extent, VkImageView[] static_image_views, VkImageView[] dynamic_image_views ) {
+	Meta_Framebuffers meta = vk;
+	return meta.createFramebuffers( meta_render_pass, framebuffer_extent, static_image_views, dynamic_image_views );
 }
 
 
