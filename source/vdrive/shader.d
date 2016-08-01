@@ -114,7 +114,7 @@ auto createDescriptorPool( ref Vulkan vk, VkDescriptorPoolSize[] descriptor_pool
 
 	VkDescriptorPoolCreateInfo pool_create_info = { 
 		maxSets			: max_sets,
-		poolSizeCount	: cast( uint32_t )descriptor_pool_sizes.length,
+		poolSizeCount	: descriptor_pool_sizes.length.toUint,
 		pPoolSizes		: descriptor_pool_sizes.ptr,
 	};
 
@@ -144,7 +144,7 @@ auto createDescriptorSetLayout(
 auto createDescriptorSetLayout( ref Vulkan vk, const VkDescriptorSetLayoutBinding[] set_layout_bindings ) {
 
 	VkDescriptorSetLayoutCreateInfo descriptor_set_layout_create_info = {
-		bindingCount	: cast( uint32_t )set_layout_bindings.length,
+		bindingCount	: set_layout_bindings.length.toUint,
 		pBindings		: set_layout_bindings.ptr,
 	};
 
@@ -187,7 +187,7 @@ auto createMatrixBuffer( ref Vulkan vk, void[] data ) {
 }
 
 
-auto createMatrixUniform( ref Vulkan vk, VkBuffer buffer, VkDescriptorPool descriptor_pool ) {
+auto createMatrixUniform( ref Vulkan vk, VkDescriptorPool descriptor_pool, VkBuffer buffer, VkDeviceSize range, VkDeviceSize offset = 0 ) {
 
 	Meta_Descriptor meta_descriptor = vk;
 	meta_descriptor.set_layout = vk.createDescriptorSetLayout( 
@@ -205,8 +205,8 @@ auto createMatrixUniform( ref Vulkan vk, VkBuffer buffer, VkDescriptorPool descr
 	// descriptors are uninitialised. must init all statically used bindings:
 	VkDescriptorBufferInfo descriptor_buffer_info = {
 		buffer	: buffer,
-		offset	: 0,
-		range	: 64,	// VK_WHOLE_SIZE not working here, Driver Bug?	
+		offset	: offset,
+		range	: range,	// VK_WHOLE_SIZE not working here, Driver Bug?	
 	};
 
 	VkWriteDescriptorSet write_descriptor_set = {
