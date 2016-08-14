@@ -12,7 +12,7 @@ import erupted;
 
 
 
-struct Meta_Pipeline {
+struct Meta_Graphics {
 	mixin										Vulkan_State_Pointer;
 
 	VkPipeline									pipeline;
@@ -63,7 +63,7 @@ struct Meta_Pipeline {
 // get empty meta pipeline //
 /////////////////////////////
 auto initPipeline( ref Vulkan vk ) {
-	Meta_Pipeline meta = vk;
+	Meta_Graphics meta = vk;
 	return meta;
 }
 
@@ -72,7 +72,7 @@ auto initPipeline( ref Vulkan vk ) {
 ///////////////////////////
 // pipeline create flags //
 ///////////////////////////
-auto ref pipelineCreateFlags( ref Meta_Pipeline meta, VkPipelineCreateFlags pipeline_create_flags ) {
+auto ref pipelineCreateFlags( ref Meta_Graphics meta, VkPipelineCreateFlags pipeline_create_flags ) {
 	meta.pipeline_create_flags = pipeline_create_flags;
 	return meta;
 }
@@ -82,7 +82,7 @@ auto ref pipelineCreateFlags( ref Meta_Pipeline meta, VkPipelineCreateFlags pipe
 //////////////////////////////
 // shader stage create info //
 //////////////////////////////
-auto ref addShaderStageCreateInfo( ref Meta_Pipeline meta, VkPipelineShaderStageCreateInfo shader_stage_create_info ) {
+auto ref addShaderStageCreateInfo( ref Meta_Graphics meta, VkPipelineShaderStageCreateInfo shader_stage_create_info ) {
 	meta.shader_stages.append = shader_stage_create_info;
 	return meta;
 }
@@ -92,23 +92,23 @@ auto ref addShaderStageCreateInfo( ref Meta_Pipeline meta, VkPipelineShaderStage
 ////////////////////////////////////////////////////////
 // vertex input, input assembly and tesselation state //
 ////////////////////////////////////////////////////////
-auto ref addBindingDescription( ref Meta_Pipeline meta, size_t binding, size_t stride, VkVertexInputRate input_rate = VK_VERTEX_INPUT_RATE_VERTEX ) {
+auto ref addBindingDescription( ref Meta_Graphics meta, size_t binding, size_t stride, VkVertexInputRate input_rate = VK_VERTEX_INPUT_RATE_VERTEX ) {
 	meta.vertex_input_binding_descriptions.append( VkVertexInputBindingDescription( binding.toUint, stride.toUint, input_rate ));
 	return meta;
 }
 
-auto ref addAttributeDescription( ref Meta_Pipeline meta, size_t location, size_t binding, VkFormat format, size_t offset = 0 ) {
+auto ref addAttributeDescription( ref Meta_Graphics meta, size_t location, size_t binding, VkFormat format, size_t offset = 0 ) {
 	meta.vertex_input_attribute_descriptions.append( VkVertexInputAttributeDescription( location.toUint, binding.toUint, format, offset.toUint ));
 	return meta;
 }
 
-auto ref inputAssembly( ref Meta_Pipeline meta, VkPrimitiveTopology primitive_topology, VkBool32 primitive_restart_enable = VK_FALSE ) {
+auto ref inputAssembly( ref Meta_Graphics meta, VkPrimitiveTopology primitive_topology, VkBool32 primitive_restart_enable = VK_FALSE ) {
 	meta.input_assembly_state.topology = primitive_topology;
 	meta.input_assembly_state.primitiveRestartEnable = primitive_restart_enable;
 	return meta;
 }
 
-auto ref patchControlPoints( ref Meta_Pipeline meta, uint32_t patch_control_points ) {
+auto ref patchControlPoints( ref Meta_Graphics meta, uint32_t patch_control_points ) {
 	meta.tesselation_patch_control_points = patch_control_points;
 	return meta;
 }
@@ -118,41 +118,41 @@ auto ref patchControlPoints( ref Meta_Pipeline meta, uint32_t patch_control_poin
 ////////////////////////////////
 // viewport and scissor state //
 ////////////////////////////////
-auto ref addViewport( ref Meta_Pipeline meta, float x, float y, float width, float height, float minDepth = 0, float maxDepth = 1 ) {
+auto ref addViewport( ref Meta_Graphics meta, float x, float y, float width, float height, float minDepth = 0, float maxDepth = 1 ) {
 	meta.viewports.append = VkViewport( x, y, width, height, minDepth, maxDepth );
 	return meta;
 }
 
-auto ref addViewport( ref Meta_Pipeline meta, VkOffset2D offset, VkExtent2D extent, float minDepth = 0, float maxDepth = 1 ) {
+auto ref addViewport( ref Meta_Graphics meta, VkOffset2D offset, VkExtent2D extent, float minDepth = 0, float maxDepth = 1 ) {
 	return meta.addViewport( offset.x, offset.y, extent.width, extent.height, minDepth, maxDepth );
 }
 
-auto ref addViewport( ref Meta_Pipeline meta, VkRect2D rect, float minDepth = 0, float maxDepth = 1 ) {
+auto ref addViewport( ref Meta_Graphics meta, VkRect2D rect, float minDepth = 0, float maxDepth = 1 ) {
 	return meta.addViewport( rect.offset.x, rect.offset.y, rect.extent.width, rect.extent.height, minDepth, maxDepth );
 }
 
-auto ref addScissors( ref Meta_Pipeline meta, int32_t x, int32_t y, uint32_t width, uint32_t height ) {
+auto ref addScissors( ref Meta_Graphics meta, int32_t x, int32_t y, uint32_t width, uint32_t height ) {
 	return meta.addScissors( VkRect2D( VkOffset2D( x, y ), VkExtent2D( width, height )));
 }
 
-auto ref addScissors( ref Meta_Pipeline meta, VkOffset2D offset, VkExtent2D extent ) {
+auto ref addScissors( ref Meta_Graphics meta, VkOffset2D offset, VkExtent2D extent ) {
 	return meta.addScissors( VkRect2D( offset, extent ));
 }
 
-auto ref addScissors( ref Meta_Pipeline meta, VkRect2D rect ) {
+auto ref addScissors( ref Meta_Graphics meta, VkRect2D rect ) {
 	meta.scissors.append = rect;
 	return meta;
 }
 
-auto ref addViewportAndScissors( ref Meta_Pipeline meta, float x, float y, float width, float height, float minDepth = 0, float maxDepth = 1 ) {
+auto ref addViewportAndScissors( ref Meta_Graphics meta, float x, float y, float width, float height, float minDepth = 0, float maxDepth = 1 ) {
 	return meta.addViewport( x, y, width, height, minDepth, maxDepth ).addScissors( x.toInt32_t, y.toInt32_t, width.toInt32_t, height.toInt32_t );
 }
 
-auto ref addViewportAndScissors( ref Meta_Pipeline meta, VkOffset2D offset, VkExtent2D extent, float minDepth = 0, float maxDepth = 1 ) {
+auto ref addViewportAndScissors( ref Meta_Graphics meta, VkOffset2D offset, VkExtent2D extent, float minDepth = 0, float maxDepth = 1 ) {
 	return meta.addViewport( offset, extent, minDepth, maxDepth ).addScissors( offset, extent );
 }
 
-auto ref addViewportAndScissors( ref Meta_Pipeline meta, VkRect2D rect, float minDepth = 0, float maxDepth = 1 ) {
+auto ref addViewportAndScissors( ref Meta_Graphics meta, VkRect2D rect, float minDepth = 0, float maxDepth = 1 ) {
 	return meta.addViewport( rect, minDepth, maxDepth ).addScissors( rect );
 }
 
@@ -161,10 +161,10 @@ auto ref addViewportAndScissors( ref Meta_Pipeline meta, VkRect2D rect, float mi
 /////////////////////////
 // rasterization state //
 /////////////////////////
-mixin( Forward_To_Inner_Struct!( Meta_Pipeline, VkPipelineRasterizationStateCreateInfo, "meta.rasterization_state" ));
+mixin( Forward_To_Inner_Struct!( Meta_Graphics, VkPipelineRasterizationStateCreateInfo, "meta.rasterization_state" ));
 
 auto ref depthBias(
-	ref Meta_Pipeline	meta,
+	ref Meta_Graphics	meta,
 	float 				constant_factor,
 	float				clamp,
 	float				slope_factor,
@@ -181,17 +181,17 @@ auto ref depthBias(
 ///////////////////////
 // multisample state //
 ///////////////////////
-mixin( Forward_To_Inner_Struct!( Meta_Pipeline, VkPipelineMultisampleStateCreateInfo, "meta.multisample_state" ));
+mixin( Forward_To_Inner_Struct!( Meta_Graphics, VkPipelineMultisampleStateCreateInfo, "meta.multisample_state" ));
 
 auto ref multisampleShading(
-	ref Meta_Pipeline		meta,
+	ref Meta_Graphics		meta,
 	float					min_sample_shading,
 	const( VkSampleMask )*	sample_mask = null,
 	VkBool32				enable = VK_TRUE ) {
 	return meta.minSampleShading( min_sample_shading ).pSampleMask( sample_mask ).sampleShadingEnable( enable );
 }
 
-auto ref multisampleAlpha( ref Meta_Pipeline meta, VkBool32 to_coverage, VkBool32 to_one ) {
+auto ref multisampleAlpha( ref Meta_Graphics meta, VkBool32 to_coverage, VkBool32 to_one ) {
 	return meta.alphaToCoverageEnable( to_coverage ).alphaToOneEnable( to_one );
 }
 
@@ -200,10 +200,10 @@ auto ref multisampleAlpha( ref Meta_Pipeline meta, VkBool32 to_coverage, VkBool3
 /////////////////
 // depth state //
 /////////////////
-mixin( Forward_To_Inner_Struct!( Meta_Pipeline, VkPipelineDepthStencilStateCreateInfo, "meta.depth_stencil_state", "front", "back" ));
+mixin( Forward_To_Inner_Struct!( Meta_Graphics, VkPipelineDepthStencilStateCreateInfo, "meta.depth_stencil_state", "front", "back" ));
 
 auto ref depthState(
-	ref Meta_Pipeline	meta,
+	ref Meta_Graphics	meta,
 	VkCompareOp 		compare_op		= VK_COMPARE_OP_LESS_OR_EQUAL,
 	VkBool32			write_enable	= VK_TRUE,
 	VkBool32			test_enable		= VK_TRUE ) {
@@ -219,7 +219,7 @@ auto ref depthState(
 // stencil state //
 ///////////////////
 auto ref stencilState(
-	ref Meta_Pipeline	meta,
+	ref Meta_Graphics	meta,
 	VkStencilOpState	front_op_state,
 	VkStencilOpState	back_op_state,
 	VkBool32			stencil_test_enable = VK_TRUE ) {
@@ -230,7 +230,7 @@ auto ref stencilState(
 }
 
 auto ref stencilStateFront(
-	ref Meta_Pipeline	meta,
+	ref Meta_Graphics	meta,
 	VkStencilOpState	stencil_op_state,
 	VkBool32			stencil_test_enable = VK_TRUE ) {
 	meta.depth_stencil_state.stencilTestEnable = stencil_test_enable;
@@ -239,7 +239,7 @@ auto ref stencilStateFront(
 }
 
 auto ref stencilStateBack(
-	ref Meta_Pipeline	meta,
+	ref Meta_Graphics	meta,
 	VkStencilOpState	stencil_op_state,
 	VkBool32			stencil_test_enable = VK_TRUE ) {
 	meta.depth_stencil_state.stencilTestEnable = stencil_test_enable;
@@ -248,7 +248,7 @@ auto ref stencilStateBack(
 }
 
 auto ref stencilStateFront(
-	ref Meta_Pipeline	meta, 
+	ref Meta_Graphics	meta, 
 	VkStencilOp			fail_op,
 	VkStencilOp			pass_op,
 	VkStencilOp			depth_fail_op,
@@ -264,7 +264,7 @@ auto ref stencilStateFront(
 }
 
 auto ref stencilStateBack(
-	ref Meta_Pipeline	meta, 
+	ref Meta_Graphics	meta, 
 	VkStencilOp			fail_op,
 	VkStencilOp			pass_op,
 	VkStencilOp			depth_fail_op,
@@ -285,19 +285,19 @@ auto ref stencilStateBack(
 ////////////////////////
 // color blend states //
 ////////////////////////
-mixin( Forward_To_Inner_Struct!( Meta_Pipeline, VkPipelineColorBlendStateCreateInfo, "meta.color_blend_state", "attachmentCount", "pAttachments" ));
+mixin( Forward_To_Inner_Struct!( Meta_Graphics, VkPipelineColorBlendStateCreateInfo, "meta.color_blend_state", "attachmentCount", "pAttachments" ));
 
-auto ref colorBlendLogicOp( ref Meta_Pipeline meta, VkLogicOp logic_op, VkBool32 enable = VK_TRUE ) {
+auto ref colorBlendLogicOp( ref Meta_Graphics meta, VkLogicOp logic_op, VkBool32 enable = VK_TRUE ) {
 	return meta.logicOp( logic_op ).logicOpEnable( enable );
 }
 
-auto ref addColorBlendState( ref Meta_Pipeline meta, VkPipelineColorBlendAttachmentState color_blend_attachment_state ) {
+auto ref addColorBlendState( ref Meta_Graphics meta, VkPipelineColorBlendAttachmentState color_blend_attachment_state ) {
 	meta.color_blend_states.append( color_blend_attachment_state );
 	return meta;
 }
 
 auto ref addColorBlendState(
-	ref Meta_Pipeline		meta,
+	ref Meta_Graphics		meta,
 	VkBool32				blendEnable,
 	VkBlendFactor			srcColorBlendFactor	= VK_BLEND_FACTOR_SRC_COLOR,
 	VkBlendFactor			dstColorBlendFactor	= VK_BLEND_FACTOR_ONE_MINUS_DST_COLOR,
@@ -314,7 +314,7 @@ auto ref addColorBlendState(
 }
 
 auto ref setColorBlendState(
-	ref Meta_Pipeline	meta,
+	ref Meta_Graphics	meta,
 	VkBlendFactor		src_blend_factor,
 	VkBlendFactor		dst_blend_factor,
 	VkBlendOp			blend_op		= VK_BLEND_OP_ADD,
@@ -329,7 +329,7 @@ auto ref setColorBlendState(
 }
 
 auto ref setAlphaBlendState(
-	ref Meta_Pipeline	meta,
+	ref Meta_Graphics	meta,
 	VkBlendFactor		src_blend_factor,
 	VkBlendFactor		dst_blend_factor,
 	VkBlendOp			blend_op		= VK_BLEND_OP_ADD,
@@ -343,14 +343,14 @@ auto ref setAlphaBlendState(
 	return meta;
 }
 
-auto ref setColorWriteMask( ref Meta_Pipeline meta, VkColorComponentFlags color_write_mask ) {
+auto ref setColorWriteMask( ref Meta_Graphics meta, VkColorComponentFlags color_write_mask ) {
 	if( meta.color_blend_states.length == 0 )
 		meta.addColorBlendState( VK_FALSE );
 	meta.color_blend_states[ $-1 ].colorWriteMask = color_write_mask;
 	return meta;
 }
 
-auto ref setColorBlendEnable( ref Meta_Pipeline meta, VkBool32 blend_enable ) {
+auto ref setColorBlendEnable( ref Meta_Graphics meta, VkBool32 blend_enable ) {
 	if( meta.color_blend_states.length == 0 )
 		meta.addColorBlendState( blend_enable );
 	else
@@ -363,7 +363,7 @@ auto ref setColorBlendEnable( ref Meta_Pipeline meta, VkBool32 blend_enable ) {
 ///////////////////
 // Dynamic State //
 ///////////////////
-auto ref addDynamicState( ref Meta_Pipeline meta, VkDynamicState dynamic_state ) {
+auto ref addDynamicState( ref Meta_Graphics meta, VkDynamicState dynamic_state ) {
 	meta.dynamic_states.append = dynamic_state;
 	return meta;
 }
@@ -373,17 +373,17 @@ auto ref addDynamicState( ref Meta_Pipeline meta, VkDynamicState dynamic_state )
 /////////////////////
 // pipeline layout //
 /////////////////////
-auto ref addDescriptorSetLayout( ref Meta_Pipeline meta, VkDescriptorSetLayout descriptor_set_layout ) {
+auto ref addDescriptorSetLayout( ref Meta_Graphics meta, VkDescriptorSetLayout descriptor_set_layout ) {
 	meta.descriptor_set_layouts.append = descriptor_set_layout;
 	return meta;
 }
 
-auto ref addPushConstantRange( ref Meta_Pipeline meta, VkPushConstantRange push_constant_range ) {
+auto ref addPushConstantRange( ref Meta_Graphics meta, VkPushConstantRange push_constant_range ) {
 	meta.push_constant_ranges.append = push_constant_range;
 	return meta;
 }
 
-auto ref addPushConstantRange( ref Meta_Pipeline meta, VkShaderStageFlags stage_flags, size_t offset, size_t size ) {
+auto ref addPushConstantRange( ref Meta_Graphics meta, VkShaderStageFlags stage_flags, size_t offset, size_t size ) {
 	return meta.addPushConstantRange( VkPushConstantRange( stage_flags, offset.toUint, size.toUint ));
 }
 
@@ -392,13 +392,13 @@ auto ref addPushConstantRange( ref Meta_Pipeline meta, VkShaderStageFlags stage_
 ////////////////////////////////////////////
 // render pass, subpass and base pipeline //
 ////////////////////////////////////////////
-auto ref renderPass( ref Meta_Pipeline meta, VkRenderPass render_pass, size_t subpass = 0 ) {
+auto ref renderPass( ref Meta_Graphics meta, VkRenderPass render_pass, size_t subpass = 0 ) {
 	meta.render_pass = render_pass;
 	meta.subpass = subpass.toUint;
 	return meta;
 }
 
-auto ref basePipeline( ref Meta_Pipeline meta, VkPipeline base_pipeline, int32_t base_pipeline_index = 0 ) {
+auto ref basePipeline( ref Meta_Graphics meta, VkPipeline base_pipeline, int32_t base_pipeline_index = 0 ) {
 	meta.base_pipeline = base_pipeline;
 	meta.base_pipeline_index = base_pipeline_index;
 	return meta;
@@ -409,7 +409,7 @@ auto ref basePipeline( ref Meta_Pipeline meta, VkPipeline base_pipeline, int32_t
 /////////////////////////////////////////
 // construct the pipeline state object //
 /////////////////////////////////////////
-auto ref createPipeline( ref Meta_Pipeline meta ) {
+auto ref createPipeline( ref Meta_Graphics meta ) {
 
 	VkPipelineVertexInputStateCreateInfo vertex_input_state_create_info = {
 		vertexBindingDescriptionCount	: meta.vertex_input_binding_descriptions.length.toUint,
@@ -472,4 +472,65 @@ auto ref createPipeline( ref Meta_Pipeline meta ) {
 
 	meta.device.vkCreateGraphicsPipelines( VK_NULL_ND_HANDLE, 1, &pipeline_create_info, meta.allocator, &meta.pipeline ).vkEnforce;
 	return meta;
+}
+
+
+
+
+
+struct Meta_Graphics_Ressources {
+	mixin				Vulkan_State_Pointer;
+	VkPipeline			pipeline;
+	VkPipelineLayout	pipeline_layout;
+}
+
+
+struct Meta_Compute {
+	mixin										Vulkan_State_Pointer;
+
+	VkPipeline									pipeline;
+	VkPipelineCreateFlags						pipeline_create_flags;
+	VkPipelineShaderStageCreateInfo				shader_stage;
+
+	//VkPipelineLayoutCreateInfo				pipeline_layout_create_info
+	VkPipelineLayout							pipeline_layout;
+	Array!VkDescriptorSetLayout					descriptor_set_layouts;
+	Array!VkPushConstantRange					push_constant_ranges;
+
+	VkPipeline									base_pipeline = VK_NULL_ND_HANDLE;
+	int32_t										base_pipeline_index;
+
+	void destroyResources() {
+		vk.device.vkDestroyPipeline( pipeline, vk.allocator );
+		vk.device.vkDestroyPipelineLayout( pipeline_layout, vk.allocator );
+		vk.device.vkDestroyShaderModule( shader_stage._module, vk.allocator );
+	}
+}
+
+
+
+VkPipelineLayout createPipelineLayout( Vulkan vk, VkDescriptorSetLayout[] descriptor_set_layouts, VkPushConstantRange[] push_constant_ranges = [] ) {
+	VkPipelineLayoutCreateInfo pipeline_layout_create_info = {
+		setLayoutCount					: descriptor_set_layouts.length.toUint,
+		pSetLayouts						: descriptor_set_layouts.ptr,
+		pushConstantRangeCount			: push_constant_ranges.length.toUint,
+		pPushConstantRanges				: push_constant_ranges.ptr,
+	};
+
+	VkPipelineLayout pipeline_layout;
+	vk.device.vkCreatePipelineLayout( &pipeline_layout_create_info, vk.allocator, &pipeline_layout ).vkEnforce;
+	return pipeline_layout;
+}
+
+
+VkPipelineLayout createPipelineLayout( Vulkan vk, VkDescriptorSetLayout descriptor_set_layout, VkPushConstantRange push_constant_range ) {
+	VkDescriptorSetLayout[1]	descriptor_set_layouts	= [ descriptor_set_layout ];
+	VkPushConstantRange[1]		push_constant_ranges	= [ push_constant_range ];
+	return createPipelineLayout( vk, descriptor_set_layouts, push_constant_ranges );
+}
+
+
+VkPipelineLayout createPipelineLayout( Vulkan vk, VkDescriptorSetLayout descriptor_set_layout ) {
+	VkDescriptorSetLayout[1]	descriptor_set_layouts	= [ descriptor_set_layout ];
+	return createPipelineLayout( vk, descriptor_set_layouts );
 }
