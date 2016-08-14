@@ -19,6 +19,7 @@ mixin template Vulkan_State_Pointer() {
 	alias 					vk this;
 	ref Vulkan vk() { return * vk_ptr; }
 	void vk( ref Vulkan vk ) { vk_ptr = &vk; }
+	auto ref opCall( ref Vulkan vk ) { vk_ptr = &vk; return this; }
 }
 
 struct Vulkan {
@@ -30,6 +31,9 @@ struct Vulkan {
 
 	VkQueue				graphic_queue = VK_NULL_HANDLE;
 	uint32_t			graphic_queue_family_index;
+
+	VkQueue				compute_queue = VK_NULL_HANDLE;
+	uint32_t			compute_queue_family_index;
 }
 
 
