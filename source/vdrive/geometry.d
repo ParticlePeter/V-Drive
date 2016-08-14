@@ -16,23 +16,25 @@ mixin template Meta_Geometry_Alias_This() {
 }
 
 
+private alias RecordCommands = void function( VkCommandBuffer command_buffer, ref Meta_Geometry meta_geometry );
+
 struct Meta_Geometry {
-	this( ref Vulkan vk )			{  this.meta_buffer.vk = vk;  }
-	alias									meta_buffer this;
-	Meta_Buffer								meta_buffer;
+	this( ref Vulkan vk )	{  this.meta_buffer.vk = vk;  }
+	alias							meta_buffer this;
+	Meta_Buffer						meta_buffer;
 
-	Array!VkVertexInputBindingDescription	binding_descriptions;
-	Array!VkVertexInputAttributeDescription	attribute_descriptions;
+	uint32_t						index_count;
+	uint32_t						vertex_count;
 
-	VkPipelineVertexInputStateCreateInfo	vertex_input_create_info;
-	VkPipelineInputAssemblyStateCreateInfo	input_assembly_create_info;
+	VkDeviceSize					index_offset;
+	Array!VkDeviceSize				vertex_offsets;
+	Array!VkBuffer					vertex_buffers;
 
-	uint32_t								index_count;
-	uint32_t								vertex_count;
+	RecordCommands					recordCommands;
 
-	VkDeviceSize							index_offset;
-	Array!VkDeviceSize						vertex_offsets;
-	Array!VkBuffer							vertex_buffers;	
+	void recordDrawCommands( VkCommandBuffer command_buffer ) {
+		recordCommands( command_buffer, this );
+	}	
 }
 
 
