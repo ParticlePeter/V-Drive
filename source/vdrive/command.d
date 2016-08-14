@@ -31,7 +31,7 @@ auto allocateCommandBuffer( ref Vulkan vk, VkCommandPool command_pool, VkCommand
 	};
 
 	VkCommandBuffer command_buffer;
-	vkAllocateCommandBuffers( vk.device, &command_buffer_allocation_info, &command_buffer );
+	vkAllocateCommandBuffers( vk.device, &command_buffer_allocation_info, &command_buffer ).vkEnforce;
 	return command_buffer;
 }
 
@@ -46,7 +46,7 @@ auto allocateCommandBuffers( ref Vulkan vk, VkCommandPool command_pool, VkComman
 
 	import vdrive.util.array;
 	auto command_buffers = sizedArray!VkCommandBuffer( command_buffer_count );
-	vkAllocateCommandBuffers( vk.device, &command_buffer_allocation_info, command_buffers.ptr );
+	vkAllocateCommandBuffers( vk.device, &command_buffer_allocation_info, command_buffers.ptr ).vkEnforce;
 	return command_buffers;
 }
 
