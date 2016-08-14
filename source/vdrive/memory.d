@@ -94,7 +94,7 @@ mixin template Memory_Member() {
 	private VkDeviceSize	device_memory_offset;
 	private bool			owns_device_memory = false;
 	VkDeviceSize offset()	{ return device_memory_offset; }
-	VkDeviceSize size()		{ return memory_requirements.size; }
+	VkDeviceSize memSize()	{ return memory_requirements.size; }
 }
 
 private template hasMemReqs( T ) { 
@@ -119,13 +119,12 @@ auto requiredMemorySize( META )( ref META meta ) if( hasMemReqs!META ) {
 }
 
 
-auto alignedMemorySize( META )( ref META meta ) if( hasMemReqs!META ) {
-	auto size = meta.memory_requirements.size;
-	if(  size % meta.memory_requirements.alignment > 0 ) {
+auto alignedOffset( META )( ref META meta, VkDeviceSize device_memory_offset ) if( hasMemReqs!META ) {
+	if( device_memory_offset % meta.memory_requirements.alignment > 0 ) {
 		auto alignment = meta.memory_requirements.alignment;
-		size = ( size / alignment + 1 ) * alignment;
+		device_memory_offset = ( device_memory_offset / alignment + 1 ) * alignment;
 	}
-	return size;
+	return device_memory_offset;
 }
 
 
@@ -176,6 +175,7 @@ struct Meta_Buffer {
 	VkBufferCreateInfo		buffer_create_info;
 	VkBufferView			buffer_view;
 	VkBufferViewCreateInfo	buffer_view_create_info;
+	VkDeviceSize size()		{ return buffer_create_info.size; }
 
 	mixin					Memory_Member;
 
@@ -194,12 +194,12 @@ struct Meta_Buffer {
 /// create a VkBuffer object, this function or initBuffer must be called first, further operations require the buffer
 /// the resulting buffer and its create info are stored in the Meta_Buffer struct
 /// the Meta_Buffer struct is returned for function chaining
-auto ref createBuffer( ref Meta_Buffer meta, VkBufferUsageFlags usage, VkDeviceSize size ) {
+auto ref createBuffer( ref Meta_Buffer meta, VkBufferUsageFlags usage, VkDeviceSize size, VkSharingMode sharing_mode = VK_SHARING_MODE_EXCLUSIVE ) {
 
 	// buffer create info from arguments
 	meta.buffer_create_info.size 		= size; // size in Bytes
 	meta.buffer_create_info.usage		= usage;
-	meta.buffer_create_info.sharingMode	= VK_SHARING_MODE_EXCLUSIVE;
+	meta.buffer_create_info.sharingMode	= sharing_mode;
 	
 	meta.device.vkCreateBuffer( &meta.buffer_create_info, meta.allocator, &meta.buffer ).vkEnforce;
 	meta.device.vkGetBufferMemoryRequirements( meta.buffer, &meta.memory_requirements );
@@ -210,9 +210,9 @@ auto ref createBuffer( ref Meta_Buffer meta, VkBufferUsageFlags usage, VkDeviceS
 /// create a VkBuffer object, this function or createBuffer must be called first, further operations require the buffer
 /// the resulting buffer and its create info are stored in the Meta_Buffer struct
 /// the Meta_Buffer struct is returned for function chaining
-auto initBuffer( ref Vulkan vk, VkBufferUsageFlags usage, VkDeviceSize size ) {
+auto initBuffer( ref Vulkan vk, VkBufferUsageFlags usage, VkDeviceSize size, VkSharingMode sharing_mode = VK_SHARING_MODE_EXCLUSIVE ) {
 	Meta_Buffer meta = vk;
-	return meta.createBuffer( VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, size );
+	return meta.createBuffer( usage, size, sharing_mode );
 }
 
 
@@ -276,7 +276,8 @@ auto ref createImage(
 	VkFormat				image_format,
 	VkExtent2D				image_extent,
 	VkImageUsageFlags		image_usage,
-	VkSampleCountFlagBits	image_samples = VK_SAMPLE_COUNT_1_BIT ) {
+	VkSampleCountFlagBits	image_samples = VK_SAMPLE_COUNT_1_BIT,
+	VkSharingMode			sharing_mode = VK_SHARING_MODE_EXCLUSIVE ) {
 
 	VkImageCreateInfo image_create_info = {
 		imageType				: VK_IMAGE_TYPE_2D,
@@ -287,7 +288,7 @@ auto ref createImage(
 		samples					: image_samples,								// notice me senpai!
 		tiling					: VK_IMAGE_TILING_OPTIMAL,
 		usage					: image_usage,									// notice me senpai!
-		sharingMode				: VK_SHARING_MODE_EXCLUSIVE,
+		sharingMode				: sharing_mode,
 		queueFamilyIndexCount	: 0,
 		pQueueFamilyIndices		: null,
 		initialLayout			: VK_IMAGE_LAYOUT_UNDEFINED,             		// notice me senpai!
@@ -305,10 +306,11 @@ auto initImage(
 	VkFormat				image_format,
 	VkExtent2D				image_extent,
 	VkImageUsageFlags		image_usage,
-	VkSampleCountFlagBits	image_samples = VK_SAMPLE_COUNT_1_BIT ) {
+	VkSampleCountFlagBits	image_samples = VK_SAMPLE_COUNT_1_BIT,
+	VkSharingMode			sharing_mode = VK_SHARING_MODE_EXCLUSIVE ) {
 
 	Meta_Image meta = vk;
-	return meta.createImage( image_format, image_extent, image_usage, image_samples );
+	return meta.createImage( image_format, image_extent, image_usage, image_samples, sharing_mode );
 } 
 
 
@@ -395,7 +397,7 @@ void recordTransition(
 		subresourceRange	: subresource_range,
 	};
 
-	command_buffer.vkCmdPipelineBarrier(   
+	command_buffer.vkCmdPipelineBarrier(
 		src_stage_mask, dst_stage_mask, dependency_flags,
 		0, null, 0, null, 1, &layout_transition_barrier
 	);
