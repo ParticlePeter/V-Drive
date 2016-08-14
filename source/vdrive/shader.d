@@ -47,7 +47,7 @@ auto createShaderModule( ref Vulkan vk, string path ) {
 			import std.process : execute;				// use process execute to call glslangValidator
 			string[6] compile_glsl_args = [ "glslangValidator", "-V", "-w", "-o", spir_path, path ];
 			auto compile_glsl = compile_glsl_args.execute;		// store in status struct
-			printf( compile_glsl.output.toStringz.ptr );		// print output
+			printf( compile_glsl.output.ptr );		// print output
 		}
 		path = array.data.idup;							// create string from the composed char array
 	}
@@ -126,7 +126,7 @@ auto createDescriptorPool( ref Vulkan vk, VkDescriptorPoolSize[] descriptor_pool
 
 
 /// create a VkDescriptorSetLayout from one VkDescriptorSetLayoutBinding
-auto createDescriptorSetLayout(
+auto createSetLayout(
 	ref Vulkan 			vk,
 	uint32_t			binding,
 	VkDescriptorType	descriptorType,
@@ -137,11 +137,11 @@ auto createDescriptorSetLayout(
 	const VkDescriptorSetLayoutBinding[1] set_layout_bindings = [ 
 		VkDescriptorSetLayoutBinding( binding, descriptorType, descriptorCount, stageFlags, pImmutableSamplers ) 
 	];
-	return vk.createDescriptorSetLayout( set_layout_bindings );
+	return vk.createSetLayout( set_layout_bindings );
 }
 
 /// create a VkDescriptorSetLayout from several VkDescriptorSetLayoutBinding(s)
-auto createDescriptorSetLayout( ref Vulkan vk, const VkDescriptorSetLayoutBinding[] set_layout_bindings ) {
+auto createSetLayout( ref Vulkan vk, const VkDescriptorSetLayoutBinding[] set_layout_bindings ) {
 
 	VkDescriptorSetLayoutCreateInfo descriptor_set_layout_create_info = {
 		bindingCount	: set_layout_bindings.length.toUint,
@@ -153,6 +153,20 @@ auto createDescriptorSetLayout( ref Vulkan vk, const VkDescriptorSetLayoutBindin
 	return descriptor_set_layout;
 }
 
+
+/// create a VkDescriptorSetLayout from several VkDescriptorSetLayoutBinding(s)
+auto allocateSet( ref Vulkan vk, VkDescriptorPool descriptor_pool, VkDescriptorSetLayout set_layout ) {
+
+	VkDescriptorSetAllocateInfo descriptor_allocate_info = {
+		descriptorPool		: descriptor_pool,
+		descriptorSetCount	: 1,
+		pSetLayouts			: &set_layout,
+	};
+
+	VkDescriptorSet descriptor_set;
+	vkAllocateDescriptorSets( vk.device, &descriptor_allocate_info, &descriptor_set ).vkEnforce;
+	return descriptor_set;
+}
 
 
 
@@ -172,7 +186,79 @@ struct Meta_Descriptor {
 	VkDescriptorSetLayout	set_layout;
 	VkDescriptorSet			set;
 
+	Array!VkDescriptorSetLayoutBinding	set_layout_bindings;
+
+	void destroyResources() {
+		vk.device.vkDestroyDescriptorSetLayout( set_layout, vk.allocator );
+	}
+
 }
+
+
+auto ref createDescriptor(
+	ref Meta_Descriptor meta,
+	VkDescriptorPool	descriptor_pool,
+	uint32_t			binding,
+	VkDescriptorType	descriptorType,
+	uint32_t			descriptorCount,
+	VkShaderStageFlags	stageFlags,
+	const(VkSampler)*	pImmutableSamplers = null ) {
+
+	meta.set_layout = meta.createSetLayout( binding, descriptorType, descriptorCount, stageFlags, pImmutableSamplers );
+	meta.set = meta.allocateSet( descriptor_pool, meta.set_layout );
+	return meta;
+}
+
+
+auto initDescriptor(
+	ref Vulkan 			vk,
+	VkDescriptorPool	descriptor_pool,
+	uint32_t			binding,
+	VkDescriptorType	descriptorType,
+	uint32_t			descriptorCount,
+	VkShaderStageFlags	stageFlags,
+	const(VkSampler)*	pImmutableSamplers = null ) {
+
+	Meta_Descriptor meta = vk;
+	return meta.createDescriptor( 
+		descriptor_pool, binding, descriptorType, descriptorCount, stageFlags, pImmutableSamplers );
+}
+
+
+auto initDescriptor( ref Vulkan vk ) {
+	return Meta_Descriptor( vk );
+}
+
+
+auto ref addLayoutBinding( ref Meta_Descriptor meta, VkDescriptorSetLayoutBinding set_layout_binding ) {
+	meta.set_layout_bindings.append( set_layout_binding );
+	return meta;
+}
+
+
+auto ref addLayoutBinding(
+	ref Meta_Descriptor meta,
+	uint32_t			binding,
+	VkDescriptorType	descriptorType,
+	uint32_t			descriptorCount,
+	VkShaderStageFlags	stageFlags,
+	const(VkSampler)*	pImmutableSamplers = null ) {
+
+	return meta.addLayoutBinding(
+		VkDescriptorSetLayoutBinding( binding, descriptorType, descriptorCount, stageFlags, pImmutableSamplers
+	));
+}
+
+
+auto ref createDescriptor( ref Meta_Descriptor meta, VkDescriptorPool descriptor_pool ) {
+	meta.set_layout = meta.createSetLayout( meta.set_layout_bindings.data );
+	meta.set = meta.allocateSet( descriptor_pool, meta.set_layout );
+	return meta;
+}
+
+
+
+
 
 
 auto createMatrixBuffer( ref Vulkan vk, void[] data ) {
@@ -190,8 +276,7 @@ auto createMatrixBuffer( ref Vulkan vk, void[] data ) {
 auto createMatrixUniform( ref Vulkan vk, VkDescriptorPool descriptor_pool, VkBuffer buffer, VkDeviceSize range, VkDeviceSize offset = 0 ) {
 
 	Meta_Descriptor meta_descriptor = vk;
-	meta_descriptor.set_layout = vk.createDescriptorSetLayout( 
-		0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT, null );
+	meta_descriptor.set_layout = vk.createSetLayout( 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT, null );
 
 	VkDescriptorSetAllocateInfo descriptor_allocate_info = {
 		descriptorPool		: descriptor_pool,
