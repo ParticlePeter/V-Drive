@@ -28,7 +28,7 @@ private struct Meta_Subpass {
 
 struct Meta_Render_Pass {
 	mixin							Vulkan_State_Pointer;
-	VkRenderPass					render_pass() { return begin_info.renderPass; }
+	ref VkRenderPass				render_pass() { return begin_info.renderPass; }
 	VkRenderPassBeginInfo			begin_info;		// the actual renderpass is stored in a member of this struct
 	Array!VkAttachmentDescription	attachment_descriptions;
 	Array!Meta_Subpass				subpasses;
