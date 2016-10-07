@@ -47,12 +47,15 @@ struct Meta_Graphics {
 
 	VkRenderPass								render_pass;
 	uint32_t									subpass;
-	VkPipeline									base_pipeline = VK_NULL_ND_HANDLE;
-	int32_t										base_pipeline_index;
+	VkPipeline									base_pipeline_handle = VK_NULL_ND_HANDLE;
+	//int32_t									base_pipeline_index  = -1;
 
 	void destroyResources() {
 		vk.device.vkDestroyPipeline( pipeline, vk.allocator );
 		vk.device.vkDestroyPipelineLayout( pipeline_layout, vk.allocator );
+	}
+
+	void destroyShaderModules() {
 		foreach( ref shader_stage; shader_stages )
 			vk.device.vkDestroyShaderModule( shader_stage._module, vk.allocator );
 	}
@@ -84,6 +87,12 @@ auto ref pipelineCreateFlags( ref Meta_Graphics meta, VkPipelineCreateFlags pipe
 //////////////////////////////
 auto ref addShaderStageCreateInfo( ref Meta_Graphics meta, VkPipelineShaderStageCreateInfo shader_stage_create_info ) {
 	meta.shader_stages.append = shader_stage_create_info;
+	return meta;
+}
+
+auto ref addShaderStageCreateInfo( ref Meta_Graphics meta, VkPipelineShaderStageCreateInfo[] shader_stage_create_infos ) {
+	foreach( ref shader_stage_create_info; shader_stage_create_infos )
+		meta.shader_stages.append = shader_stage_create_info;
 	return meta;
 }
 
@@ -298,7 +307,7 @@ auto ref addColorBlendState( ref Meta_Graphics meta, VkPipelineColorBlendAttachm
 
 auto ref addColorBlendState(
 	ref Meta_Graphics		meta,
-	VkBool32				blendEnable,
+	VkBool32				blendEnable			= VK_FALSE,
 	VkBlendFactor			srcColorBlendFactor	= VK_BLEND_FACTOR_SRC_COLOR,
 	VkBlendFactor			dstColorBlendFactor	= VK_BLEND_FACTOR_ONE_MINUS_DST_COLOR,
 	VkBlendOp				colorBlendOp		= VK_BLEND_OP_ADD,
@@ -389,18 +398,34 @@ auto ref addPushConstantRange( ref Meta_Graphics meta, VkShaderStageFlags stage_
 
 
 
-////////////////////////////////////////////
-// render pass, subpass and base pipeline //
-////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+// render pass, subpass, base pipeline and optimization //
+//////////////////////////////////////////////////////////
 auto ref renderPass( ref Meta_Graphics meta, VkRenderPass render_pass, size_t subpass = 0 ) {
 	meta.render_pass = render_pass;
 	meta.subpass = subpass.toUint;
 	return meta;
 }
 
-auto ref basePipeline( ref Meta_Graphics meta, VkPipeline base_pipeline, int32_t base_pipeline_index = 0 ) {
-	meta.base_pipeline = base_pipeline;
+auto ref basePipeline( ref Meta_Graphics meta, VkPipeline base_pipeline_handle ) {
+	meta.base_pipeline_handle = base_pipeline_handle;
+	return meta;
+}
+
+/* not using multi pipeline creation yet
+auto ref basePipeline( ref Meta_Graphics meta, int32_t base_pipeline_index ) {
 	meta.base_pipeline_index = base_pipeline_index;
+	return meta;
+}
+*/
+
+auto ref disableOptimization( ref Meta_Graphics meta ) {
+	meta.pipeline_create_flags |= VK_PIPELINE_CREATE_DISABLE_OPTIMIZATION_BIT;
+	return meta;
+}
+
+auto ref allowDerivatives( ref Meta_Graphics meta ) {
+	meta.pipeline_create_flags |= VK_PIPELINE_CREATE_ALLOW_DERIVATIVES_BIT;
 	return meta;
 }
 
@@ -452,6 +477,7 @@ auto ref createPipeline( ref Meta_Graphics meta ) {
 
 	// create the pipeline object
 	VkGraphicsPipelineCreateInfo pipeline_create_info = {
+		flags				: meta.pipeline_create_flags,
 		stageCount			: meta.shader_stages.length.toUint,
 		pStages				: meta.shader_stages.ptr,
 		pVertexInputState	: & vertex_input_state_create_info,
@@ -466,9 +492,12 @@ auto ref createPipeline( ref Meta_Graphics meta ) {
 		layout				: meta.pipeline_layout,
 		renderPass			: meta.render_pass,
 		subpass				: meta.subpass,
-		basePipelineHandle	: meta.base_pipeline,
-		basePipelineIndex	: meta.base_pipeline_index,
+		basePipelineHandle	: meta.base_pipeline_handle,
+		basePipelineIndex	: -1,//meta.base_pipeline_index,
 	};
+
+	if( meta.base_pipeline_handle  != VK_NULL_ND_HANDLE /*|| meta.base_pipeline_index != -1*/ )
+		pipeline_create_info.flags |= VK_PIPELINE_CREATE_DERIVATIVE_BIT;
 
 	meta.device.vkCreateGraphicsPipelines( VK_NULL_ND_HANDLE, 1, &pipeline_create_info, meta.allocator, &meta.pipeline ).vkEnforce;
 	return meta;
