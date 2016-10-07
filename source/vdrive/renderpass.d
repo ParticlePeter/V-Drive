@@ -1,4 +1,4 @@
-module vdrive.framebuffer;
+module vdrive.renderpass;
 
 import core.stdc.stdio : printf;
 
