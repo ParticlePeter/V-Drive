@@ -77,7 +77,7 @@ auto ref createMemory( ref Meta_Memory meta, VkDeviceSize allocation_size, uint3
 }
 
 
-auto ref initMemory( ref Vulkan vk, VkDeviceSize allocation_size, uint32_t memory_type_index ) {
+auto initMemory( ref Vulkan vk, VkDeviceSize allocation_size, uint32_t memory_type_index ) {
 	Meta_Memory meta = vk;
 	return meta.createMemory( allocation_size, memory_type_index );
 }
