@@ -20,6 +20,7 @@ mixin template Vulkan_State_Pointer() {
 	ref Vulkan vk() { return * vk_ptr; }
 	void vk( ref Vulkan vk ) { vk_ptr = &vk; }
 	auto ref opCall( ref Vulkan vk ) { vk_ptr = &vk; return this; }
+	bool isValid() { return vk_ptr !is null; }
 }
 
 struct Vulkan {
@@ -60,7 +61,7 @@ if( is( T == string ) | is( T == string[] ) | is( T == Array!( const( char )* ))
 		engineVersion		: VK_MAKE_VERSION( 0, 1, 0 ),
 		pApplicationName	: "V-Drive-App",
 		applicationVersion	: VK_MAKE_VERSION( 0, 1, 0 ),
-		apiVersion			: VK_MAKE_VERSION( 1, 0, 8 ),
+		apiVersion			: VK_API_VERSION_1_0,
 	};
 
 	// Preprocess arguments if passed as string or string[] at compile time
