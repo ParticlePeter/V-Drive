@@ -56,21 +56,21 @@ struct Meta_Surface {
 }
 
 
-
-
-
-
 auto ref selectSurfaceFormat( ref Meta_Surface meta, VkFormat[] include_formats, bool first_available_as_fallback = true ) {
 	meta.surfaceFormat = meta.gpu.listSurfaceFormats( meta.surface, false ).filter( include_formats );
 	return meta;
 }
+
 
 auto ref selectPresentMode( ref Meta_Surface meta, VkPresentModeKHR[] include_modes, bool first_available_as_fallback = true ) {
 	meta.presentMode = meta.gpu.listPresentModes( meta.surface, false ).filter( include_modes );
 	return meta;
 }
 
-auto ref createSwapchain( ref Meta_Surface meta ) {
+
+auto ref construct( ref Meta_Surface meta ) {
+	// assert the meta struct was initialized with vulkan state struct
+	assert( meta.isValid );
 
 	// request different count of images dependent on selected present mode
 	if( meta.minImageCount == 0 ) {
@@ -116,6 +116,8 @@ auto ref createSwapchain( ref Meta_Surface meta ) {
 }
 
 
+
+
 auto swapchainImageViews( ref Meta_Surface meta, VkImageAspectFlags subrecource_aspect_mask = VK_IMAGE_ASPECT_COLOR_BIT, VkImageViewType image_view_type = VK_IMAGE_VIEW_TYPE_2D ) {
 	VkImageSubresourceRange image_subresource_range = {
 		aspectMask 		: VK_IMAGE_ASPECT_COLOR_BIT,
@@ -140,6 +142,8 @@ auto swapchainImageViews( ref Meta_Surface meta, VkImageSubresourceRange image_s
 
 
 auto swapchainImageViews( ref Meta_Surface meta, VkImageViewCreateInfo image_view_create_info ) {
+	// assert the meta struct was initialized with vulkan state struct
+	assert( meta.isValid );
 
 	// Get the swapchain images
 	//uint32_t present_image_count = 0;
