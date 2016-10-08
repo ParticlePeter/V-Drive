@@ -195,7 +195,7 @@ struct Meta_Descriptor {
 }
 
 
-auto ref createDescriptor(
+auto ref initDescriptor(
 	ref Meta_Descriptor meta,
 	VkDescriptorPool	descriptor_pool,
 	uint32_t			binding,
@@ -204,13 +204,16 @@ auto ref createDescriptor(
 	VkShaderStageFlags	stageFlags,
 	const(VkSampler)*	pImmutableSamplers = null ) {
 
+	assert( meta.isValid );		// assert the meta struct was initialized with vulkan state struct
 	meta.set_layout = meta.createSetLayout( binding, descriptorType, descriptorCount, stageFlags, pImmutableSamplers );
 	meta.set = meta.allocateSet( descriptor_pool, meta.set_layout );
 	return meta;
 }
 
+alias create = initDescriptor;
 
-auto initDescriptor(
+
+auto createDescriptor(
 	ref Vulkan 			vk,
 	VkDescriptorPool	descriptor_pool,
 	uint32_t			binding,
@@ -220,13 +223,8 @@ auto initDescriptor(
 	const(VkSampler)*	pImmutableSamplers = null ) {
 
 	Meta_Descriptor meta = vk;
-	return meta.createDescriptor( 
+	return meta.initDescriptor( 
 		descriptor_pool, binding, descriptorType, descriptorCount, stageFlags, pImmutableSamplers );
-}
-
-
-auto initDescriptor( ref Vulkan vk ) {
-	return Meta_Descriptor( vk );
 }
 
 
@@ -250,98 +248,11 @@ auto ref addLayoutBinding(
 }
 
 
-auto ref createDescriptor( ref Meta_Descriptor meta, VkDescriptorPool descriptor_pool ) {
+auto ref construct( ref Meta_Descriptor meta, VkDescriptorPool descriptor_pool ) {
 	meta.set_layout = meta.createSetLayout( meta.set_layout_bindings.data );
 	meta.set = meta.allocateSet( descriptor_pool, meta.set_layout );
 	return meta;
 }
-
-
-
-
-
-
-auto createMatrixBuffer( ref Vulkan vk, void[] data ) {
-
-	import vdrive.memory;
-	Meta_Buffer meta_buffer = vk;
-	meta_buffer.createBuffer( VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, data.length );
-	meta_buffer.createMemory( VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT );
-	meta_buffer.bufferData( data );
-
-	return meta_buffer;
-}
-
-
-auto createMatrixUniform( ref Vulkan vk, VkDescriptorPool descriptor_pool, VkBuffer buffer, VkDeviceSize range, VkDeviceSize offset = 0 ) {
-
-	Meta_Descriptor meta_descriptor = vk;
-	meta_descriptor.set_layout = vk.createSetLayout( 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT, null );
-
-	VkDescriptorSetAllocateInfo descriptor_allocate_info = {
-		descriptorPool		: descriptor_pool,
-		descriptorSetCount	: 1,
-		pSetLayouts			: &meta_descriptor.set_layout,
-	};
-
-	vkAllocateDescriptorSets( vk.device, &descriptor_allocate_info, &meta_descriptor.set );
-
-	// When a set is allocated all values are undefined and all 
-	// descriptors are uninitialised. must init all statically used bindings:
-	VkDescriptorBufferInfo descriptor_buffer_info = {
-		buffer	: buffer,
-		offset	: offset,
-		range	: range,	// VK_WHOLE_SIZE not working here, Driver Bug?	
-	};
-
-	VkWriteDescriptorSet write_descriptor_set = {
-		dstSet				: meta_descriptor.set,
-		dstBinding			: 0,
-		dstArrayElement		: 0,
-		descriptorCount		: 1,
-		descriptorType		: VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-		pImageInfo			: null,
-		pBufferInfo			: &descriptor_buffer_info,
-		pTexelBufferView	: null,
-	};
-
-	vk.device.vkUpdateDescriptorSets( 1, &write_descriptor_set, 0, null );
-
-	return meta_descriptor;
-} 
-
-
-
-
-
-
-
-
-
-/*
-auto ref appendLayoutBinding(
-	Meta_Descriptor		meta_descriptor,
-	uint32_t			binding,
-	VkDescriptorType	descriptorType,
-	uint32_t			descriptorCount,
-	VkShaderStageFlags	stageFlags,
-	const( VkSampler )*	pImmutableSamplers = null ) {
-
-	VkDescriptorSetLayoutBinding set_layout_binding = {
-		binding				: binding,
-		descriptorType		: descriptorType,
-		descriptorCount		: descriptorCount,
-		stageFlags			: stageFlags,
-		pImmutableSamplers	: pImmutableSamplers,
-	};
-
-	meta_descriptor.set_layout_bindings.append( set_layout_binding );
-	return meta_descriptor;
-}
-*/
-
-
-
 
 
 
