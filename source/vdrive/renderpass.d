@@ -10,7 +10,7 @@ import erupted;
 
 
 ///////////////////////////////////////
-// Meta_Subpass and Meta_Render_Pass //
+// Meta_Subpass and Meta_Renderpass //
 ///////////////////////////////////////
 
 
@@ -26,7 +26,7 @@ private struct Meta_Subpass {
 }
 
 
-struct Meta_Render_Pass {
+struct Meta_Renderpass {
 	mixin							Vulkan_State_Pointer;
 	ref VkRenderPass				render_pass() { return begin_info.renderPass; }
 	VkRenderPassBeginInfo			begin_info;		// the actual renderpass is stored in a member of this struct
@@ -43,14 +43,9 @@ struct Meta_Render_Pass {
 }
 
 
-auto initRenderPass( ref Vulkan vk ) {
-	return Meta_Render_Pass( vk );
-}
-
-
 
 auto ref renderPassAttachment(
-	ref Meta_Render_Pass	meta,
+	ref Meta_Renderpass	meta,
 	VkFormat				image_format,
 	VkSampleCountFlagBits	sample_count,
 	VkAttachmentLoadOp		load_op,
@@ -77,7 +72,7 @@ auto ref renderPassAttachment(
 
 
 auto ref renderPassAttachment(
-	ref Meta_Render_Pass	meta,
+	ref Meta_Renderpass	meta,
 	VkFormat				image_format,
 	VkSampleCountFlagBits	sample_count,
 	VkAttachmentLoadOp		load_op,
@@ -91,7 +86,7 @@ auto ref renderPassAttachment(
 
 
 auto ref renderPassAttachImpl( alias load_op, alias store_op )(
-	ref Meta_Render_Pass	meta,
+	ref Meta_Renderpass		meta,
 	VkFormat				image_format,
 	VkSampleCountFlagBits	sample_count,
 	VkImageLayout			initial_layout,
@@ -110,8 +105,8 @@ alias renderPassAttachment_None_None	= renderPassAttachImpl!( VK_ATTACHMENT_LOAD
 alias renderPassAttachment_None_Store	= renderPassAttachImpl!( VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_STORE_OP_STORE );
 
 
-// cannot use subpassReference as function overload as aliases bellow cannot be set for function overloads with diferent args
-auto ref firstSubpassReference( string reference )( ref Meta_Render_Pass meta, VkImageLayout render_layout = VK_IMAGE_LAYOUT_MAX_ENUM ) {
+// cannot use subpassReference as function overload as aliases bellow cannot be set for function overloads with different args
+auto ref firstSubpassReference( string reference )( ref Meta_Renderpass meta, VkImageLayout render_layout = VK_IMAGE_LAYOUT_MAX_ENUM ) {
 	assert( meta.attachment_descriptions.length > 0 );
 	return subpassReference!reference( meta, toUint( meta.attachment_descriptions.length - 1 ), render_layout );
 }
@@ -123,7 +118,7 @@ alias subpassRefPreserve		= firstSubpassReference!( "preserve" );
 alias subpassRefDepthStencil	= firstSubpassReference!( "depth_stencil" );
 
 
-auto ref subpassReference( string reference )( ref Meta_Render_Pass meta, uint32_t attachment_index, VkImageLayout render_layout = VK_IMAGE_LAYOUT_MAX_ENUM ) {
+auto ref subpassReference( string reference )( ref Meta_Renderpass meta, uint32_t attachment_index, VkImageLayout render_layout = VK_IMAGE_LAYOUT_MAX_ENUM ) {
 
 	if( meta.subpasses.length == 0 )
 		meta.appendSubpass;
@@ -137,11 +132,11 @@ auto ref subpassReference( string reference )( ref Meta_Render_Pass meta, uint32
 	if( meta.attachment_descriptions[$-1].finalLayout == VK_IMAGE_LAYOUT_MAX_ENUM )
 		meta.attachment_descriptions[$-1].finalLayout = attachment_reference.layout;
 
-			static if ( reference == "input" ) 			meta.subpass.input_reference.insert( attachment_reference );
-	else	static if ( reference == "color" ) 			meta.subpass.color_reference.insert( attachment_reference );
-	else	static if ( reference == "resolve" ) 		meta.subpass.resolve_reference.insert( attachment_reference );
-	else	static if ( reference == "preserve" ) 		meta.subpass.preserve_reference.insert( attachment_reference );
-	else	static if ( reference == "depth_stencil" ) 	meta.subpass.depth_stencil_reference = attachment_reference;
+		 static if( reference == "input" ) 			meta.subpass.input_reference.insert( attachment_reference );
+	else static if( reference == "color" ) 			meta.subpass.color_reference.insert( attachment_reference );
+	else static if( reference == "resolve" ) 		meta.subpass.resolve_reference.insert( attachment_reference );
+	else static if( reference == "preserve" ) 		meta.subpass.preserve_reference.insert( attachment_reference );
+	else static if( reference == "depth_stencil" ) 	meta.subpass.depth_stencil_reference = attachment_reference;
 
 	return meta;
 }
@@ -155,7 +150,7 @@ alias subpassRefDepthStencil	= subpassReference!( "depth_stencil" );
 
 
 
-private auto ref mayAliasOrBindPoint( alias value )( ref Meta_Render_Pass meta, size_t index = size_t.max )
+private auto ref mayAliasOrBindPoint( alias value )( ref Meta_Renderpass meta, size_t index = size_t.max )
 if( is( typeof( value ) == VkPipelineBindPoint ) || is( typeof( value ) == VkAttachmentDescriptionFlagBits ))
 {
 	assert( meta.subpasses.length > 0 );
@@ -170,19 +165,19 @@ if( is( typeof( value ) == VkPipelineBindPoint ) || is( typeof( value ) == VkAtt
 	return meta;
 }
 
-// Per Spec v1.0.21 p.118 valid usage of a VkSubpassDescription: "pipelineBindPoint must be VK_PIPELINE_BIND_POINT_GRAPHICS" 
-//auto ref graphicBindPoint( ref Meta_Render_Pass meta, size_t index = size_t.max ) { return mayAliasOrBindPoint!VK_PIPELINE_BIND_POINT_GRAPHICS( meta, index ); }	// for sake of completeness
-//auto ref computeBindPoint( ref Meta_Render_Pass meta, size_t index = size_t.max ) { return mayAliasOrBindPoint!VK_PIPELINE_BIND_POINT_COMPUTE(  meta, index ); }
-auto ref mayAlias( ref Meta_Render_Pass meta, size_t index = size_t.max ) { return mayAliasOrBindPoint!VK_ATTACHMENT_DESCRIPTION_MAY_ALIAS_BIT( meta, index ); }
+// Per Spec v1.0.21 p.118 valid usage of a VkSubpassDescription: "pipelineBindPoint must be VK_PIPELINE_BIND_POINT_GRAPHICS", hence bellow obsolete 
+//auto ref graphicBindPoint( ref Meta_Renderpass meta, size_t index = size_t.max ) { return mayAliasOrBindPoint!VK_PIPELINE_BIND_POINT_GRAPHICS( meta, index ); }	// for sake of completeness
+//auto ref computeBindPoint( ref Meta_Renderpass meta, size_t index = size_t.max ) { return mayAliasOrBindPoint!VK_PIPELINE_BIND_POINT_COMPUTE(  meta, index ); }
+auto ref mayAlias( ref Meta_Renderpass meta, size_t index = size_t.max ) { return mayAliasOrBindPoint!VK_ATTACHMENT_DESCRIPTION_MAY_ALIAS_BIT( meta, index ); }
 
 
 
-///	append a Meta_Subpass to the subpasses array of Meta_Render_Pass
+///	append a Meta_Subpass to the subpasses array of Meta_Renderpass
 /// consecutive subpass related function calls will create resources for this Meta_Structure if no index is specified
 ///	Params:
-///		meta = reference to a Meta_Render_Pass struct
+///		meta = reference to a Meta_Renderpass struct
 ///	Returns: the passed in Meta_Structure for function chaining 
-auto ref appendSubpass( ref Meta_Render_Pass meta ) {
+auto ref appendSubpass( ref Meta_Renderpass meta ) {
 	meta.subpasses.length = meta.subpasses.length + 1;
 	meta.subpass = &meta.subpasses[ $-1 ];
 	return meta; 
@@ -192,10 +187,10 @@ auto ref appendSubpass( ref Meta_Render_Pass meta ) {
 ///	set clear values into the render pass begin info
 /// usage of either this function or attachFramebuffer(s) is required to set clear values for the later used VkRenderPassBeginInfo
 ///	Params:
-///		meta = reference to a Meta_Render_Pass struct
+///		meta = reference to a Meta_Renderpass struct
 ///		clear_values = will be set into the meta render pass VkRenderPassBeginInfo. Storage must be managed outside
 ///	Returns: the passed in Meta_Structure for function chaining
-auto ref clearValues( Array_T )( ref Meta_Render_Pass meta, Array_T clear_values )
+auto ref clearValues( Array_T )( ref Meta_Renderpass meta, Array_T clear_values )
 if( is( Array_T == Array!VkClearValue ) || is( Array_T : VkClearValue[] )) {
 	meta.begin_info.pClearValues = clear_values.ptr;
 	meta.begin_info.clearValueCount = clear_values.length.toUint;
@@ -204,11 +199,13 @@ if( is( Array_T == Array!VkClearValue ) || is( Array_T : VkClearValue[] )) {
 
 // TODO(pp): not having a depth attachment does not work. Fix it!
 
-///	construct a VkRenderPass from specified resources of Meta_Render_Pass structure and store it there as well
+///	construct a VkRenderPass from specified resources of Meta_Renderpass structure and store it there as well
 ///	Params:
-///		meta = reference to a Meta_Render_Pass struct
+///		meta = reference to a Meta_Renderpass struct
 ///	Returns: the passed in Meta_Structure for function chaining 
-auto ref createRenderPass( ref Meta_Render_Pass meta ) {
+auto ref construct( ref Meta_Renderpass meta ) {
+	// assert the meta struct was initialized with vulkan state struct
+	assert( meta.isValid );
 
 	// extract VkSubpassDescription from Meta_Subpass
 	auto subpass_descriptions = sizedArray!VkSubpassDescription( meta.subpasses.length );
@@ -264,16 +261,11 @@ struct Meta_Framebuffer {
 	mixin 					Vulkan_State_Pointer;
 	VkFramebuffer			framebuffer;
 	VkRect2D				render_area;
-	Array!VkClearValue		clear_values;	// coresponds to Meta_Render_Pass.attachment_Descriptions
+	Array!VkClearValue		clear_values;	// coresponds to Meta_Renderpass.attachment_Descriptions
 
 	void destroyResources() {
 		vk.device.vkDestroyFramebuffer( framebuffer, vk.allocator );
 	}
-}
-
-
-auto initFramebuffer( ref Vulkan vk ) {
-	return Meta_Framebuffer( vk );
 }
 
 
@@ -282,7 +274,7 @@ struct Meta_Framebuffers {
 	mixin 					Vulkan_State_Pointer;
 	Array!VkFramebuffer		framebuffers;
 	VkRect2D				render_area;
-	Array!VkClearValue		clear_values;	// coresponds to Meta_Render_Pass.attachment_Descriptions
+	Array!VkClearValue		clear_values;	// coresponds to Meta_Renderpass.attachment_Descriptions
 
 	void destroyResources() {
 		foreach( framebuffer; framebuffers ) vk.device.vkDestroyFramebuffer( framebuffer, vk.allocator );
@@ -290,9 +282,6 @@ struct Meta_Framebuffers {
 }
 
 
-auto initFramebuffers( ref Vulkan vk ) {
-	return Meta_Framebuffers( vk );
-}
 
 /// Set or append an attachment specific clear value, several overloads exist
 /// The last argument is an optional attachment index:
@@ -375,59 +364,61 @@ auto ref renderAreaExtent( META_FB )( ref META_FB meta, VkExtent2D extent ) if( 
 
 
 //////////////////////////////////////////////////
-// connect Meta_Framebuffer to Meta_Render_Pass //
+// connect Meta_Framebuffer to Meta_Renderpass //
 //////////////////////////////////////////////////
 
-///	set members of a Meta_Render_Pass.VkRenderPassBeginInfo with the coresponding members of a Meta_Framebuffer structure
+///	set members of a Meta_Renderpass.VkRenderPassBeginInfo with the coresponding members of a Meta_Framebuffer structure
 /// this should be called once if the framebuffer related members of the VkRenderPassBeginInfo are not changing later on
 /// or before vkCmdBeginRenderPass to switch frambuffer, render area (hint, see renderAreaOffset/Extent) and clear values
 ///	Params:
-///		meta_render_pass = reference to a Meta_Render_Pass structure holding the VkRenderPassBeginInfo
+///		meta_renderpass = reference to a Meta_Renderpass structure holding the VkRenderPassBeginInfo
 ///		meta_framebuffer = the Meta_Framebuffer structure whose frambuffer and resources will be attached
 ///	Returns: the passed in Meta_Structure for function chaining
-auto ref attachFramebuffer( ref Meta_Render_Pass meta_render_pass, ref Meta_Framebuffer meta_framebuffer ) {
-	meta_render_pass.begin_info.framebuffer = meta_framebuffer.framebuffer;
-	meta_render_pass.begin_info.renderArea = meta_framebuffer.render_area;
-	meta_render_pass.begin_info.pClearValues = meta_framebuffer.clear_values.ptr;
-	meta_render_pass.begin_info.clearValueCount = meta_framebuffer.clear_values.length.toUint;
-	return meta_render_pass;
+auto ref attachFramebuffer( ref Meta_Renderpass meta_renderpass, ref Meta_Framebuffer meta_framebuffer ) {
+	meta_renderpass.begin_info.framebuffer = meta_framebuffer.framebuffer;
+	meta_renderpass.begin_info.renderArea = meta_framebuffer.render_area;
+	meta_renderpass.begin_info.pClearValues = meta_framebuffer.clear_values.ptr;
+	meta_renderpass.begin_info.clearValueCount = meta_framebuffer.clear_values.length.toUint;
+	return meta_renderpass;
 }
 
-///	set members of a Meta_Render_Pass.VkRenderPassBeginInfo with the coresponding members of a Meta_Framebuffers structure
+///	set members of a Meta_Renderpass.VkRenderPassBeginInfo with the coresponding members of a Meta_Framebuffers structure
 /// this should be called once if the framebuffer related members of the VkRenderPassBeginInfo are not changing later on
 /// or before vkCmdBeginRenderPass to switch frambuffer, render area (hint, see renderAreaOffset/Extent) and clear values
 ///	Params:
-///		meta_render_pass  = reference to a Meta_Render_Pass structure holding the VkRenderPassBeginInfo
+///		meta_renderpass  = reference to a Meta_Renderpass structure holding the VkRenderPassBeginInfo
 ///		meta_framebuffers = reference to the Meta_Framebuffer structure whose frambuffer and resources will be attached
 ///		framebuffer_index = the index to select a frambuffer from the member framebuffer array
 ///	Returns: the passed in Meta_Structure for function chaining
-auto ref attachFramebuffer( ref Meta_Render_Pass meta_render_pass, ref Meta_Framebuffers meta_framebuffers, size_t framebuffer_index ) {
-	meta_render_pass.begin_info.framebuffer = meta_framebuffers.framebuffers[ framebuffer_index ];
-	meta_render_pass.begin_info.renderArea = meta_framebuffers.render_area;
-	meta_render_pass.begin_info.pClearValues = meta_framebuffers.clear_values.ptr;
-	meta_render_pass.begin_info.clearValueCount = meta_framebuffers.clear_values.length.toUint;
-	return meta_render_pass;
+auto ref attachFramebuffer( ref Meta_Renderpass meta_renderpass, ref Meta_Framebuffers meta_framebuffers, size_t framebuffer_index ) {
+	meta_renderpass.begin_info.framebuffer = meta_framebuffers.framebuffers[ framebuffer_index ];
+	meta_renderpass.begin_info.renderArea = meta_framebuffers.render_area;
+	meta_renderpass.begin_info.pClearValues = meta_framebuffers.clear_values.ptr;
+	meta_renderpass.begin_info.clearValueCount = meta_framebuffers.clear_values.length.toUint;
+	return meta_renderpass;
 }
 
-///	set framebuffer member of a Meta_Render_Pass.VkRenderPassBeginInfo with a freambuffer not changing its framebuffer related resources
+///	set framebuffer member of a Meta_Renderpass.VkRenderPassBeginInfo with a freambuffer not changing its framebuffer related resources
 ///	Params:
-///		meta_render_pass = reference to a Meta_Render_Pass structure holding the VkRenderPassBeginInfo
+///		meta_renderpass = reference to a Meta_Renderpass structure holding the VkRenderPassBeginInfo
 ///		framebuffer      = the VkFramebuffer to attach to VkRenderPassBeginInfo
 ///	Returns: the passed in Meta_Structure for function chaining
-auto ref attachFramebuffer( ref Meta_Render_Pass meta_render_pass, VkFramebuffer framebuffer ) {
-	meta_render_pass.begin_info.framebuffer = framebuffer;
-	return meta_render_pass;
+auto ref attachFramebuffer( ref Meta_Renderpass meta_renderpass, VkFramebuffer framebuffer ) {
+	meta_renderpass.begin_info.framebuffer = framebuffer;
+	return meta_renderpass;
 }
 
 
-///	create the VkFramebuffer and store them in the meta structure
+///	initialize the VkFramebuffer and store them in the meta structure
 ///	Params:
 ///		meta				= reference to a Meta_Framebuffer or Meta_Framebuffers
 ///		render_pass			= required for VkFramebufferCreateInfo to specify COMPATIBLE renderpasses
 ///		framebuffer_extent	= the extent of the frambuffer, this is not(!) the render area
 ///		image_views			= these will be attached to each of the VkFramebuffer(s) attachments 0 .. first_image_views.length
 ///	Returns: the passed in Meta_Structure for function chaining
-auto ref createFramebuffer( ref Meta_Framebuffer meta, VkRenderPass render_pass, VkExtent2D framebuffer_extent, VkImageView[] image_views ) {
+auto ref initFramebuffer( ref Meta_Framebuffer meta, VkRenderPass render_pass, VkExtent2D framebuffer_extent, VkImageView[] image_views ) {
+	// assert the meta struct was initialized with vulkan state struct
+	assert( meta.isValid );
 
 	// the framebuffer_extent is not(!) the render_area, but rather a specification of how big the framebuffer is
 	// the render area specifies a renderable window into this frambuffer
@@ -452,36 +443,36 @@ auto ref createFramebuffer( ref Meta_Framebuffer meta, VkRenderPass render_pass,
 }
 
 
-auto initFramebuffer( ref Vulkan vk, VkRenderPass render_pass, VkExtent2D framebuffer_extent, VkImageView[] image_views ) {
-	Meta_Framebuffer meta = vk;
-	return meta.createFramebuffer( render_pass, framebuffer_extent, image_views );
-}
-
-
-
-///	create the VkFramebuffer and store them in the meta structure
+///	initialize the VkFramebuffer and store them in the meta structure
 ///	Params:
 ///		meta				= reference to a Meta_Framebuffer or Meta_Framebuffers
-///		meta_render_pass	= the render_pass member is required for VkFramebufferCreateInfo to specify COMPATIBLE renderpasses,
+///		meta_renderpass	= the render_pass member is required for VkFramebufferCreateInfo to specify COMPATIBLE renderpasses,
 ///								additionally framebuffer[0], clear_values and extent are set into the VkRenderPassBeginInfo member  
 ///		framebuffer_extent	= the extent of the render area
 ///		image_views	= these will be attached to each of the VkFramebuffer(s) attachments 0 .. first_image_views.length
 ///	Returns: the passed in Meta_Structure for function chaining
-auto ref createFramebuffer( ref Meta_Framebuffer meta, ref Meta_Render_Pass meta_render_pass, VkExtent2D framebuffer_extent, VkImageView[] image_views ) {
-	meta.createFramebuffer( meta_render_pass.begin_info.renderPass, framebuffer_extent, image_views );
-	meta_render_pass.attachFramebuffer( meta );
+auto ref initFramebuffer( ref Meta_Framebuffer meta, ref Meta_Renderpass meta_renderpass, VkExtent2D framebuffer_extent, VkImageView[] image_views ) {
+	meta.initFramebuffer( meta_renderpass.begin_info.renderPass, framebuffer_extent, image_views );
+	meta_renderpass.attachFramebuffer( meta );
 	return meta;
 }
 
+alias create = initFramebuffer;
 
 
-auto initFramebuffer( ref Vulkan vk, ref Meta_Render_Pass meta_render_pass, VkExtent2D framebuffer_extent, VkImageView[] image_views ) {
+auto createFramebuffer( ref Vulkan vk, VkRenderPass render_pass, VkExtent2D framebuffer_extent, VkImageView[] image_views ) {
 	Meta_Framebuffer meta = vk;
-	return meta.createFramebuffer( meta_render_pass, framebuffer_extent, image_views );
+	return meta.initFramebuffer( render_pass, framebuffer_extent, image_views );
 }
 
 
-///	create the VkFramebuffer(s) and store them in the meta structure
+auto createFramebuffer( ref Vulkan vk, ref Meta_Renderpass meta_renderpass, VkExtent2D framebuffer_extent, VkImageView[] image_views ) {
+	Meta_Framebuffer meta = vk;
+	return meta.initFramebuffer( meta_renderpass, framebuffer_extent, image_views );
+}
+
+
+///	initialize the VkFramebuffer(s) and store them in the meta structure
 ///	Params:
 ///		meta				= reference to a Meta_Framebuffer or Meta_Framebuffers
 ///		render_pass			= required for VkFramebufferCreateInfo to specify COMPATIBLE renderpasses
@@ -490,13 +481,16 @@ auto initFramebuffer( ref Vulkan vk, ref Meta_Render_Pass meta_render_pass, VkEx
 ///		dynamic_image_views = the count of these specifies the count if VkFramebuffers(s), dynamic_imag_views[i] will be attached to framebuffer[i] attachment[first_image_views.length] 
 ///		last_image views	= these will be attached to each of the VkFramebuffer(s) attachments first_image_views.length + 1 .. last_image_view_length + 1 
 ///	Returns: the passed in Meta_Structure for function chaining
-auto ref createFramebuffers(
+auto ref initFramebuffers(
 	ref Meta_Framebuffers	meta,
 	VkRenderPass			render_pass,
 	VkExtent2D				framebuffer_extent,
 	VkImageView[]			first_image_views,
 	VkImageView[]			dynamic_image_views,
 	VkImageView[]			last_image_views = [] ) {
+
+	// assert the meta struct was initialized with vulkan state struct
+	assert( meta.isValid );
 
 	// the framebuffer_extent is not(!) the render_area, but rather a specification of how big the framebuffer is
 	// the render area specifies a renderable window into this frambuffer
@@ -533,8 +527,32 @@ auto ref createFramebuffers(
 }
 
 
+///	initialize the VkFramebuffer(s) and store them in the meta structure
+///	Params:
+///		meta				= reference to a Meta_Framebuffer or Meta_Framebuffers
+///		meta_renderpass	= the render_pass member is required for VkFramebufferCreateInfo to specify COMPATIBLE renderpasses,
+///								additionally framebuffer[0], clear_values and extent are set into the VkRenderPassBeginInfo member  
+///		extent				= the extent of the render area
+///		first_image_views	= these will be attached to each of the VkFramebuffer(s) attachments 0 .. first_image_views.length
+///		dynamic_image_views = the count of these specifies the count if VkFramebuffers(s), dynamic_imag_views[i] will be attached to framebuffer[i] attachment[first_image_views.length] 
+///	Returns: the passed in Meta_Structure for function chaining
+auto ref initFramebuffers( 
+	ref Meta_Framebuffers	meta,
+	ref Meta_Renderpass		meta_renderpass,
+	VkExtent2D				framebuffer_extent,
+	VkImageView[]			first_image_views,
+	VkImageView[]			dynamic_image_views,
+	VkImageView[]			last_image_views = [] ) {
+	meta.initFramebuffers( meta_renderpass.begin_info.renderPass, framebuffer_extent, first_image_views, dynamic_image_views );
+	meta_renderpass.attachFramebuffer( meta, 0 );
+	return meta;
+}
 
-auto initFramebuffers(
+alias create = initFramebuffers;
+
+
+
+auto createFramebuffers(
 	ref Vulkan		vk,
 	VkRenderPass	render_pass,
 	VkExtent2D		framebuffer_extent,
@@ -542,47 +560,24 @@ auto initFramebuffers(
 	VkImageView[]	dynamic_image_views,
 	VkImageView[]	last_image_views = [] ) {
 	Meta_Framebuffers meta = vk;
-	return meta.createFramebuffers( render_pass, framebuffer_extent, first_image_views, dynamic_image_views, last_image_views );
+	return meta.create( render_pass, framebuffer_extent, first_image_views, dynamic_image_views, last_image_views );
 }
 
 
-///	create the VkFramebuffer(s) and store them in the meta structure
-///	Params:
-///		meta				= reference to a Meta_Framebuffer or Meta_Framebuffers
-///		meta_render_pass	= the render_pass member is required for VkFramebufferCreateInfo to specify COMPATIBLE renderpasses,
-///								additionally framebuffer[0], clear_values and extent are set into the VkRenderPassBeginInfo member  
-///		extent				= the extent of the render area
-///		first_image_views	= these will be attached to each of the VkFramebuffer(s) attachments 0 .. first_image_views.length
-///		dynamic_image_views = the count of these specifies the count if VkFramebuffers(s), dynamic_imag_views[i] will be attached to framebuffer[i] attachment[first_image_views.length] 
-///	Returns: the passed in Meta_Structure for function chaining
-auto ref createFramebuffers( 
-	ref Meta_Framebuffers	meta,
-	ref Meta_Render_Pass	meta_render_pass,
-	VkExtent2D				framebuffer_extent,
-	VkImageView[]			first_image_views,
-	VkImageView[]			dynamic_image_views,
-	VkImageView[]			last_image_views = [] ) {
-	meta.createFramebuffers( meta_render_pass.begin_info.renderPass, framebuffer_extent, first_image_views, dynamic_image_views );
-	meta_render_pass.attachFramebuffer( meta, 0 );
-	return meta;
-}
-
-
-
-auto initFramebuffers(
+auto createFramebuffers(
 	ref Vulkan				vk,
-	ref Meta_Render_Pass	meta_render_pass,
+	ref Meta_Renderpass	meta_renderpass,
 	VkExtent2D				framebuffer_extent,
 	VkImageView[]			first_image_views,
 	VkImageView[]			dynamic_image_views,
 	VkImageView[]			last_image_views = [] ) {
 	Meta_Framebuffers meta = vk;
-	return meta.createFramebuffers( meta_render_pass, framebuffer_extent, first_image_views, dynamic_image_views );
+	return meta.create( meta_renderpass, framebuffer_extent, first_image_views, dynamic_image_views );
 }
 
 
 
-// code reference not using Meta_Render_Pass
+// code reference not using Meta_Renderpass
 /*
 	// create attachment description
 	VkAttachmentDescription[3] attachment_description; 
