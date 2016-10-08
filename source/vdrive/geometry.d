@@ -36,10 +36,3 @@ struct Meta_Geometry {
 		recordCommands( command_buffer, this );
 	}	
 }
-
-
-auto ref initGeometry( ref Vulkan vk ) {
-	return Meta_Geometry( vk );
-}
-
-
