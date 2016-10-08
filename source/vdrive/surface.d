@@ -21,22 +21,6 @@ struct Meta_Surface {
 	VkSwapchainKHR				swapchain;
 	VkSwapchainCreateInfoKHR	create_info;
 
-	//alias surface 			=	create_info.surface;
-	//alias min_image_count		=	create_info.minImageCount;
-	//alias format				=	create_info.imageFormat;
-	//alias color_space			=	create_info.imageColorSpace;
-	//alias extent				=	create_info.imageExtent;
-	//alias array_layers		=	create_info.imageArrayLayers;
-	//alias usage				=	create_info.imageUsage;
-	//alias sharing_mode		=	create_info.imageSharingMode;
-	//alias pre_transform		=	create_info.preTransform;
-	//alias composite_alpha		=	create_info.compositeAlpha;
-	//alias present_mode		=	create_info.presentMode;
-	//alias clipped				=	create_info.clipped;
-
-	// forward all members of vk and create_info to Meta_Surface
-	mixin Dispatch_To_Inner_Struct!create_info;
-
 	// convenience to get VkSurfaceFormatKHR from VkSwapchainCreateInfoKHR.imageFormat and .imageColorSpace and set vice versa
 	auto surfaceFormat() { return VkSurfaceFormatKHR( create_info.imageFormat, create_info.imageColorSpace ); }
 	void surfaceFormat( VkSurfaceFormatKHR surface_format ) {
@@ -66,6 +50,10 @@ auto ref selectPresentMode( ref Meta_Surface meta, VkPresentModeKHR[] include_mo
 	meta.presentMode = meta.gpu.listPresentModes( meta.surface, false ).filter( include_modes );
 	return meta;
 }
+
+
+// forward members of Meta_Surface.create_info to setter and getter functions
+mixin( Forward_To_Inner_Struct!( Meta_Surface, VkSwapchainCreateInfoKHR, "meta.create_info" ));
 
 
 auto ref construct( ref Meta_Surface meta ) {
