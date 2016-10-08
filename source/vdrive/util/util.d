@@ -96,16 +96,23 @@ auto Forward_To_Inner_Struct( outer, inner, string path, ignore... )() {
 		static if( !skip && member != "sType" && member != "pNext" && member != "flags" ) {		// skip, also these
 			import vdrive.util.string : snakeCaseCT;							// convertor from camel to snake case
 			enum member_snake = member.snakeCaseCT;								// convert to snake case
-			//enum result = "\n"												// enum string wich will be mixed in
+			//enum result = "\n"												// enum string wich will be mixed in, use only for pragma( msg ) output
 			result ~= "\n"
-				~ "/// forward member " ~ member ~ " of inner " ~ inner.stringof ~ " as function to " ~ outer.stringof ~ "\n"
+				~ "/// forward member " ~ member ~ " of inner " ~ inner.stringof ~ " as setter function to " ~ outer.stringof ~ "\n"
 				~ "/// Params:\n"
 				~ "/// \tmeta = reference to a " ~ outer.stringof ~ " struct\n"
 				~ "/// \t" ~ member_snake ~ " = the value forwarded to the inner struct\n"
 				~ "/// Returns: the passed in Meta_Structure for function chaining\n"
 				~ "auto ref " ~ member ~ "( ref " ~ outer.stringof ~ " meta, "
 				~ typeof( __traits( getMember,  inner, member )).stringof ~ " " ~ member_snake ~ " ) {\n"
-				~ "\t" ~ path ~ "." ~ member ~ " = " ~ member_snake ~ ";\n\treturn meta;\n}\n";
+				~ "\t" ~ path ~ "." ~ member ~ " = " ~ member_snake ~ ";\n\treturn meta;\n}\n"
+				~ "\n"
+				~ "/// forward member " ~ member ~ " of inner " ~ inner.stringof ~ " as getter function to " ~ outer.stringof ~ "\n"
+				~ "/// Params:\n"
+				~ "/// \tmeta = reference to a " ~ outer.stringof ~ " struct\n"
+				~ "/// Returns: copy of " ~ path ~ "." ~ member ~ "\n"
+				~ "auto " ~ member ~ "( ref " ~ outer.stringof ~ " meta ) {\n"
+				~ "\treturn " ~ path ~ "." ~ member ~ ";\n}\n\n";
 			//pragma( msg, result );
 			//mixin( result );
 		}
