@@ -62,14 +62,6 @@ struct Meta_Graphics {
 }
 
 
-/////////////////////////////
-// get empty meta pipeline //
-/////////////////////////////
-auto initPipeline( ref Vulkan vk ) {
-	Meta_Graphics meta = vk;
-	return meta;
-}
-
 
 
 ///////////////////////////
@@ -434,7 +426,9 @@ auto ref allowDerivatives( ref Meta_Graphics meta ) {
 /////////////////////////////////////////
 // construct the pipeline state object //
 /////////////////////////////////////////
-auto ref createPipeline( ref Meta_Graphics meta ) {
+auto ref construct( ref Meta_Graphics meta ) {
+	// assert the meta struct was initialized with vulkan state struct
+	assert( meta.isValid );
 
 	VkPipelineVertexInputStateCreateInfo vertex_input_state_create_info = {
 		vertexBindingDescriptionCount	: meta.vertex_input_binding_descriptions.length.toUint,
