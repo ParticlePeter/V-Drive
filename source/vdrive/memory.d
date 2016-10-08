@@ -38,7 +38,6 @@ auto memoryTypeIndex(
 
 
 auto allocateMemory( ref Vulkan vk, VkDeviceSize allocation_size, uint32_t memory_type_index ) {
-
 	// construct a memory allocation info from arguments
 	VkMemoryAllocateInfo memory_allocate_info = {
 		allocationSize	: allocation_size,
@@ -70,16 +69,19 @@ struct Meta_Memory {
 }
 
 
-auto ref createMemory( ref Meta_Memory meta, VkDeviceSize allocation_size, uint32_t memory_type_index ) {
+auto ref initMemory( ref Meta_Memory meta, VkDeviceSize allocation_size, uint32_t memory_type_index ) {
+	assert( meta.isValid );		// assert the meta struct was initialized with vulkan state struct
 	meta.device_memory = allocateMemory( meta, allocation_size, memory_type_index );
 	meta.device_memory_size = allocation_size;
 	return meta;
 }
 
+alias create = initMemory;
 
-auto initMemory( ref Vulkan vk, VkDeviceSize allocation_size, uint32_t memory_type_index ) {
+
+auto createMemory( ref Vulkan vk, VkDeviceSize allocation_size, uint32_t memory_type_index ) {
 	Meta_Memory meta = vk;
-	return meta.createMemory( allocation_size, memory_type_index );
+	return meta.create( allocation_size, memory_type_index );
 }
 
 
@@ -134,6 +136,7 @@ auto alignedOffset( META )( ref META meta, VkDeviceSize device_memory_offset ) i
 /// for an existing memory object where the buffer is supposed to suballocate its memory from
 /// the Meta_Buffer struct is returned for function chaining
 auto ref createMemoryImpl( META )( ref META meta, VkMemoryPropertyFlags memory_property_flags ) if( hasMemReqs!META ) {
+	assert( meta.isValid );		// assert the meta struct was initialized with vulkan state struct
 	meta.owns_device_memory = true;
 	meta.device_memory = allocateMemory( meta, meta.memory_requirements.size, meta.memoryTypeIndex( memory_property_flags ));
 	static if( is( META == Meta_Buffer ))	meta.device.vkBindBufferMemory( meta.buffer, meta.device_memory, 0 ).vkEnforce;
@@ -141,8 +144,10 @@ auto ref createMemoryImpl( META )( ref META meta, VkMemoryPropertyFlags memory_p
 	return meta;
 }
 
+// TODO(pp): Assert that an VkBuffer or VkImage was created and is valid already
 
 auto ref bindMemoryImpl( META )( ref META meta, VkDeviceMemory device_memory, VkDeviceSize device_memory_offset = 0 )if( hasMemReqs!META ) {
+	assert( meta.isValid );		// assert the meta struct was initialized with vulkan state struct
 	meta.owns_device_memory = false;
 	meta.device_memory = device_memory;
 	meta.device_memory_offset = device_memory_offset;
@@ -191,10 +196,13 @@ struct Meta_Buffer {
 }
 
 
-/// create a VkBuffer object, this function or initBuffer must be called first, further operations require the buffer
+/// initialize a VkBuffer object, this function or createBuffer must be called first, further operations require the buffer
 /// the resulting buffer and its create info are stored in the Meta_Buffer struct
 /// the Meta_Buffer struct is returned for function chaining
-auto ref createBuffer( ref Meta_Buffer meta, VkBufferUsageFlags usage, VkDeviceSize size, VkSharingMode sharing_mode = VK_SHARING_MODE_EXCLUSIVE ) {
+auto ref initBuffer( ref Meta_Buffer meta, VkBufferUsageFlags usage, VkDeviceSize size, VkSharingMode sharing_mode = VK_SHARING_MODE_EXCLUSIVE ) {
+
+	// assert the meta struct was initialized with vulkan state struct
+	assert( meta.isValid );
 
 	// buffer create info from arguments
 	meta.buffer_create_info.size 		= size; // size in Bytes
@@ -207,13 +215,17 @@ auto ref createBuffer( ref Meta_Buffer meta, VkBufferUsageFlags usage, VkDeviceS
 	return meta;
 }
 
-/// create a VkBuffer object, this function or createBuffer must be called first, further operations require the buffer
+alias create = initBuffer;
+
+
+/// create a VkBuffer object, this function or initBuffer (or its alias create) must be called first, further operations require the buffer
 /// the resulting buffer and its create info are stored in the Meta_Buffer struct
 /// the Meta_Buffer struct is returned for function chaining
-auto initBuffer( ref Vulkan vk, VkBufferUsageFlags usage, VkDeviceSize size, VkSharingMode sharing_mode = VK_SHARING_MODE_EXCLUSIVE ) {
+auto createBuffer( ref Vulkan vk, VkBufferUsageFlags usage, VkDeviceSize size, VkSharingMode sharing_mode = VK_SHARING_MODE_EXCLUSIVE ) {
 	Meta_Buffer meta = vk;
-	return meta.createBuffer( usage, size, sharing_mode );
+	return meta.create( usage, size, sharing_mode );
 }
+
 
 
 /// upload data to the VkDeviceMemory object of the coresponding buffer through memory mapping
@@ -221,7 +233,6 @@ auto bufferData( Meta_Buffer meta, void[] data, VkDeviceSize offset = 0 ) {
 	void* mapped_memory;
 
 	// map the memory
-	//vkMapMemory( meta.device, meta.device_memory, 0, VK_WHOLE_SIZE, 0, &mapped_memory ).vkEnforce;
 	vkMapMemory( meta.device, meta.device_memory, meta.offset + offset, data.length.toUint, 0, &mapped_memory ).vkEnforce;
 	mapped_memory[ 0 .. data.length ] = data[];
 
@@ -269,9 +280,9 @@ struct Meta_Image {
 // meta image and related functions //
 //////////////////////////////////////
 
-/// create simple VkImage with one level and one layer, assume VK_IMAGE_TILING_OPTIMAL and VK_SHARING_MODE_EXCLUSIVE
-/// store vulkan data in argument meta image container, return container for piping 
-auto ref createImage( 
+/// init a simple VkImage with one level and one layer, assume VK_IMAGE_TILING_OPTIMAL and VK_SHARING_MODE_EXCLUSIVE
+/// store vulkan data in argument meta image container, return container for chaining 
+auto ref initImage( 
 	ref Meta_Image			meta,
 	VkFormat				image_format,
 	VkExtent2D				image_extent,
@@ -279,6 +290,7 @@ auto ref createImage(
 	VkSampleCountFlagBits	image_samples = VK_SAMPLE_COUNT_1_BIT,
 	VkSharingMode			sharing_mode = VK_SHARING_MODE_EXCLUSIVE ) {
 
+	assert( meta.isValid );		// assert the meta struct was initialized with vulkan state struct
 	VkImageCreateInfo image_create_info = {
 		imageType				: VK_IMAGE_TYPE_2D,
 		format					: image_format,									// notice me senpai!
@@ -294,14 +306,35 @@ auto ref createImage(
 		initialLayout			: VK_IMAGE_LAYOUT_UNDEFINED,             		// notice me senpai!
 	};
 
-	return meta.createImage( image_create_info );
+	return meta.create( image_create_info );
 }
 
+/// init a VkImage, general create image function, gets a VkImageCreateInfo as argument 
+/// store vulkan data in argument meta image container, return container for chaining
+auto ref initImage( ref Meta_Image meta, const ref VkImageCreateInfo image_create_info ) {
+	assert( meta.isValid );		// assert the meta struct was initialized with vulkan state struct
+	meta.image_create_info = image_create_info;
+	meta.device.vkCreateImage( &meta.image_create_info, meta.allocator, &meta.image ).vkEnforce;
+	meta.device.vkGetImageMemoryRequirements( meta.image, &meta.memory_requirements );
+	return meta;
+}
+
+alias create = initImage;
+
+// TODO(pp): add chained functions to edit the meta.image_create_info and finalize with construct(), see module pipeline 
 
 
-/// init a simple VkImage with one level and one layer, assume VK_IMAGE_TILING_OPTIMAL and VK_SHARING_MODE_EXCLUSIVE
-/// store vulkan data in argument meta image container, return container for piping 
-auto initImage(
+
+/// create a VkImage, general init image function, gets a VkImageCreateInfo as argument 
+/// store vulkan data in argument meta image container, return container for chaining
+auto createImage( ref Vulkan vk, const ref VkImageCreateInfo image_create_info ) {
+	Meta_Image meta = vk;
+	return meta.create( image_create_info );
+}
+
+/// create a simple VkImage with one level and one layer, assume VK_IMAGE_TILING_OPTIMAL and VK_SHARING_MODE_EXCLUSIVE as default args
+/// store vulkan data in argument meta image container, return container for chaining 
+auto createImage(
 	ref Vulkan				vk,
 	VkFormat				image_format,
 	VkExtent2D				image_extent,
@@ -310,59 +343,40 @@ auto initImage(
 	VkSharingMode			sharing_mode = VK_SHARING_MODE_EXCLUSIVE ) {
 
 	Meta_Image meta = vk;
-	return meta.createImage( image_format, image_extent, image_usage, image_samples, sharing_mode );
+	return meta.create( image_format, image_extent, image_usage, image_samples, sharing_mode );
 } 
 
 
+// TODO(pp): assert that valid memory was bound already to the VkBuffer or VkImage
 
-/// create a VkImage, general create image function, gets a VkImageCreateInfo as argument 
-/// store vulkan data in argument meta image container, return container for piping
-auto ref createImage( ref Meta_Image meta, const ref VkImageCreateInfo image_create_info ) {
-	meta.image_create_info = image_create_info;
-	meta.device.vkCreateImage( &meta.image_create_info, meta.allocator, &meta.image ).vkEnforce;
-	meta.device.vkGetImageMemoryRequirements( meta.image, &meta.memory_requirements );
-	return meta;
-}
-
-
-
-/// init a VkImage, general init image function, gets a VkImageCreateInfo as argument 
-/// store vulkan data in argument meta image container, return container for piping
-auto initImage( ref Vulkan vk, const ref VkImageCreateInfo image_create_info ) {
-	Meta_Image meta = vk;
-	return meta.createImage( image_create_info );
-}
-
-
-
-/// create a VkImageView which closely coresponds to the underlying VkImage type
-/// store vulkan data in argument meta image container, return container for piping
-auto ref imageView( ref Meta_Image meta, VkImageAspectFlags subrecource_aspect_mask ) {
+/// create a VkImageView which closely corresponds to the underlying VkImage type
+/// store vulkan data in argument meta image container, return container for chaining
+auto ref createView( ref Meta_Image meta, VkImageAspectFlags subrecource_aspect_mask ) {
 	VkImageSubresourceRange subresource_range = {
 		aspectMask		: subrecource_aspect_mask,
 		baseMipLevel	: cast( uint32_t )0,
 		levelCount		: meta.image_create_info.mipLevels,
 		baseArrayLayer	: cast( uint32_t )0,
 		layerCount		: meta.image_create_info.arrayLayers, };
-	return meta.imageView( subresource_range );
+	return meta.createView( subresource_range );
 }
 
 /// create a VkImageView which closely coresponds to the underlying VkImage type
-/// store vulkan data in argument meta image container, return container for piping
-auto ref imageView( ref Meta_Image meta, VkImageSubresourceRange subresource_range ) {
-	return meta.imageView( subresource_range, cast( VkImageViewType )meta.image_create_info.imageType, meta.image_create_info.format );
+/// store vulkan data in argument meta image container, return container for chaining
+auto ref createView( ref Meta_Image meta, VkImageSubresourceRange subresource_range ) {
+	return meta.createView( subresource_range, cast( VkImageViewType )meta.image_create_info.imageType, meta.image_create_info.format );
 }
 
 /// create a VkImageView with choosing a image view type and format for the underlying VkImage, component mapping is identity
-/// store vulkan data in argument meta image container, return container for piping
-auto ref imageView( ref Meta_Image meta, VkImageSubresourceRange subresource_range, VkImageViewType view_type, VkFormat format ) {
-	return meta.imageView( subresource_range, view_type, format, VkComponentMapping(
+/// store vulkan data in argument meta image container, return container for chaining
+auto ref createView( ref Meta_Image meta, VkImageSubresourceRange subresource_range, VkImageViewType view_type, VkFormat format ) {
+	return meta.createView( subresource_range, view_type, format, VkComponentMapping(
 		VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY ));
 }
 
 /// create a VkImageView with choosing a image view type, format and VkComponentMapping for the underlying VkImage
-/// store vulkan data in argument meta image container, return container for piping
-auto ref imageView( ref Meta_Image meta, VkImageSubresourceRange subresource_range, VkImageViewType view_type, VkFormat format, VkComponentMapping component_mapping ) {
+/// store vulkan data in argument meta image container, return container for chaining
+auto ref createView( ref Meta_Image meta, VkImageSubresourceRange subresource_range, VkImageViewType view_type, VkFormat format, VkComponentMapping component_mapping ) {
 	meta.image_view_create_info.image				= meta.image;
 	meta.image_view_create_info.viewType			= view_type;
 	meta.image_view_create_info.format				= format;
