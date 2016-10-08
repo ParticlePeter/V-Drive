@@ -427,7 +427,7 @@ auto ref allowDerivatives( ref Meta_Graphics meta ) {
 // construct the pipeline state object //
 /////////////////////////////////////////
 auto ref construct( ref Meta_Graphics meta ) {
-	// assert the meta struct was initialized with vulkan state struct
+	// assert that meta struct is initialized with a valid vulkan state pointer
 	assert( meta.isValid );
 
 	VkPipelineVertexInputStateCreateInfo vertex_input_state_create_info = {

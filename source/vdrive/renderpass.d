@@ -204,7 +204,7 @@ if( is( Array_T == Array!VkClearValue ) || is( Array_T : VkClearValue[] )) {
 ///		meta = reference to a Meta_Renderpass struct
 ///	Returns: the passed in Meta_Structure for function chaining 
 auto ref construct( ref Meta_Renderpass meta ) {
-	// assert the meta struct was initialized with vulkan state struct
+	// assert that meta struct is initialized with a valid vulkan state pointer
 	assert( meta.isValid );
 
 	// extract VkSubpassDescription from Meta_Subpass
@@ -417,7 +417,7 @@ auto ref attachFramebuffer( ref Meta_Renderpass meta_renderpass, VkFramebuffer f
 ///		image_views			= these will be attached to each of the VkFramebuffer(s) attachments 0 .. first_image_views.length
 ///	Returns: the passed in Meta_Structure for function chaining
 auto ref initFramebuffer( ref Meta_Framebuffer meta, VkRenderPass render_pass, VkExtent2D framebuffer_extent, VkImageView[] image_views ) {
-	// assert the meta struct was initialized with vulkan state struct
+	// assert that meta struct is initialized with a valid vulkan state pointer
 	assert( meta.isValid );
 
 	// the framebuffer_extent is not(!) the render_area, but rather a specification of how big the framebuffer is
@@ -489,7 +489,7 @@ auto ref initFramebuffers(
 	VkImageView[]			dynamic_image_views,
 	VkImageView[]			last_image_views = [] ) {
 
-	// assert the meta struct was initialized with vulkan state struct
+	// assert that meta struct is initialized with a valid vulkan state pointer
 	assert( meta.isValid );
 
 	// the framebuffer_extent is not(!) the render_area, but rather a specification of how big the framebuffer is

@@ -204,7 +204,7 @@ auto ref initDescriptor(
 	VkShaderStageFlags	stageFlags,
 	const(VkSampler)*	pImmutableSamplers = null ) {
 
-	assert( meta.isValid );		// assert the meta struct was initialized with vulkan state struct
+	assert( meta.isValid );		// assert that meta struct is initialized with a valid vulkan state pointer
 	meta.set_layout = meta.createSetLayout( binding, descriptorType, descriptorCount, stageFlags, pImmutableSamplers );
 	meta.set = meta.allocateSet( descriptor_pool, meta.set_layout );
 	return meta;

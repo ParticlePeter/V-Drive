@@ -69,7 +69,7 @@ auto ref selectPresentMode( ref Meta_Surface meta, VkPresentModeKHR[] include_mo
 
 
 auto ref construct( ref Meta_Surface meta ) {
-	// assert the meta struct was initialized with vulkan state struct
+	// assert that meta struct is initialized with a valid vulkan state pointer
 	assert( meta.isValid );
 
 	// request different count of images dependent on selected present mode
@@ -142,7 +142,7 @@ auto swapchainImageViews( ref Meta_Surface meta, VkImageSubresourceRange image_s
 
 
 auto swapchainImageViews( ref Meta_Surface meta, VkImageViewCreateInfo image_view_create_info ) {
-	// assert the meta struct was initialized with vulkan state struct
+	// assert that meta struct is initialized with a valid vulkan state pointer
 	assert( meta.isValid );
 
 	// Get the swapchain images

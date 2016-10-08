@@ -70,7 +70,7 @@ struct Meta_Memory {
 
 
 auto ref initMemory( ref Meta_Memory meta, VkDeviceSize allocation_size, uint32_t memory_type_index ) {
-	assert( meta.isValid );		// assert the meta struct was initialized with vulkan state struct
+	assert( meta.isValid );		// assert that meta struct is initialized with a valid vulkan state pointer
 	meta.device_memory = allocateMemory( meta, allocation_size, memory_type_index );
 	meta.device_memory_size = allocation_size;
 	return meta;
@@ -136,7 +136,7 @@ auto alignedOffset( META )( ref META meta, VkDeviceSize device_memory_offset ) i
 /// for an existing memory object where the buffer is supposed to suballocate its memory from
 /// the Meta_Buffer struct is returned for function chaining
 auto ref createMemoryImpl( META )( ref META meta, VkMemoryPropertyFlags memory_property_flags ) if( hasMemReqs!META ) {
-	assert( meta.isValid );		// assert the meta struct was initialized with vulkan state struct
+	assert( meta.isValid );		// assert that meta struct is initialized with a valid vulkan state pointer
 	meta.owns_device_memory = true;
 	meta.device_memory = allocateMemory( meta, meta.memory_requirements.size, meta.memoryTypeIndex( memory_property_flags ));
 	static if( is( META == Meta_Buffer ))	meta.device.vkBindBufferMemory( meta.buffer, meta.device_memory, 0 ).vkEnforce;
@@ -147,7 +147,7 @@ auto ref createMemoryImpl( META )( ref META meta, VkMemoryPropertyFlags memory_p
 // TODO(pp): Assert that an VkBuffer or VkImage was created and is valid already
 
 auto ref bindMemoryImpl( META )( ref META meta, VkDeviceMemory device_memory, VkDeviceSize device_memory_offset = 0 )if( hasMemReqs!META ) {
-	assert( meta.isValid );		// assert the meta struct was initialized with vulkan state struct
+	assert( meta.isValid );		// assert that meta struct is initialized with a valid vulkan state pointer
 	meta.owns_device_memory = false;
 	meta.device_memory = device_memory;
 	meta.device_memory_offset = device_memory_offset;
@@ -201,7 +201,7 @@ struct Meta_Buffer {
 /// the Meta_Buffer struct is returned for function chaining
 auto ref initBuffer( ref Meta_Buffer meta, VkBufferUsageFlags usage, VkDeviceSize size, VkSharingMode sharing_mode = VK_SHARING_MODE_EXCLUSIVE ) {
 
-	// assert the meta struct was initialized with vulkan state struct
+	// assert that meta struct is initialized with a valid vulkan state pointer
 	assert( meta.isValid );
 
 	// buffer create info from arguments
@@ -290,7 +290,7 @@ auto ref initImage(
 	VkSampleCountFlagBits	image_samples = VK_SAMPLE_COUNT_1_BIT,
 	VkSharingMode			sharing_mode = VK_SHARING_MODE_EXCLUSIVE ) {
 
-	assert( meta.isValid );		// assert the meta struct was initialized with vulkan state struct
+	assert( meta.isValid );		// assert that meta struct is initialized with a valid vulkan state pointer
 	VkImageCreateInfo image_create_info = {
 		imageType				: VK_IMAGE_TYPE_2D,
 		format					: image_format,									// notice me senpai!
@@ -312,7 +312,7 @@ auto ref initImage(
 /// init a VkImage, general create image function, gets a VkImageCreateInfo as argument 
 /// store vulkan data in argument meta image container, return container for chaining
 auto ref initImage( ref Meta_Image meta, const ref VkImageCreateInfo image_create_info ) {
-	assert( meta.isValid );		// assert the meta struct was initialized with vulkan state struct
+	assert( meta.isValid );		// assert that meta struct is initialized with a valid vulkan state pointer
 	meta.image_create_info = image_create_info;
 	meta.device.vkCreateImage( &meta.image_create_info, meta.allocator, &meta.image ).vkEnforce;
 	meta.device.vkGetImageMemoryRequirements( meta.image, &meta.memory_requirements );
