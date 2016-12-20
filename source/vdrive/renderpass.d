@@ -405,7 +405,11 @@ struct Meta_Framebuffers {
 }
 
 
+/// template to determine if a type is a Meta_Framebuffer or Meta_Framebuffers
+template IS_FB( META_FB ) {  enum IS_FB = ( is( META_FB == Meta_Framebuffer ) || is( META_FB == Meta_Framebuffers ));  }
 
+
+/*
 /// Set or append an attachment specific clear value, several overloads exist
 /// The last argument is an optional attachment index:
 ///		if it is not provided the clear value gets appended
@@ -419,8 +423,7 @@ struct Meta_Framebuffers {
 ///		meta = reference to a Meta_Framebuffer or Meta_Framebuffers struct
 ///		args = Arguments as described above
 ///	Returns: the passed in Meta_Structure for function chaining 
-auto ref clearValue( META_FB, Args... )( ref META_FB meta, Args args )
-if(( is( META_FB == Meta_Framebuffer ) || is( META_FB == Meta_Framebuffers )) && Args.length > 0 && Args.length < 6 ) {
+auto ref clearValue( META_FB, Args... )( ref META_FB meta, Args args ) if( IS_FB!META_FB && Args.length > 0 && Args.length < 6 ) {
 
 	// clear values [r, g, b, a] and optional array index
 	static if( Args.length > 3 && is( Args[0] == Args[1] ) && is( Args[0] == Args[2] ) && is( Args[0] == Args[3] )) {
@@ -441,7 +444,7 @@ if(( is( META_FB == Meta_Framebuffer ) || is( META_FB == Meta_Framebuffers )) &&
 
 	// direct clear value struct, implemented logic for setting, extending and/or appending
 	else static if( is( Args[0] == VkClearValue )) {
-		static if( Args.length == 2 && is( args[1] : size_t )) {
+		static if( Args.length == 2 && is( Args[1] : size_t )) {
 			size_t index = args[1];
 			if( meta.clear_values.length <= index )
 				meta.clear_values.length  = index + 1;
@@ -459,6 +462,120 @@ if(( is( META_FB == Meta_Framebuffer ) || is( META_FB == Meta_Framebuffers )) &&
 		static assert( 0 );
 	} 
 }
+*/
+
+/// Set attachment specific (framebuffer attachment index) r, g, b, a clear value
+/// The type of all values must be the same and either float, int32_t or uint32_t
+///	Params:
+///		meta	= reference to a Meta_Framebuffer or Meta_Framebuffers struct
+///		index	= framebuffer attachment index
+///		r		= red clear value
+///		g		= green clear value
+///		b		= blue clear value
+///		a		= alpha clear value
+///	Returns: the passed in Meta_Structure for function chaining
+auto ref setClearValue( META_FB, T )( ref META_FB meta, size_t index, T r, T g, T b, T a )
+if( IS_FB!META_FB && ( is( T == float ) || is( T == int32_t ) || is( T == uint32_t ))) {
+	T[4] rgba = [ r, g, b, a ];
+	return setClearValue( meta, index, rgba );
+}
+
+
+/// Set attachment specific (framebuffer attachment index) rgba clear value array or math vector (e.g. dlsl)
+/// The element type must be either float, int32_t or uint32_t
+///	Params:
+///		meta	= reference to a Meta_Framebuffer or Meta_Framebuffers struct
+///		index	= framebuffer attachment index
+///		rgba	= the rgba clear value as array or four component math vector
+///	Returns: the passed in Meta_Structure for function chaining
+auto ref setClearValue( META_FB, T )( ref META_FB meta, size_t index, T[4] rgba )
+if( IS_FB!META_FB && ( is( T == float ) || is( T == int32_t ) || is( T == uint32_t ))) {
+	VkClearValue clear_value;
+			static if( is( T == float ))	clear_value.color.float32	= rgba;
+	else	static if( is( T == int32_t ))	clear_value.color.int32		= rgba;
+	else	static if( is( T == uint32_t ))	clear_value.color.uint32	= rgba;
+	return	setClearValue( meta, index, clear_value );
+} 
+
+
+/// Set attachment specific (framebuffer attachment index) depth-stencil clear value
+/// Stencil value defaults to 0
+///	Params:
+///		meta	= reference to a Meta_Framebuffer or Meta_Framebuffers struct
+///		index	= framebuffer attachment index
+///		depth	= the depth clear value
+///		stencil = the stencil clear value, defaults to 0
+///	Returns: the passed in Meta_Structure for function chaining
+auto ref setClearValue( META_FB, U )( ref META_FB meta, size_t index, float depth, U stencil = 0 ) if( IS_FB!META_FB && is( U : uint32_t )) {
+	VkClearValue clear_value = { depthStencil : VkClearDepthStencilValue( depth, stencil ) };
+	return setClearValue( meta, index, clear_value );
+}
+
+
+/// Set attachment specific (framebuffer attachment index) VkClearValue
+/// Stencil value defaults to 0
+///	Params:
+///		meta		= reference to a Meta_Framebuffer or Meta_Framebuffers struct
+///		index		= framebuffer attachment index
+///		clear_value	= the VkClearValue clear value
+///	Returns: the passed in Meta_Structure for function chaining
+auto ref setClearValue( META_FB )( ref META_FB meta, size_t index, VkClearValue clear_value ) if( IS_FB!META_FB ) {
+	if( index == size_t.max )					// signal to append clear_value instead of setting to a specific index ...
+		index = meta.clear_values.length;		// ... hence set the index to the length of the current array length
+	if( meta.clear_values.length <= index )		// if index is greater then the array ...
+		meta.clear_values.length  = index + 1;	// ... resize the array
+	meta.clear_values[ index ] = clear_value;
+	return meta;
+}
+
+
+/// Add (append) attachment specific (framebuffer attachment index) r, g, b, a clear value
+/// The type of all values must be the same and either float, int32_t or uint32_t
+///	Params:
+///		meta	= reference to a Meta_Framebuffer or Meta_Framebuffers struct
+///		r		= red clear value
+///		g		= green clear value
+///		b		= blue clear value
+///		a		= alpha clear value
+///	Returns: the passed in Meta_Structure for function chaining
+auto ref addClearValue( META_FB, T )( ref META_FB meta, T r, T g, T b, T a ) if( IS_FB!META_FB && ( is( T == float ) || is( T == int32_t ) || is( T == uint32_t ))) {
+	return setClearValue( meta, size_t.max, r, g, b, a );
+}
+
+
+/// Add (append) attachment specific (framebuffer attachment index) rgba clear value array or math vector (e.g. dlsl)
+/// The element type must be either float, int32_t or uint32_t
+///	Params:
+///		meta	= reference to a Meta_Framebuffer or Meta_Framebuffers struct
+///		rgba	= the rgba clear value as array or four component math vector
+///	Returns: the passed in Meta_Structure for function chaining
+auto ref addClearValue( META_FB, T )( ref META_FB meta, T[4] rgba ) if( IS_FB!META_FB && ( is( T == float ) || is( T == int32_t ) || is( T == uint32_t ))) {
+	return setClearValue( meta, size_t.max, rgba );
+}
+
+
+/// Add (append) attachment specific (framebuffer attachment index) depth-stencil clear value
+/// Stencil value defaults to 0
+///	Params:
+///		meta	= reference to a Meta_Framebuffer or Meta_Framebuffers struct
+///		depth	= the depth clear value
+///		stencil = the stencil clear value, defaults to 0
+///	Returns: the passed in Meta_Structure for function chaining
+auto ref addClearValue( META_FB, U )( ref META_FB meta, float depth, U stencil = 0 ) if( IS_FB!META_FB && is( U : uint32_t )) {
+	return setClearValue( meta, size_t.max, depth, stencil );
+}
+
+
+/// Add (append) attachment specific (framebuffer attachment index) VkClearValue
+/// Stencil value defaults to 0
+///	Params:
+///		meta		= reference to a Meta_Framebuffer or Meta_Framebuffers struct
+///		clear_value	= the VkClearValue clear value
+///	Returns: the passed in Meta_Structure for function chaining
+auto ref addClearValue( META_FB )( ref META_FB meta, VkClearValue clear_value ) if( IS_FB!META_FB ) {
+	return setClearValue( meta, size_t.max, clear_value );
+}
+
 
 ///	set the render area offset separate from the extent
 /// the render area is passed into a VkRenderPassBeginInfo when the appropriate attachFramebuffer (see bellow) overload is called
@@ -467,10 +584,11 @@ if(( is( META_FB == Meta_Framebuffer ) || is( META_FB == Meta_Framebuffers )) &&
 ///		meta   = reference to a Meta_Framebuffer or Meta_Framebuffers
 ///		offset = the offset of the render area
 ///	Returns: the passed in Meta_Structure for function chaining 
-auto ref renderAreaOffset( META_FB )( ref META_FB meta, VkOffset2D offset ) if( is( META_FB == Meta_Framebuffer ) || is( META_FB == Meta_Framebuffers )) {
+auto ref renderAreaOffset( META_FB )( ref META_FB meta, VkOffset2D offset ) if( IS_FB!META_FB ) {
 	meta.render_area.offset = offset;
 	return meta;
 }
+
 
 ///	set the render area extent separate from the extent
 /// the render area is passed into a VkRenderPassBeginInfo when the appropriate attachFramebuffer (see bellow) overload is called
@@ -479,10 +597,14 @@ auto ref renderAreaOffset( META_FB )( ref META_FB meta, VkOffset2D offset ) if( 
 ///		meta   = reference to a Meta_Framebuffer or Meta_Framebuffers
 ///		extent = the extent of the render area
 ///	Returns: the passed in Meta_Structure for function chaining
-auto ref renderAreaExtent( META_FB )( ref META_FB meta, VkExtent2D extent ) if( is( META_FB == Meta_Framebuffer ) || is( META_FB == Meta_Framebuffers )) {
+auto ref renderAreaExtent( META_FB )( ref META_FB meta, VkExtent2D extent ) if( IS_FB!META_FB ) {
 	meta.render_area.extent = extent;
 	return meta;
 }
+
+
+// TODO(pp): add overloads to the functions above taking 2 (u)int32_t as args
+// TODO(pp): add similar overloads of renderArea, taking VkRect2D, VkOffset2D/VkExtent2D, 2 int32_t/uint32_t 
 
 
 
