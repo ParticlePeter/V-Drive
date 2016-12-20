@@ -142,8 +142,7 @@ void destroyInstance( ref Vulkan vk ) {
 	vkDestroyInstance( vk.instance, vk.allocator );
 }
 
-// TODO(pp): Create Template specialization for const( char* )[]
-//const( char* )[2] ext = [ "VK_KHR_surface", "VK_KHR_win32_surface" ]; foreach( e; ext ) printf( "%s\n", e );
+
 auto initDevice( T )( 
 	ref Vulkan vk, 
 	Queue_Family[] queue_families, 
