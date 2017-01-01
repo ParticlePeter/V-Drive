@@ -307,12 +307,12 @@ auto ref accessMaskDependency( ref Meta_Renderpass meta, VkAccessFlags source, V
 /// usage of either this function or attachFramebuffer(s) is required to set clear values for the later used VkRenderPassBeginInfo
 ///	Params:
 ///		meta = reference to a Meta_Renderpass struct
-///		clear_values = will be set into the meta render pass VkRenderPassBeginInfo. Storage must be managed outside
+///		clear_value = will be set into the meta render pass VkRenderPassBeginInfo. Storage must be managed outside
 ///	Returns: the passed in Meta_Structure for function chaining
-auto ref clearValues( Array_T )( ref Meta_Renderpass meta, Array_T clear_values )
+auto ref clearValues( Array_T )( ref Meta_Renderpass meta, Array_T clear_value )
 if( is( Array_T == Array!VkClearValue ) || is( Array_T : VkClearValue[] )) {
-	meta.begin_info.pClearValues = clear_values.ptr;
-	meta.begin_info.clearValueCount = clear_values.length.toUint;
+	meta.begin_info.pClearValues = clear_value.ptr;
+	meta.begin_info.clearValueCount = clear_value.length.toUint;
 	return meta;
 }
 
@@ -375,12 +375,37 @@ auto ref construct( ref Meta_Renderpass meta ) {
 // Meta_Framebuffer //
 //////////////////////
 
+struct Meta_FB( size_t framebuffer_count = 1, size_t clear_value_count = size_t.max ) {
+
+	mixin 	Vulkan_State_Pointer;
+
+			static if( framebuffer_count == 1 )				VkFramebuffer						framebuffer;
+	else	static if( framebuffer_count == size_t.max )	Array!VkFramebuffer					framebuffer;
+	else													VkFramebuffer[ framebuffer_count ]	framebuffer;
+
+	VkRect2D	render_area;
+
+			static if( clear_value_count == 1 )				VkClearValue						clear_value;
+	else	static if( clear_value_count == size_t.max )	Array!VkClearValue					clear_value;
+	else													VkClearValue[ clear_value_count ]	clear_value;
+
+	void destroyResources() {
+		static if( framebuffer_count == 1 )	vk.device.vkDestroyFramebuffer( framebuffer, vk.allocator );
+		else foreach( fb; framebuffer )		vk.device.vkDestroyFramebuffer( fb, vk.allocator );
+		// Required if this struct should be reused for proper render_area reinitialization
+		render_area = VkRect2D( VkOffset2D( 0, 0 ), VkExtent2D( 0, 0 ));
+	}
+}
+
+alias Meta_Framebuffer  = Meta_FB!( 1, size_t.max );
+alias Meta_Framebuffers = Meta_FB!( size_t.max, size_t.max );
+/*
 /// aggregate to manage one framebuffer and the related resources aka render area and clear values of the attachments
 struct Meta_Framebuffer {
 	mixin 					Vulkan_State_Pointer;
 	VkFramebuffer			framebuffer;
 	VkRect2D				render_area;
-	Array!VkClearValue		clear_values;	// corresponds to Meta_Renderpass.attachment_Descriptions
+	Array!VkClearValue		clear_value;	// corresponds to Meta_Renderpass.attachment_Descriptions
 
 	void destroyResources() {
 		vk.device.vkDestroyFramebuffer( framebuffer, vk.allocator );
@@ -390,20 +415,20 @@ struct Meta_Framebuffer {
 }
 
 
-/// aggregate to manage multiple framebuffers sharing same framebuffer resources aka render area and clear values of the attachments 
+/// aggregate to manage multiple framebuffer sharing same framebuffer resources aka render area and clear values of the attachments 
 struct Meta_Framebuffers {
 	mixin 					Vulkan_State_Pointer;
-	Array!VkFramebuffer		framebuffers;
+	Array!VkFramebuffer		framebuffer;
 	VkRect2D				render_area;
-	Array!VkClearValue		clear_values;	// corresponds to Meta_Renderpass.attachment_Descriptions
+	Array!VkClearValue		clear_value;	// corresponds to Meta_Renderpass.attachment_Descriptions
 
 	void destroyResources() {
-		foreach( framebuffer; framebuffers ) vk.device.vkDestroyFramebuffer( framebuffer, vk.allocator );
+		foreach( framebuffer; framebuffer ) vk.device.vkDestroyFramebuffer( framebuffer, vk.allocator );
 		// Required if this struct should be reused for proper render_area reinitialization
 		render_area = VkRect2D( VkOffset2D( 0, 0 ), VkExtent2D( 0, 0 ));
 	}
 }
-
+*/
 
 /// template to determine if a type is a Meta_Framebuffer or Meta_Framebuffers
 template IS_FB( META_FB ) {  enum IS_FB = ( is( META_FB == Meta_Framebuffer ) || is( META_FB == Meta_Framebuffers ));  }
@@ -446,11 +471,11 @@ auto ref clearValue( META_FB, Args... )( ref META_FB meta, Args args ) if( IS_FB
 	else static if( is( Args[0] == VkClearValue )) {
 		static if( Args.length == 2 && is( Args[1] : size_t )) {
 			size_t index = args[1];
-			if( meta.clear_values.length <= index )
-				meta.clear_values.length  = index + 1;
-			meta.clear_values[ index ] = args[0];
+			if( meta.clear_value.length <= index )
+				meta.clear_value.length  = index + 1;
+			meta.clear_value[ index ] = args[0];
 		} else {
-			meta.clear_values.append( args[0] );
+			meta.clear_value.append( args[0] );
 		}
 		return meta;
 	}
@@ -521,10 +546,10 @@ auto ref setClearValue( META_FB, U )( ref META_FB meta, size_t index, float dept
 ///	Returns: the passed in Meta_Structure for function chaining
 auto ref setClearValue( META_FB )( ref META_FB meta, size_t index, VkClearValue clear_value ) if( IS_FB!META_FB ) {
 	if( index == size_t.max )					// signal to append clear_value instead of setting to a specific index ...
-		index = meta.clear_values.length;		// ... hence set the index to the length of the current array length
-	if( meta.clear_values.length <= index )		// if index is greater then the array ...
-		meta.clear_values.length  = index + 1;	// ... resize the array
-	meta.clear_values[ index ] = clear_value;
+		index = meta.clear_value.length;		// ... hence set the index to the length of the current array length
+	if( meta.clear_value.length <= index )		// if index is greater then the array ...
+		meta.clear_value.length  = index + 1;	// ... resize the array
+	meta.clear_value[ index ] = clear_value;
 	return meta;
 }
 
@@ -581,8 +606,8 @@ auto ref addClearValue( META_FB )( ref META_FB meta, VkClearValue clear_value ) 
 /// the render area is passed into a VkRenderPassBeginInfo when the appropriate attachFramebuffer (see bellow) overload is called
 ///	for Vulkan itself this parameter is just an optimization hint and must be properly set as scissor parameter of VkPipelineViewportStateCreateInfo
 ///	Params:
-///		meta   = reference to a Meta_Framebuffer or Meta_Framebuffers
-///		offset = the offset of the render area
+///		meta	= reference to a Meta_Framebuffer or Meta_Framebuffers
+///		offset	= the offset of the render area
 ///	Returns: the passed in Meta_Structure for function chaining 
 auto ref renderAreaOffset( META_FB )( ref META_FB meta, VkOffset2D offset ) if( IS_FB!META_FB ) {
 	meta.render_area.offset = offset;
@@ -590,12 +615,25 @@ auto ref renderAreaOffset( META_FB )( ref META_FB meta, VkOffset2D offset ) if( 
 }
 
 
-///	set the render area extent separate from the extent
+///	set the render area offset separate from the extent
 /// the render area is passed into a VkRenderPassBeginInfo when the appropriate attachFramebuffer (see bellow) overload is called
 ///	for Vulkan itself this parameter is just an optimization hint and must be properly set as scissor parameter of VkPipelineViewportStateCreateInfo
 ///	Params:
-///		meta   = reference to a Meta_Framebuffer or Meta_Framebuffers
-///		extent = the extent of the render area
+///		meta	= reference to a Meta_Framebuffer or Meta_Framebuffers
+///		x		= the offset of the render area in x
+///		y		= the offset of the render area in y
+///	Returns: the passed in Meta_Structure for function chaining 
+auto ref renderAreaOffset( META_FB )( ref META_FB meta, int32_t x, int32_t y ) if( IS_FB!META_FB ) {
+	return meta.renderAreaOffset( VkOffset2D( x, y ));
+}
+
+
+///	set the render area extent separate from the offset
+/// the render area is passed into a VkRenderPassBeginInfo when the appropriate attachFramebuffer (see bellow) overload is called
+///	for Vulkan itself this parameter is just an optimization hint and must be properly set as scissor parameter of VkPipelineViewportStateCreateInfo
+///	Params:
+///		meta	= reference to a Meta_Framebuffer or Meta_Framebuffers
+///		extent	= the extent of the render area
 ///	Returns: the passed in Meta_Structure for function chaining
 auto ref renderAreaExtent( META_FB )( ref META_FB meta, VkExtent2D extent ) if( IS_FB!META_FB ) {
 	meta.render_area.extent = extent;
@@ -603,10 +641,58 @@ auto ref renderAreaExtent( META_FB )( ref META_FB meta, VkExtent2D extent ) if( 
 }
 
 
-// TODO(pp): add overloads to the functions above taking 2 (u)int32_t as args
-// TODO(pp): add similar overloads of renderArea, taking VkRect2D, VkOffset2D/VkExtent2D, 2 int32_t/uint32_t 
+///	set the render area extent separate from the offset
+/// the render area is passed into a VkRenderPassBeginInfo when the appropriate attachFramebuffer (see bellow) overload is called
+///	for Vulkan itself this parameter is just an optimization hint and must be properly set as scissor parameter of VkPipelineViewportStateCreateInfo
+///	Params:
+///		meta	= reference to a Meta_Framebuffer or Meta_Framebuffers
+///		width	= the width of the render area
+///		height	= the height of the render area
+///	Returns: the passed in Meta_Structure for function chaining
+auto ref renderAreaExtent( META_FB )( ref META_FB meta, uint32_t width, uint32_t height ) if( IS_FB!META_FB ) {
+	return meta.renderAreaExtent( VkExtent2D( width, height ));
+}
 
 
+///	set the render area
+/// the render area is passed into a VkRenderPassBeginInfo when the appropriate attachFramebuffer (see bellow) overload is called
+///	for Vulkan itself this parameter is just an optimization hint and must be properly set as scissor parameter of VkPipelineViewportStateCreateInfo
+///	Params:
+///		meta	= reference to a Meta_Framebuffer or Meta_Framebuffers
+///		area	= the render area
+///	Returns: the passed in Meta_Structure for function chaining
+auto ref renderArea( META_FB )( ref META_FB meta, VkRect2D area ) if( IS_FB!META_FB ) {
+	meta.render_area = area;
+	return meta;
+}
+
+
+///	set the render area
+/// the render area is passed into a VkRenderPassBeginInfo when the appropriate attachFramebuffer (see bellow) overload is called
+///	for Vulkan itself this parameter is just an optimization hint and must be properly set as scissor parameter of VkPipelineViewportStateCreateInfo
+///	Params:
+///		meta	= reference to a Meta_Framebuffer or Meta_Framebuffers
+///		offset	= the offset of the render area
+///		extent	= the extent of the render area
+///	Returns: the passed in Meta_Structure for function chaining
+auto ref renderAreaExtent( META_FB )( ref META_FB meta, VkOffset2D offset, VkExtent2D extent ) if( IS_FB!META_FB ) {
+	return meta.renderArea( VkRect( offset, extent ));
+}
+
+
+///	set the render area
+/// the render area is passed into a VkRenderPassBeginInfo when the appropriate attachFramebuffer (see bellow) overload is called
+///	for Vulkan itself this parameter is just an optimization hint and must be properly set as scissor parameter of VkPipelineViewportStateCreateInfo
+///	Params:
+///		meta	= reference to a Meta_Framebuffer or Meta_Framebuffers
+///		x		= the offset of the render area in x
+///		y		= the offset of the render area in y
+///		width	= the width of the render area
+///		height	= the height of the render area
+///	Returns: the passed in Meta_Structure for function chaining
+auto ref renderAreaExtent( META_FB )( ref META_FB meta, int32_t x, int32_t y, uint32_t width, uint32_t height ) if( IS_FB!META_FB ) {
+	return meta.renderArea( VkRect( VkOffset2D( x, y ), VkExtent( width, height )));
+}
 
 //////////////////////////////////////////////////
 // connect Meta_Framebuffer to Meta_Renderpass //
@@ -622,8 +708,8 @@ auto ref renderAreaExtent( META_FB )( ref META_FB meta, VkExtent2D extent ) if( 
 auto ref attachFramebuffer( ref Meta_Renderpass meta_renderpass, ref Meta_Framebuffer meta_framebuffer ) {
 	meta_renderpass.begin_info.framebuffer = meta_framebuffer.framebuffer;
 	meta_renderpass.begin_info.renderArea = meta_framebuffer.render_area;
-	meta_renderpass.begin_info.pClearValues = meta_framebuffer.clear_values.ptr;
-	meta_renderpass.begin_info.clearValueCount = meta_framebuffer.clear_values.length.toUint;
+	meta_renderpass.begin_info.pClearValues = meta_framebuffer.clear_value.ptr;
+	meta_renderpass.begin_info.clearValueCount = meta_framebuffer.clear_value.length.toUint;
 	return meta_renderpass;
 }
 
@@ -636,10 +722,10 @@ auto ref attachFramebuffer( ref Meta_Renderpass meta_renderpass, ref Meta_Frameb
 ///		framebuffer_index = the index to select a framebuffer from the member framebuffer array
 ///	Returns: the passed in Meta_Structure for function chaining
 auto ref attachFramebuffer( ref Meta_Renderpass meta_renderpass, ref Meta_Framebuffers meta_framebuffers, size_t framebuffer_index ) {
-	meta_renderpass.begin_info.framebuffer = meta_framebuffers.framebuffers[ framebuffer_index ];
+	meta_renderpass.begin_info.framebuffer = meta_framebuffers.framebuffer[ framebuffer_index ];
 	meta_renderpass.begin_info.renderArea = meta_framebuffers.render_area;
-	meta_renderpass.begin_info.pClearValues = meta_framebuffers.clear_values.ptr;
-	meta_renderpass.begin_info.clearValueCount = meta_framebuffers.clear_values.length.toUint;
+	meta_renderpass.begin_info.pClearValues = meta_framebuffers.clear_value.ptr;
+	meta_renderpass.begin_info.clearValueCount = meta_framebuffers.clear_value.length.toUint;
 	return meta_renderpass;
 }
 
@@ -691,10 +777,10 @@ auto ref initFramebuffer( ref Meta_Framebuffer meta, VkRenderPass render_pass, V
 ///	initialize the VkFramebuffer and store them in the meta structure
 ///	Params:
 ///		meta				= reference to a Meta_Framebuffer or Meta_Framebuffers
-///		meta_renderpass	= the render_pass member is required for VkFramebufferCreateInfo to specify COMPATIBLE renderpasses,
-///								additionally framebuffer[0], clear_values and extent are set into the VkRenderPassBeginInfo member  
+///		meta_renderpass		= the render_pass member is required for VkFramebufferCreateInfo to specify COMPATIBLE renderpasses,
+///							additionally framebuffer[0], clear_value and extent are set into the VkRenderPassBeginInfo member  
 ///		framebuffer_extent	= the extent of the render area
-///		image_views	= these will be attached to each of the VkFramebuffer(s) attachments 0 .. first_image_views.length
+///		image_views			= these will be attached to each of the VkFramebuffer(s) attachments 0 .. first_image_views.length
 ///	Returns: the passed in Meta_Structure for function chaining
 auto ref initFramebuffer( ref Meta_Framebuffer meta, ref Meta_Renderpass meta_renderpass, VkExtent2D framebuffer_extent, VkImageView[] image_views ) {
 	meta.initFramebuffer( meta_renderpass.begin_info.renderPass, framebuffer_extent, image_views );
@@ -762,10 +848,10 @@ auto ref initFramebuffers(
 	};
 
 	// create a framebuffer per dynamic_image_view (e.g. for each swapchain image view)
-	meta.framebuffers.length = dynamic_image_views.length;
-	foreach( i, ref framebuffer; meta.framebuffers.data ) {
+	meta.framebuffer.length = dynamic_image_views.length;
+	foreach( i, ref fb; meta.framebuffer.data ) {
 		image_views[ first_image_views.length ] = dynamic_image_views[ i ];
-		vkCreateFramebuffer( meta.device, &framebuffer_create_info, meta.allocator, &framebuffer ).vkEnforce;
+		vkCreateFramebuffer( meta.device, &framebuffer_create_info, meta.allocator, &fb ).vkEnforce;
 	}
 
 	return meta;
@@ -776,7 +862,7 @@ auto ref initFramebuffers(
 ///	Params:
 ///		meta				= reference to a Meta_Framebuffer or Meta_Framebuffers
 ///		meta_renderpass	= the render_pass member is required for VkFramebufferCreateInfo to specify COMPATIBLE renderpasses,
-///								additionally framebuffer[0], clear_values and extent are set into the VkRenderPassBeginInfo member  
+///								additionally framebuffer[0], clear_value and extent are set into the VkRenderPassBeginInfo member  
 ///		extent				= the extent of the render area
 ///		first_image_views	= these will be attached to each of the VkFramebuffer(s) attachments 0 .. first_image_views.length
 ///		dynamic_image_views = the count of these specifies the count if VkFramebuffers(s), dynamic_imag_views[i] will be attached to framebuffer[i] attachment[first_image_views.length] 
