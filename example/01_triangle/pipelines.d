@@ -109,8 +109,6 @@ auto createDescriptorSets( ref VDriveState vd ) {
 	write_descriptor_sets[0].pBufferInfo		= &descriptor_wvpm_info;
 	write_descriptor_sets[0].pTexelBufferView	= null;
 
-// TODO(pp): remove VkBufferView from Meta_Buffer, as VkBufferView is only required for the above pTexelBufferView
-
 	vd.device.vkUpdateDescriptorSets( write_descriptor_sets.length.toUint, write_descriptor_sets.ptr, 0, null );	// last parameters are copy count and pointer to copies
 
 	return vd;

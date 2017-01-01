@@ -178,8 +178,6 @@ struct Meta_Buffer {
 	mixin 					Vulkan_State_Pointer;
 	VkBuffer				buffer;
 	VkBufferCreateInfo		buffer_create_info;
-	VkBufferView			buffer_view;
-	VkBufferViewCreateInfo	buffer_view_create_info;
 	VkDeviceSize size()		{ return buffer_create_info.size; }
 
 	mixin					Memory_Member;
@@ -187,8 +185,6 @@ struct Meta_Buffer {
 	// bulk destroy the resources belonging to this meta struct
 	void destroyResources() {
 		vk.device.vkDestroyBuffer( buffer, vk.allocator );
-		if( buffer_view != VK_NULL_ND_HANDLE )
-			vk.device.vkDestroyBufferView( buffer_view, vk.allocator );
 		if( owns_device_memory )
 			vk.device.vkFreeMemory( device_memory, vk.allocator );
 	}
