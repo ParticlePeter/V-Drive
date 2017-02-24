@@ -81,7 +81,8 @@ alias create = initMemory;
 
 auto createMemory( ref Vulkan vk, VkDeviceSize allocation_size, uint32_t memory_type_index ) {
 	Meta_Memory meta = vk;
-	return meta.create( allocation_size, memory_type_index );
+	meta.create( allocation_size, memory_type_index );
+	return meta;
 }
 
 
@@ -219,7 +220,8 @@ alias create = initBuffer;
 /// the Meta_Buffer struct is returned for function chaining
 auto createBuffer( ref Vulkan vk, VkBufferUsageFlags usage, VkDeviceSize size, VkSharingMode sharing_mode = VK_SHARING_MODE_EXCLUSIVE ) {
 	Meta_Buffer meta = vk;
-	return meta.create( usage, size, sharing_mode );
+	meta.create( usage, size, sharing_mode );
+	return meta;
 }
 
 
@@ -325,7 +327,8 @@ alias create = initImage;
 /// store vulkan data in argument meta image container, return container for chaining
 auto createImage( ref Vulkan vk, const ref VkImageCreateInfo image_create_info ) {
 	Meta_Image meta = vk;
-	return meta.create( image_create_info );
+	meta.create( image_create_info );
+	return meta;
 }
 
 /// create a simple VkImage with one level and one layer, assume VK_IMAGE_TILING_OPTIMAL and VK_SHARING_MODE_EXCLUSIVE as default args
@@ -339,7 +342,8 @@ auto createImage(
 	VkSharingMode			sharing_mode = VK_SHARING_MODE_EXCLUSIVE ) {
 
 	Meta_Image meta = vk;
-	return meta.create( image_format, image_extent, image_usage, image_samples, sharing_mode );
+	meta.create( image_format, image_extent, image_usage, image_samples, sharing_mode );
+	return meta;
 } 
 
 
