@@ -476,7 +476,7 @@ auto ref construct( ref Meta_Graphics meta ) {
 		pStages				: meta.shader_stages.ptr,
 		pVertexInputState	: & vertex_input_state_create_info,
 		pInputAssemblyState	: & meta.input_assembly_state,
-		pTessellationState	: & tessellation_state_create_info,
+		pTessellationState	: meta.tesselation_patch_control_points > 0 ? & tessellation_state_create_info : null,	// assume inputAssembly = VK_PRIMITIVE_TOPOLOGY_PATCH_LIST
 		pViewportState		: & viewport_state_create_info,
 		pRasterizationState	: & meta.rasterization_state,
 		pMultisampleState	: & meta.multisample_state,
