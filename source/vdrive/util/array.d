@@ -3,6 +3,12 @@ module vdrive.util.array;
 public import std.container.array;
 
 
+// Todo(pp): write your own nothrow @nogc array similar to std::vector (non ref counted)
+// Requirements:
+// - optionally use external memory ( not managed - not allocated/freed )
+// - optionally move data out of function without destroying and reallocating memory
+// - underlying data should be castable
+
 auto sizedArray( T )( size_t length ) {
 	Array!T array;
 	array.length = length;
@@ -105,4 +111,25 @@ auto toPtrArray( string data ) {
 	pointer_buffer.length = pointer_count;
 	data.toPtrArray( pointer_buffer.data );
 	return pointer_buffer;
+}
+
+
+
+unittest {
+
+	// Testing string of terminated strings toPtrArray buffer
+	string strings = "test\0t1\0TEST2\0T3\0";
+	const( char )*[8] stringPtr;
+	auto stringPoi = strings.toPtrArray( stringPtr );
+	printf( "Count: %d\n%s %s %s\n", stringPtr.length, stringPtr[0], stringPtr[2], stringPtr[1] );
+	printf( "Count: %d\n%s %s %s\n", stringPoi.length, stringPoi[0], stringPoi[2], stringPoi[1] );
+
+	// Testing array of strings to string of terminated strings toPtrArray
+	auto array_of_strings = [ "test", "t1", "TEST2" ];
+	Array!char pointer_buffer;
+	auto String = array_of_strings.toPtrArray( pointer_buffer );
+	printf( "%s\n%s\n%s\n", String[0], String[2], String[1] );
+	foreach( s; String ) writeln( * ( cast( ubyte * )s ) );
+	writeln( cast( ubyte[] )pointer_buffer.data() );
+
 }
