@@ -133,24 +133,41 @@ auto swapchainImageViews( ref Meta_Surface meta, VkImageViewCreateInfo image_vie
 	// assert that meta struct is initialized with a valid vulkan state pointer
 	assert( meta.isValid );
 
-	// Get the swapchain images
-	//uint32_t present_image_count = 0;
-	//vkGetSwapchainImagesKHR( vk.device, vk.swapchain, &present_image_count, null );
-	//vk.present_images.length = present_image_count;
-	//vkGetSwapchainImagesKHR( vk.device, vk.swapchain, &present_image_count, vk.present_images.ptr );
-
 	// Create image views of the swapchain images in the passed in argument present_image_views
 	auto present_images = listVulkanProperty!( VkImage, vkGetSwapchainImagesKHR, VkDevice, VkSwapchainKHR )( meta.device, meta.swapchain );
 
-	Array!VkImageView present_image_views;
-	present_image_views.length = present_images.length;
+	// allocate storage for image views and create one view per swapchain image in a loop
+	auto present_image_views = sizedArray!VkImageView( present_images.length );
 	foreach( i; 0 .. present_image_views.length ) {
-		// complete VkImageViewCreateInfo with image i:
-		image_view_create_info.image = present_images[i];
-
-		// create the view for the ith swapchain image
+		image_view_create_info.image = present_images[i];	// complete VkImageViewCreateInfo with image i:
 		vkCreateImageView( meta.device, &image_view_create_info, meta.allocator, &present_image_views[i] ).vkEnforce;
 	}
+	return present_image_views;
+}
+
+
+// Todo(pp): this function is only a stub and must be merged with the one above.
+// issue with the approach bellow: the two overloads above and bellow must return the same type as overloads based on return type only are not allowed
+// hence both must return some kind of dynamic array which is optionally able to use scratch memory
+// moreover, to over complicate the argument amount the option to use scratch space should be set globally and recorded in the vulkan state struct
+// see requirements and recipe on array in util.array module 
+auto swapchainImageViews( ref Meta_Surface meta, VkImageViewCreateInfo image_view_create_info, void* scratch = null, uint32_t* size_used = null ) {
+	// assert that meta struct is initialized with a valid vulkan state pointer
+	assert( meta.isValid );
+
+	// Create image views of the swapchain images in the passed in argument present_image_views
+	auto present_images = listVulkanProperty!( VkImage, vkGetSwapchainImagesKHR, VkDevice, VkSwapchainKHR )( scratch, meta.device, meta.swapchain );
+
+	// offset scratch pointer and use the remaining memory to store the image views
+	scratch += present_images.sizeof;
+	auto present_image_views = ( cast( VkImageView* )scratch )[ 0 .. present_images.length ];
+	foreach( i; 0 .. present_image_views.length ) {
+		image_view_create_info.image = present_images[i];	// complete VkImageViewCreateInfo with image i:
+		vkCreateImageView( meta.device, &image_view_create_info, meta.allocator, &present_image_views[i] ).vkEnforce;
+	}
+
+	if( size_used )
+		*size_used = present_images.sizeof + present_image_views.sizeof;
 
 	return present_image_views;
 }
