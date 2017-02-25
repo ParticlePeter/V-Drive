@@ -1,5 +1,6 @@
 module vdrive.util.info;
 
+import core.stdc.stdio : printf;
 import std.exception : enforce;
 
 import vdrive.util.util;
@@ -7,7 +8,19 @@ import vdrive.util.array;
 
 import erupted;
 
-void println() { printf( "\n" ); }
+
+// print new line
+void println() @nogc nothrow { printf( "\n" ); }
+
+
+// print char n count
+void printRepeat( size_t MAX_CHAR_COUNT )( char c, size_t count ) @nogc nothrow {
+	char[ MAX_CHAR_COUNT ] repeat;
+	repeat[] = c;
+	if( MAX_CHAR_COUNT < count ) count = MAX_CHAR_COUNT;
+	printf( "%.*s", count, repeat.ptr );	
+}
+
 
 // TODO(pp): get rid of the GC with @nogc, remove to!string requirement
 // TODO(pp): extract function for listing available enums of possible enums
@@ -22,7 +35,7 @@ void printTypeInfo( T, size_t buffer_size = 256 )(
 	// struct name
 	import std.conv : to;
 	//import std.array : replicate;
-	import core.stdc.stdio : printf;
+	
 	//import core.stdc.string : strncpy, memset;
 			//if( strncmp( properties.layerName.ptr, layer.ptr, layer.length ) == 0 ) {
 			//	return properties.implementationVersion;
@@ -181,7 +194,7 @@ void printTypeInfo( T, size_t buffer_size = 256 )(
 			*/ 					
 		//}
 	}
-	if( newline ) printf("\n");
+	if( newline ) println;
 }
 
 // From D Cookbok p. 216
@@ -239,10 +252,8 @@ private void inspect( T )( T info, string before = "" ) {
 
 
 
-import std.array : replicate;
-import std.stdio;
-import std.string : fromStringz;
 
+//nothrow:
 
 ////////////////
 // Extensions //
@@ -258,17 +269,14 @@ auto listExtensions( VkPhysicalDevice gpu, char* layer, bool printInfo = true ) 
 
 	if( printInfo ) {
 		if(	extension_properties.length == 0 )  {
-			writeln( "\tExtension: None" );
+			printf( "\tExtension: None\n" );
 
 		} else {
 			foreach( ref properties; extension_properties ) {
-				//printf( "\tExtension: %s, version: %d", properties.extensionName, properties.specVersion );
-				writefln( "\tExtension: %s, version: %s", 
-					properties.extensionName.ptr.fromStringz, 
-					properties.specVersion );
+				printf( "\t%s, version: %d\n", properties.extensionName.ptr, properties.specVersion );
 			}
 		}	
-		writeln;
+		println;
 	}
 	return extension_properties;
 }
@@ -338,6 +346,8 @@ unittest {
 // Layers //
 ////////////
 
+
+
 /// list all available instance / device layers
 auto listLayers( VkPhysicalDevice gpu, bool printInfo = true  ) {
 
@@ -348,26 +358,29 @@ auto listLayers( VkPhysicalDevice gpu, bool printInfo = true  ) {
 
 	if( printInfo ) {
 		if(	layer_properties.length == 0 )  {
-			writeln( "\tLayers: None" );
+			printf( "\tLayers: None\n" );
 
 		} else {
 			if ( gpu != VK_NULL_HANDLE ) {
 				VkPhysicalDeviceProperties gpu_properties;
 				vkGetPhysicalDeviceProperties( gpu, &gpu_properties );
-				writeln;
-				writeln( "Layers of GPU: ", gpu_properties.deviceName.ptr.fromStringz );
-				writeln( replicate( "=", 15 + gpu_properties.deviceName.ptr.fromStringz.length ));
+				println;
+				printf( "Layers of: %s\n", gpu_properties.deviceName.ptr );
+				import core.stdc.string : strlen;
+				auto underline_length = 11 + strlen( gpu_properties.deviceName.ptr );
+				printRepeat!VK_MAX_PHYSICAL_DEVICE_NAME_SIZE( '=', underline_length );
+				println;
 			}
 			foreach( ref property; layer_properties ) {
-				writefln( "%s:", property.layerName.ptr.fromStringz );
-				writefln( "\tVersion: %s", property.implementationVersion );
+				printf( "%s:\n", property.layerName.ptr );
+				printf( "\tVersion: %d\n", property.implementationVersion );
 				auto ver = property.specVersion;
-				writefln( "\tSpec Version: %s.%s.%s ", ver.vkMajor, ver.vkMinor, ver.vkPatch );
-				writefln( "\tDescription: %s", property.description.ptr.fromStringz );
+				printf( "\tSpec Version: %d.%d.%d\n", ver.vkMajor, ver.vkMinor, ver.vkPatch );
+				printf( "\tDescription: %s\n", property.description.ptr );
 				gpu.listExtensions( property.layerName.ptr, true );	// drill into extensions
 			}
 		}	
-		writeln;
+		println;
 	}
 	return layer_properties;
 }
@@ -433,13 +446,14 @@ auto listPhysicalDevices( VkInstance instance, bool printInfo = true ) {
 	auto gpus = listVulkanProperty!( VkPhysicalDevice, vkEnumeratePhysicalDevices, VkInstance )( instance );
 
 	if( gpus.length == 0 ) {
-		stderr.writeln("No gpus found.");
+		import core.stdc.stdio : fprintf, stderr;
+		fprintf( stderr, "No gpus found.\n" );
 	}
 
 	if( printInfo ) {
-		writeln;
-		writeln( "GPU count: ", gpus.length ); 
-		writeln( "============" );
+		println;
+		printf( "GPU count: %d\n", gpus.length ); 
+		printf( "============\n" );
 	}
 	return gpus;
 }
@@ -451,27 +465,28 @@ auto listProperties( VkPhysicalDevice gpu, GPU_Info gpu_info = GPU_Info.none ) {
 	VkPhysicalDeviceProperties gpu_properties;
 	vkGetPhysicalDeviceProperties( gpu, &gpu_properties );
 
-	writeln( gpu_properties.deviceName.ptr.fromStringz );
-	writeln( replicate( "=", gpu_properties.deviceName.ptr.fromStringz.length ));
+	printf( "%s\n", gpu_properties.deviceName.ptr );
+	import core.stdc.string : strlen;
+	auto underline_length = strlen( gpu_properties.deviceName.ptr );
+	printRepeat!VK_MAX_PHYSICAL_DEVICE_NAME_SIZE( '=', underline_length );
+	println;
 
 	if( gpu_info & GPU_Info.properties ) {
 		auto ver = gpu_properties.apiVersion;
-		writefln("\tAPI Version     : %s.%s.%s", ver.vkMajor, ver.vkMinor, ver.vkPatch );
-		writeln( "\tDriver Version  : ", gpu_properties.driverVersion );
-		writeln( "\tVendor ID       : ", gpu_properties.vendorID );
-		writeln( "\tDevice ID       : ", gpu_properties.deviceID );
-		writeln( "\tGPU type        : ", gpu_properties.deviceType );
-		writeln;
+		printf( "\tAPI Version     : %d.%d.%d\n", ver.vkMajor, ver.vkMinor, ver.vkPatch );
+		printf( "\tDriver Version  : %d\n", gpu_properties.driverVersion );
+		printf( "\tVendor ID       : %d\n", gpu_properties.vendorID );
+		printf( "\tDevice ID       : %d\n", gpu_properties.deviceID );
+		printf( "\tGPU type        : %s\n", gpu_properties.deviceType.toStringz.ptr );
+		println;
 	}
 
 	if( gpu_info & GPU_Info.limits ) {
 		gpu_properties.limits.printTypeInfo;
-		//writeln;
 	}
 	
 	if( gpu_info & GPU_Info.sparse_properties ) {
 		gpu_properties.sparseProperties.printTypeInfo;
-		//writeln;
 	}
 
 	return gpu_properties;
@@ -515,7 +530,7 @@ auto presentSupport( VkPhysicalDevice gpu, VkSurfaceKHR surface ) {
 ////////////
 // Queues //
 ////////////
-auto listQueues( VkPhysicalDevice gpu, bool printInfo = true ) {
+auto listQueues( VkPhysicalDevice gpu, bool printInfo = true, VkSurfaceKHR surface = VK_NULL_ND_HANDLE ) {
 
 	uint32_t queue_family_property_count;
 	Array!VkQueueFamilyProperties queue_family_properties;
@@ -529,22 +544,28 @@ auto listQueues( VkPhysicalDevice gpu, bool printInfo = true ) {
 
 	if( printInfo ) { 
 		foreach( q, ref queue; queue_family_properties.data ) {
-			writeln;
-			writeln("Queue Family ", q );
-			writeln("\tQueues in Family         : ", queue.queueCount );
-			writeln("\tQueue timestampValidBits : ", queue.timestampValidBits );
+			println;
+			printf( "Queue Family %d\n", q );
+			printf( "\tQueues in Family         : %d\n", queue.queueCount );
+			printf( "\tQueue timestampValidBits : %d\n", queue.timestampValidBits );
 
+			if( surface != VK_NULL_ND_HANDLE ) {
+				VkBool32 present_supported;
+				vkGetPhysicalDeviceSurfaceSupportKHR( gpu, q.toUint, surface, &present_supported );
+				printf( "\tPresentation supported   : %d\n", present_supported );
+			}
+			
 			if( queue.queueFlags & VK_QUEUE_GRAPHICS_BIT )
-				writeln("\tVK_QUEUE_GRAPHICS_BIT" );
+				printf( "\tVK_QUEUE_GRAPHICS_BIT\n" );
 
 			if( queue.queueFlags & VK_QUEUE_COMPUTE_BIT )
-				writeln("\tVK_QUEUE_COMPUTE_BIT" );
+				printf( "\tVK_QUEUE_COMPUTE_BIT\n" );
 
 			if( queue.queueFlags & VK_QUEUE_TRANSFER_BIT )
-				writeln("\tVK_QUEUE_TRANSFER_BIT" );
+				printf( "\tVK_QUEUE_TRANSFER_BIT\n" );
 
 			if( queue.queueFlags & VK_QUEUE_SPARSE_BINDING_BIT )
-				writeln("\tVK_QUEUE_SPARSE_BINDING_BIT" );
+				printf( "\tVK_QUEUE_SPARSE_BINDING_BIT\n" );
 		}
 	}
 
@@ -627,8 +648,8 @@ struct Queue_Family {
 	}
 }
 
-auto listQueueFamilies( VkPhysicalDevice gpu, bool printInfo = true ) {
-	auto queue_family_properties = listQueues( gpu, printInfo );
+auto listQueueFamilies( VkPhysicalDevice gpu, bool printInfo = true, VkSurfaceKHR surface = VK_NULL_ND_HANDLE ) {
+	auto queue_family_properties = listQueues( gpu, printInfo, surface );
 	Array!Queue_Family family_queues;
 	foreach( family_index, ref family; queue_family_properties.data ) {
 		family_queues.insert( Queue_Family( cast( uint32_t )family_index, /*gpu,*/ family ));
@@ -669,26 +690,6 @@ if( is( Array_T == Array!Queue_Family ) || is( Array_T : Queue_Family[] )) {
 }
 
 
-unittest {
-
-	// Testing string of terminated strings toPtrArray buffer
-	string strings = "test\0t1\0TEST2\0T3\0";
-	const( char )*[8] stringPtr;
-	auto stringPoi = strings.toPtrArray( stringPtr );
-	printf( "Count: %d\n%s %s %s\n", stringPtr.length, stringPtr[0], stringPtr[2], stringPtr[1] );
-	printf( "Count: %d\n%s %s %s\n", stringPoi.length, stringPoi[0], stringPoi[2], stringPoi[1] );
-
-	// Testing array of strings to string of terminated strings toPtrArray
-	auto array_of_strings = [ "test", "t1", "TEST2" ];
-	Array!char pointer_buffer;
-	auto String = array_of_strings.toPtrArray( pointer_buffer );
-	printf( "%s\n%s\n%s\n", String[0], String[2], String[1] );
-	foreach( s; String ) writeln( * ( cast( ubyte * )s ) );
-	writeln( cast( ubyte[] )pointer_buffer.data() );
-
-}
-
-
 
 
 ///////////////////////////
@@ -698,9 +699,9 @@ unittest {
 /// list all available instance extensions
 auto listExtensions( bool printInfo = true ) {
 	if ( printInfo ) {
-		writeln;
-		writeln( "Instance Extensions" );
-		writeln( "===================" );
+		println;
+		printf( "Instance Extensions\n" );
+		printf( "===================\n" );
 	}
 	return listExtensions( VK_NULL_HANDLE, null, printInfo );
 }
@@ -708,9 +709,9 @@ auto listExtensions( bool printInfo = true ) {
 /// list all available per layere instance extensions
 auto listExtensions( char* layer, bool printInfo = true ) {
 	if ( printInfo ) {
-		writeln;
-		writeln( "Instance Layere Extensions" );
-		writeln( "==========================" );
+		println;
+		printf( "Instance Layere Extensions\n" );
+		printf( "==========================\n" );
 	}
 	return listExtensions( VK_NULL_HANDLE, layer, printInfo );	
 }
@@ -718,9 +719,9 @@ auto listExtensions( char* layer, bool printInfo = true ) {
 /// list all available device extensions
 auto listExtensions( VkPhysicalDevice gpu, bool printInfo = true ) {
 	if ( printInfo ) {
-		writeln;
-		writeln( "Physical Device Extensions" );
-		writeln( "==========================" );
+		println;
+		printf( "Physical Device Extensions\n" );
+		printf( "==========================\n" );
 	}
 	return listExtensions( gpu, null, printInfo );
 }
@@ -728,9 +729,9 @@ auto listExtensions( VkPhysicalDevice gpu, bool printInfo = true ) {
 /// list all available layer per device extensions
 auto list_device_layer_extensions( VkPhysicalDevice gpu, char* layer, bool printInfo = true ) {
 	if ( printInfo ) {
-		writeln;
-		writeln( "Physical Device Layer Extensions" );
-		writeln( "================================" );
+		println;
+		printf( "Physical Device Layer Extensions\n" );
+		printf( "================================\n" );
 	}
 	return listExtensions( gpu, layer, printInfo );	
 }
@@ -761,9 +762,9 @@ if( is( T == string )| is( T : const( char* )) | is( T : char[] )) {
 // list all instance layers
 auto listLayers( bool printInfo = true ) {
 	if( printInfo ) {
-		writeln;
-		writeln( "Instance Layers" );
-		writeln( "===============" );
+		println;
+		printf( "Instance Layers\n" );
+		printf( "===============\n" );
 	}
 	return listLayers( VK_NULL_HANDLE, printInfo );
 }
