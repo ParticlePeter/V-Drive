@@ -1,7 +1,8 @@
 module vdrive.state;
 
 import std.array : replicate;
-import std.stdio : writeln, writefln, stderr;
+//import std.stdio : writeln, writefln, stderr;
+import core.stdc.stdio : printf;
 import std.string : fromStringz;
 
 import erupted;
@@ -9,18 +10,20 @@ import erupted;
 import vdrive.util;
 
 
+//nothrow: //@nogc:
 
 bool verbose = true;
 
 
 mixin template Vulkan_State_Pointer() {
-	this( ref Vulkan vk ) { vk_ptr = &vk; }
 	private Vulkan*			vk_ptr;
 	alias 					vk this;
-	ref Vulkan vk() { return * vk_ptr; }
-	void vk( ref Vulkan vk ) { vk_ptr = &vk; }
-	auto ref opCall( ref Vulkan vk ) { vk_ptr = &vk; return this; }
-	bool isValid() { return vk_ptr !is null; }
+
+	this( ref Vulkan vk ) 				{ vk_ptr = &vk; }
+	ref Vulkan vk() 					{ return * vk_ptr; }
+	void vk( ref Vulkan vk ) 			{ vk_ptr = &vk; }
+	auto ref opCall( ref Vulkan vk )	{ vk_ptr = &vk; return this; }
+	bool isValid() 						{ return vk_ptr !is null; }
 }
 
 struct Vulkan {
@@ -50,8 +53,6 @@ private struct Device_Resource {
 
 
 
-// TODO(pp): Create Template specialization for const( char* )[]
-//const( char* )[2] ext = [ "VK_KHR_surface", "VK_KHR_win32_surface" ]; foreach( e; ext ) printf( "%s\n", e );
 void initInstance( T )( ref Vulkan vk, T extensionNames, T layerNames )
 if( is( T == string ) | is( T == string[] ) | is( T == Array!( const( char )* )) | is( T : const( char* )[] )) {
 
@@ -102,27 +103,10 @@ if( is( T == string ) | is( T == string[] ) | is( T == Array!( const( char )* ))
 	loadInstanceLevelFunctions( vk.instance );
 
 	if( verbose ) {
-		writeln;
-		writeln( "Instance initialized" );
-		writeln( "====================" );
+		println;
+		printf( "Instance initialized\n" );
+		printf( "====================\n" );
 	}
-/*
-	uint32_t gpus_count;
-	vkEnumeratePhysicalDevices( vk.instance, &gpus_count, null ).vkEnforce;
-
-	if( gpus_count == 0 ) {
-		stderr.writeln("No gpus found.");
-	}
-
-	vk.gpus.length = gpus_count;
-	vkEnumeratePhysicalDevices( vk.instance, &gpus_count, vk.gpus.ptr ).vkEnforce;
-
-	if( verbose ) {
-		writeln;
-		writeln( "GPU count: ", gpus_count ); 
-		writeln( "============" );
-	}
-*/
 }
 
 
@@ -153,13 +137,13 @@ if( is( T == string ) | is( T == string[] ) | is( T == Array!( const( char )* ))
 
 	// check if Vulkan state has a not VK_NULL_HANDLE
 	if( vk.gpu == VK_NULL_HANDLE )  {
-		writeln( "Physical Device is VK_NULL_HANDLE! Set a valid Physical Devise as Vulkan.gpu ");
+		printf( "Physical Device is VK_NULL_HANDLE! Set a valid Physical Devise as Vulkan.gpu\n" );
 		return null;
 	}
 
 	// check if any queue family was passed into function
 	if( queue_families.length == 0 )  {
-		writeln( "Zero family queues specified! Need at least one family queue! ");
+		printf( "Zero family queues specified! Need at least one family queue!\n" );
 		return null;
 	}
 
@@ -209,7 +193,7 @@ if( is( T == string ) | is( T == string[] ) | is( T == Array!( const( char )* ))
 	loadDeviceLevelFunctions( vk.device );
 
 	// get and store the memory properties of the current gpu
-	// TODO(pp): the memory properties do not print nicely, fix this
+	// TODO(pp): the memory properties print uints instaed of enum flags, fix this
 	vk.memory_properties = vk.gpu.listMemoryProperties( false );
 
 
@@ -243,3 +227,27 @@ void destroyDevice( VkDevice device, const( VkAllocationCallbacks )* allocator =
 	vkDestroyDevice( device, allocator );
 }
 
+
+// overloads forward to specific vkDestroy(Handle) functions
+void destroy( ref Vulkan vk, VkSemaphore			handle )	{ vkDestroySemaphore(			vk.device, handle, vk.allocator ); }
+void destroy( ref Vulkan vk, VkFence				handle )	{ vkDestroyFence(				vk.device, handle, vk.allocator ); }
+void destroy( ref Vulkan vk, VkDeviceMemory			handle )	{ vkFreeMemory(					vk.device, handle, vk.allocator ); }
+void destroy( ref Vulkan vk, VkBuffer				handle )	{ vkDestroyBuffer(				vk.device, handle, vk.allocator ); }
+void destroy( ref Vulkan vk, VkImage				handle )	{ vkDestroyImage(				vk.device, handle, vk.allocator ); }
+void destroy( ref Vulkan vk, VkEvent				handle )	{ vkDestroyEvent(				vk.device, handle, vk.allocator ); }
+void destroy( ref Vulkan vk, VkQueryPool			handle )	{ vkDestroyQueryPool(			vk.device, handle, vk.allocator ); }
+void destroy( ref Vulkan vk, VkBufferView			handle )	{ vkDestroyBufferView(			vk.device, handle, vk.allocator ); }
+void destroy( ref Vulkan vk, VkImageView			handle )	{ vkDestroyImageView(			vk.device, handle, vk.allocator ); }
+void destroy( ref Vulkan vk, VkShaderModule			handle )	{ vkDestroyShaderModule(		vk.device, handle, vk.allocator ); }
+void destroy( ref Vulkan vk, VkPipelineCache		handle )	{ vkDestroyPipelineCache(		vk.device, handle, vk.allocator ); }
+void destroy( ref Vulkan vk, VkPipelineLayout		handle )	{ vkDestroyPipelineLayout(		vk.device, handle, vk.allocator ); }
+void destroy( ref Vulkan vk, VkRenderPass			handle )	{ vkDestroyRenderPass(			vk.device, handle, vk.allocator ); }
+void destroy( ref Vulkan vk, VkPipeline				handle )	{ vkDestroyPipeline(			vk.device, handle, vk.allocator ); }
+void destroy( ref Vulkan vk, VkDescriptorSetLayout	handle )	{ vkDestroyDescriptorSetLayout(	vk.device, handle, vk.allocator ); }
+void destroy( ref Vulkan vk, VkSampler				handle )	{ vkDestroySampler(				vk.device, handle, vk.allocator ); }
+void destroy( ref Vulkan vk, VkDescriptorPool		handle )	{ vkDestroyDescriptorPool(		vk.device, handle, vk.allocator ); }
+void destroy( ref Vulkan vk, VkFramebuffer			handle )	{ vkDestroyFramebuffer(			vk.device, handle, vk.allocator ); }
+void destroy( ref Vulkan vk, VkCommandPool			handle )	{ vkDestroyCommandPool(			vk.device, handle, vk.allocator ); }
+
+// extension specific destroy functions
+void destroy( ref Vulkan vk, VkDebugReportCallbackEXT handle ) { vkDestroyDebugReportCallbackEXT( vk.instance, handle, vk.allocator ); }
