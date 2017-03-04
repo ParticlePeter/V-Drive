@@ -250,4 +250,6 @@ void destroy( ref Vulkan vk, VkFramebuffer			handle )	{ vkDestroyFramebuffer(			
 void destroy( ref Vulkan vk, VkCommandPool			handle )	{ vkDestroyCommandPool(			vk.device, handle, vk.allocator ); }
 
 // extension specific destroy functions
-void destroy( ref Vulkan vk, VkDebugReportCallbackEXT handle ) { vkDestroyDebugReportCallbackEXT( vk.instance, handle, vk.allocator ); }
+void destroy( ref Vulkan vk, VkSwapchainKHR			handle )	{ vkDestroySwapchainKHR( 		vk.device, handle, vk.allocator ); }
+
+void destroy( ref Vulkan vk, VkDebugReportCallbackEXT handle )	{ vkDestroyDebugReportCallbackEXT( vk.instance, handle, vk.allocator ); }
