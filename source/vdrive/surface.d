@@ -99,7 +99,11 @@ auto ref construct( ref Meta_Surface meta ) {
 		meta.preTransform = surface_capabilities.currentTransform;
 	}
 
+	meta.create_info.oldSwapchain = meta.swapchain; 		// store this in case we are reecreating the swapchain
 	vkCreateSwapchainKHR( meta.vk.device, &meta.create_info, meta.allocator, &meta.swapchain ).vkEnforce;
+	if( meta.create_info.oldSwapchain )						// if the old swapchain was valid
+		meta.destroy( meta.create_info.oldSwapchain );		// destroy it now
+
 	return meta;
 }
 
