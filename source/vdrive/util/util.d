@@ -5,10 +5,13 @@ import std.container.array;
 
 
 /// check the correctness of a vulkan result
-void vkEnforce( VkResult vkResult ) {
-	import std.exception : enforce;
+void vkEnforce( VkResult vkResult ) nothrow @nogc {
 	import std.conv : to;
-	enforce( vkResult == VK_SUCCESS, vkResult.to!string );
+	//import std.exception : enforce;
+	//enforce( vkResult == VK_SUCCESS, vkResult.to!string );
+	//assert( vkResult == VK_SUCCESS, vkResult.to!string );
+	// Todo(pp): create lookup table from VkResult to its coresponding char or string and use instead of vkResult.to!string
+	assert( vkResult == VK_SUCCESS );
 }
 
 
