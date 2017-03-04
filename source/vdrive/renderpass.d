@@ -773,13 +773,13 @@ auto ref initFramebuffer( ref Meta_Framebuffer meta, ref Meta_Renderpass meta_re
 alias create = initFramebuffer;
 
 
-auto createFramebuffer( ref vulkan vk, VkRenderPass render_pass, VkExtent2D framebuffer_extent, VkImageView[] image_views ) {
+auto createFramebuffer( ref Vulkan vk, VkRenderPass render_pass, VkExtent2D framebuffer_extent, VkImageView[] image_views ) {
 	Meta_Framebuffer meta = vk;
 	return meta.initFramebuffer( render_pass, framebuffer_extent, image_views );
 }
 
 
-auto createFramebuffer( ref vulkan vk, ref Meta_Renderpass meta_renderpass, VkExtent2D framebuffer_extent, VkImageView[] image_views ) {
+auto createFramebuffer( ref Vulkan vk, ref Meta_Renderpass meta_renderpass, VkExtent2D framebuffer_extent, VkImageView[] image_views ) {
 	Meta_Framebuffer meta = vk;
 	return meta.initFramebuffer( meta_renderpass, framebuffer_extent, image_views );
 }
@@ -866,7 +866,7 @@ alias create = initFramebuffers;
 
 
 auto createFramebuffers(
-	ref vulkan		vk,
+	ref Vulkan		vk,
 	VkRenderPass	render_pass,
 	VkExtent2D		framebuffer_extent,
 	VkImageView[]	first_image_views,
@@ -878,7 +878,7 @@ auto createFramebuffers(
 
 
 auto createFramebuffers(
-	ref vulkan				vk,
+	ref Vulkan				vk,
 	ref Meta_Renderpass	meta_renderpass,
 	VkExtent2D				framebuffer_extent,
 	VkImageView[]			first_image_views,
