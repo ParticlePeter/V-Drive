@@ -17,7 +17,7 @@ import erupted;
 /// struct to collect
 private struct Meta_Subpass {
 	VkSubpassDescriptionFlags	flags;
-	VkPipelineBindPoint			pipeline_bind_point = VK_PIPELINE_BIND_POINT_GRAPHICS;
+	VkPipelineBindPoint			pipeline_bind_point = VK_PIPELINE_BIND_POINT_GRAPHICS;	// currently this is the only acceptable value, but might change in future 
 	Array!VkAttachmentReference	input_reference;
 	Array!VkAttachmentReference	color_reference;
 	Array!VkAttachmentReference	resolve_reference;
@@ -29,7 +29,7 @@ private struct Meta_Subpass {
 struct Meta_Renderpass {
 	mixin							Vulkan_State_Pointer;
 	ref VkRenderPass				render_pass() { return begin_info.renderPass; }
-	VkRenderPassBeginInfo			begin_info;		// the actual renderpass is stored in a member of this struct
+	VkRenderPassBeginInfo			begin_info;		// the actual render pass is stored in a member of this struct
 	Array!VkAttachmentDescription	attachment_descriptions;
 	Array!Meta_Subpass				subpasses;
 	private Meta_Subpass*			subpass;
@@ -151,36 +151,18 @@ alias subpassRefDepthStencil	= subpassReference!( "depth_stencil" );
 
 
 
-private auto ref mayAliasOrBindPoint( alias value )( ref Meta_Renderpass meta, size_t index = size_t.max )
-if( is( typeof( value ) == VkPipelineBindPoint ) || is( typeof( value ) == VkAttachmentDescriptionFlagBits ))
-{
-	assert( meta.subpasses.length > 0 );
-	if( index == size_t.max ) {
-		static if( is( typeof( value ) == VkPipelineBindPoint ))	meta.subpasses[ $-1 ].pipeline_bind_point = value;
-		else static if( is( typeof( value ) == VkAttachmentDescriptionFlagBits ))	meta.subpasses[ $-1 ].flags = value;
-	} else {
-		assert( index < meta.subpasses.length );
-		static if( is( typeof( value ) == VkPipelineBindPoint ))	meta.subpasses[ $-1 ].pipeline_bind_point = value;
-		else static if( is( typeof( value ) == VkAttachmentDescriptionFlagBits ))	meta.subpasses[ $-1 ].flags = value;
-	}
-	return meta;
-}
-
-// Per Spec v1.0.21 p.118 valid usage of a VkSubpassDescription: "pipelineBindPoint must be VK_PIPELINE_BIND_POINT_GRAPHICS", hence bellow obsolete 
-//auto ref graphicBindPoint( ref Meta_Renderpass meta, size_t index = size_t.max ) { return mayAliasOrBindPoint!VK_PIPELINE_BIND_POINT_GRAPHICS( meta, index ); }	// for sake of completeness
-//auto ref computeBindPoint( ref Meta_Renderpass meta, size_t index = size_t.max ) { return mayAliasOrBindPoint!VK_PIPELINE_BIND_POINT_COMPUTE(  meta, index ); }
-auto ref mayAlias( ref Meta_Renderpass meta, size_t index = size_t.max ) { return mayAliasOrBindPoint!VK_ATTACHMENT_DESCRIPTION_MAY_ALIAS_BIT( meta, index ); }
-
 
 
 ///	add a Meta_Subpass to the subpasses array of Meta_Renderpass
 /// consecutive subpass related function calls will create resources for this Meta_Structure if no index is specified
 ///	Params:
 ///		meta = reference to a Meta_Renderpass struct
+///		subpass_description_flags = optionally add a ( currently the only one: VK_ATTACHMENT_DESCRIPTION_MAY_ALIAS_BIT ) flag
 ///	Returns: the passed in Meta_Structure for function chaining 
-auto ref addSubpass( ref Meta_Renderpass meta ) {
+auto ref addSubpass( ref Meta_Renderpass meta, VkSubpassDescriptionFlags subpass_description_flags = 0 ) {
 	meta.subpasses.length = meta.subpasses.length + 1;
 	meta.subpass = &meta.subpasses[ $-1 ];
+	meta.subpass.flags = subpass_description_flags;
 	return meta; 
 }
 
@@ -343,7 +325,7 @@ auto ref construct( ref Meta_Renderpass meta ) {
 			subpass.resolve_reference[ old_length .. subpass.resolve_reference.length ] = VkAttachmentReference( VK_ATTACHMENT_UNUSED, VK_IMAGE_LAYOUT_UNDEFINED );
 		}
 
-		// fill the current VkSubpassDescription with data from coresponding Meta_Subpass
+		// fill the current VkSubpassDescription with data from corresponding Meta_Subpass
 		subpass_descriptions[i].pipelineBindPoint		=  subpass.pipeline_bind_point;
 		subpass_descriptions[i].inputAttachmentCount	=  subpass.input_reference.length.toUint;
 		subpass_descriptions[i].pInputAttachments		=  subpass.input_reference.ptr;
@@ -443,7 +425,7 @@ template IS_FB( META_FB ) {  enum IS_FB = ( is( META_FB == Meta_Framebuffer ) ||
 /// Three overloads exist, each with first param of Meta_Framebuffer and an additional optional attachment index:
 ///		1.: 4 (+1) parameters each of type float, int32_t or uint32_t to set color clear values (at specified index)
 ///		2.: 2 (+1) parameters, float and uint32_t specifying depth and stencil (at specified index)
-///		3.: 1 (+1) parameter of type VkClearValue setting directly the Vulkan clear value (at specified index)
+///		3.: 1 (+1) parameter of type VkClearValue setting directly the vulkan clear value (at specified index)
 ///	Params:
 ///		meta = reference to a Meta_Framebuffer or Meta_Framebuffers struct
 ///		args = Arguments as described above
@@ -604,7 +586,7 @@ auto ref addClearValue( META_FB )( ref META_FB meta, VkClearValue clear_value ) 
 
 ///	set the render area offset separate from the extent
 /// the render area is passed into a VkRenderPassBeginInfo when the appropriate attachFramebuffer (see bellow) overload is called
-///	for Vulkan itself this parameter is just an optimization hint and must be properly set as scissor parameter of VkPipelineViewportStateCreateInfo
+///	for vulkan itself this parameter is just an optimization hint and must be properly set as scissor parameter of VkPipelineViewportStateCreateInfo
 ///	Params:
 ///		meta	= reference to a Meta_Framebuffer or Meta_Framebuffers
 ///		offset	= the offset of the render area
@@ -617,7 +599,7 @@ auto ref renderAreaOffset( META_FB )( ref META_FB meta, VkOffset2D offset ) if( 
 
 ///	set the render area offset separate from the extent
 /// the render area is passed into a VkRenderPassBeginInfo when the appropriate attachFramebuffer (see bellow) overload is called
-///	for Vulkan itself this parameter is just an optimization hint and must be properly set as scissor parameter of VkPipelineViewportStateCreateInfo
+///	for vulkan itself this parameter is just an optimization hint and must be properly set as scissor parameter of VkPipelineViewportStateCreateInfo
 ///	Params:
 ///		meta	= reference to a Meta_Framebuffer or Meta_Framebuffers
 ///		x		= the offset of the render area in x
@@ -630,7 +612,7 @@ auto ref renderAreaOffset( META_FB )( ref META_FB meta, int32_t x, int32_t y ) i
 
 ///	set the render area extent separate from the offset
 /// the render area is passed into a VkRenderPassBeginInfo when the appropriate attachFramebuffer (see bellow) overload is called
-///	for Vulkan itself this parameter is just an optimization hint and must be properly set as scissor parameter of VkPipelineViewportStateCreateInfo
+///	for vulkan itself this parameter is just an optimization hint and must be properly set as scissor parameter of VkPipelineViewportStateCreateInfo
 ///	Params:
 ///		meta	= reference to a Meta_Framebuffer or Meta_Framebuffers
 ///		extent	= the extent of the render area
@@ -643,7 +625,7 @@ auto ref renderAreaExtent( META_FB )( ref META_FB meta, VkExtent2D extent ) if( 
 
 ///	set the render area extent separate from the offset
 /// the render area is passed into a VkRenderPassBeginInfo when the appropriate attachFramebuffer (see bellow) overload is called
-///	for Vulkan itself this parameter is just an optimization hint and must be properly set as scissor parameter of VkPipelineViewportStateCreateInfo
+///	for vulkan itself this parameter is just an optimization hint and must be properly set as scissor parameter of VkPipelineViewportStateCreateInfo
 ///	Params:
 ///		meta	= reference to a Meta_Framebuffer or Meta_Framebuffers
 ///		width	= the width of the render area
@@ -656,7 +638,7 @@ auto ref renderAreaExtent( META_FB )( ref META_FB meta, uint32_t width, uint32_t
 
 ///	set the render area
 /// the render area is passed into a VkRenderPassBeginInfo when the appropriate attachFramebuffer (see bellow) overload is called
-///	for Vulkan itself this parameter is just an optimization hint and must be properly set as scissor parameter of VkPipelineViewportStateCreateInfo
+///	for vulkan itself this parameter is just an optimization hint and must be properly set as scissor parameter of VkPipelineViewportStateCreateInfo
 ///	Params:
 ///		meta	= reference to a Meta_Framebuffer or Meta_Framebuffers
 ///		area	= the render area
@@ -669,7 +651,7 @@ auto ref renderArea( META_FB )( ref META_FB meta, VkRect2D area ) if( IS_FB!META
 
 ///	set the render area
 /// the render area is passed into a VkRenderPassBeginInfo when the appropriate attachFramebuffer (see bellow) overload is called
-///	for Vulkan itself this parameter is just an optimization hint and must be properly set as scissor parameter of VkPipelineViewportStateCreateInfo
+///	for vulkan itself this parameter is just an optimization hint and must be properly set as scissor parameter of VkPipelineViewportStateCreateInfo
 ///	Params:
 ///		meta	= reference to a Meta_Framebuffer or Meta_Framebuffers
 ///		offset	= the offset of the render area
@@ -682,7 +664,7 @@ auto ref renderAreaExtent( META_FB )( ref META_FB meta, VkOffset2D offset, VkExt
 
 ///	set the render area
 /// the render area is passed into a VkRenderPassBeginInfo when the appropriate attachFramebuffer (see bellow) overload is called
-///	for Vulkan itself this parameter is just an optimization hint and must be properly set as scissor parameter of VkPipelineViewportStateCreateInfo
+///	for vulkan itself this parameter is just an optimization hint and must be properly set as scissor parameter of VkPipelineViewportStateCreateInfo
 ///	Params:
 ///		meta	= reference to a Meta_Framebuffer or Meta_Framebuffers
 ///		x		= the offset of the render area in x
@@ -729,7 +711,7 @@ auto ref attachFramebuffer( ref Meta_Renderpass meta_renderpass, ref Meta_Frameb
 	return meta_renderpass;
 }
 
-///	set framebuffer member of a Meta_Renderpass.VkRenderPassBeginInfo with a freambuffer not changing its framebuffer related resources
+///	set framebuffer member of a Meta_Renderpass.VkRenderPassBeginInfo with a framebuffer not changing its framebuffer related resources
 ///	Params:
 ///		meta_renderpass = reference to a Meta_Renderpass structure holding the VkRenderPassBeginInfo
 ///		framebuffer      = the VkFramebuffer to attach to VkRenderPassBeginInfo
@@ -752,7 +734,7 @@ auto ref initFramebuffer( ref Meta_Framebuffer meta, VkRenderPass render_pass, V
 	assert( meta.isValid );
 
 	// the framebuffer_extent is not(!) the render_area, but rather a specification of how big the framebuffer is
-	// the render area specifies a renderable window into this framebuffer
+	// the render area specifies a render able window into this framebuffer
 	// this window must also be set as scissors in the VkPipeline
 	// here, if no render area was specified use the full framebuffer extent
 	if( meta.render_area.extent.width == 0 || meta.render_area.extent.height == 0 )
@@ -791,13 +773,13 @@ auto ref initFramebuffer( ref Meta_Framebuffer meta, ref Meta_Renderpass meta_re
 alias create = initFramebuffer;
 
 
-auto createFramebuffer( ref Vulkan vk, VkRenderPass render_pass, VkExtent2D framebuffer_extent, VkImageView[] image_views ) {
+auto createFramebuffer( ref vulkan vk, VkRenderPass render_pass, VkExtent2D framebuffer_extent, VkImageView[] image_views ) {
 	Meta_Framebuffer meta = vk;
 	return meta.initFramebuffer( render_pass, framebuffer_extent, image_views );
 }
 
 
-auto createFramebuffer( ref Vulkan vk, ref Meta_Renderpass meta_renderpass, VkExtent2D framebuffer_extent, VkImageView[] image_views ) {
+auto createFramebuffer( ref vulkan vk, ref Meta_Renderpass meta_renderpass, VkExtent2D framebuffer_extent, VkImageView[] image_views ) {
 	Meta_Framebuffer meta = vk;
 	return meta.initFramebuffer( meta_renderpass, framebuffer_extent, image_views );
 }
@@ -824,8 +806,8 @@ auto ref initFramebuffers(
 	assert( meta.isValid );
 
 	// the framebuffer_extent is not(!) the render_area, but rather a specification of how big the framebuffer is
-	// the render area specifies a renderable window into this framebuffer
-	// this window must alos be set as scissors in the VkPipeline
+	// the render area specifies a render able window into this framebuffer
+	// this window must also be set as scissors in the VkPipeline
 	// here, if no render area was specified use the full framebuffer extent
 	if( meta.render_area.extent.width == 0 || meta.render_area.extent.height == 0 )
 		meta.renderAreaExtent( framebuffer_extent );
@@ -884,7 +866,7 @@ alias create = initFramebuffers;
 
 
 auto createFramebuffers(
-	ref Vulkan		vk,
+	ref vulkan		vk,
 	VkRenderPass	render_pass,
 	VkExtent2D		framebuffer_extent,
 	VkImageView[]	first_image_views,
@@ -896,7 +878,7 @@ auto createFramebuffers(
 
 
 auto createFramebuffers(
-	ref Vulkan				vk,
+	ref vulkan				vk,
 	ref Meta_Renderpass	meta_renderpass,
 	VkExtent2D				framebuffer_extent,
 	VkImageView[]			first_image_views,
