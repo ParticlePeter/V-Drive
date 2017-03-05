@@ -35,7 +35,7 @@ auto toStringz( T )( T data ) if( is( T == enum )) {
 	return data.to!string.toStringz;
 }
 
-auto toStringz( T )( T data ) if( is( T == string ) | is( T : char[] )) {
+auto toStringz( T )( T data ) if( is( T == string ) || is( T : char[] )) {
 	Array!char result;
 	result.length = data.length + 1;
 	result[ data.length ] = '\0';
