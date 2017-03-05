@@ -77,10 +77,10 @@ auto createSetLayout(
 	VkShaderStageFlags	shader_stage_flags,
 	const( VkSampler )*	immutable_samplers = null ) {
 
-	const VkDescriptorSetLayoutBinding[1] set_layout_bindings = [ 
+	const VkDescriptorSetLayoutBinding[1] descriptor_set_layout_bindings = [ 
 		VkDescriptorSetLayoutBinding( binding, descriptor_type, descriptor_count, shader_stage_flags, immutable_samplers ) 
 	];
-	return vk.createSetLayout( set_layout_bindings );
+	return vk.createSetLayout( descriptor_set_layout_bindings );
 }
 
 /// create a VkDescriptorSetLayout from several VkDescriptorSetLayoutBinding(s)
@@ -91,11 +91,11 @@ auto createSetLayout(
 ///		shader_stage_flags = shader stages where the descriptor can be used
 ///		immutable_samplers = optional: pointer to ( an array of descriptor_count length ) of immutable samplers
 ///	Returns: VkDescriptorSetLayout
-auto createSetLayout( ref Vulkan vk, const VkDescriptorSetLayoutBinding[] set_layout_bindings ) {
+auto createSetLayout( ref Vulkan vk, const VkDescriptorSetLayoutBinding[] descriptor_set_layout_bindings ) {
 
 	VkDescriptorSetLayoutCreateInfo descriptor_set_layout_create_info = {
-		bindingCount	: set_layout_bindings.length.toUint,
-		pBindings		: set_layout_bindings.ptr,
+		bindingCount	: descriptor_set_layout_bindings.length.toUint,
+		pBindings		: descriptor_set_layout_bindings.ptr,
 	};
 
 	VkDescriptorSetLayout descriptor_set_layout;
@@ -156,13 +156,16 @@ import vdrive.util.array;
 // than edit the active descriptor 
 struct Meta_Descriptor {
 	mixin					Vulkan_State_Pointer;
-	VkDescriptorSetLayout	set_layout;
-	VkDescriptorSet			set;
+	VkDescriptorPool		descriptor_pool;
+	uint32_t[ VK_DESCRIPTOR_TYPE_RANGE_SIZE ] descriptor_counts;
+	VkDescriptorSetLayout	descriptor_set_layout;
+	VkDescriptorSet			descriptor_set;
 
-	Array!VkDescriptorSetLayoutBinding	set_layout_bindings;
+	Array!VkDescriptorSetLayoutBinding descriptor_set_layout_bindings;
+	Array!VkWriteDescriptorSet		   write_descriptor_sets;			
 
 	void destroyResources() {
-		vk.device.vkDestroyDescriptorSetLayout( set_layout, vk.allocator );
+		vk.device.vkDestroyDescriptorSetLayout( descriptor_set_layout, vk.allocator );
 	}
 }
 
@@ -177,8 +180,8 @@ auto ref initDescriptor(
 	const(VkSampler)*	immutable_samplers = null ) {
 
 	assert( meta.isValid );		// assert that meta struct is initialized with a valid vulkan state pointer
-	meta.set_layout = meta.createSetLayout( binding, descriptor_type, descriptor_count, shader_stage_flags, immutable_samplers );
-	meta.set = meta.allocateSet( descriptor_pool, meta.set_layout );
+	meta.descriptor_set_layout = meta.createSetLayout( binding, descriptor_type, descriptor_count, shader_stage_flags, immutable_samplers );
+	meta.descriptor_set = meta.allocateSet( descriptor_pool, meta.descriptor_set_layout );
 	return meta;
 }
 
@@ -201,7 +204,7 @@ auto createDescriptor(
 
 
 auto ref addLayoutBinding( ref Meta_Descriptor meta, VkDescriptorSetLayoutBinding set_layout_binding ) {
-	meta.set_layout_bindings.append( set_layout_binding );
+	meta.descriptor_set_layout_bindings.append( set_layout_binding );
 	return meta;
 }
 
@@ -222,8 +225,8 @@ auto ref addLayoutBinding(
 
 
 auto ref construct( ref Meta_Descriptor meta, VkDescriptorPool descriptor_pool ) {
-	meta.set_layout = meta.createSetLayout( meta.set_layout_bindings.data );
-	meta.set = meta.allocateSet( descriptor_pool, meta.set_layout );
+	meta.descriptor_set_layout = meta.createSetLayout( meta.descriptor_set_layout_bindings.data );
+	meta.descriptor_set = meta.allocateSet( descriptor_pool, meta.descriptor_set_layout );
 	return meta;
 }
 
