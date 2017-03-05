@@ -17,7 +17,7 @@ import std.stdio;
 struct Meta_Surface {
 	mixin 						Vulkan_State_Pointer;
 	VkQueue						present_queue = VK_NULL_HANDLE;
-	uint32_t					present_queue_family_index;
+//	uint32_t					present_queue_family_index;			// does not seem to be required so far
 	VkSwapchainKHR				swapchain;
 	VkSwapchainCreateInfoKHR	create_info;
 
