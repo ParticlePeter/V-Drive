@@ -9,8 +9,8 @@ import erupted;
 
 import vdrive.util;
 
-
-//nothrow: //@nogc:
+// Todo(pp): enable
+//nothrow @nogc:
 
 bool verbose = true;
 
@@ -26,31 +26,14 @@ mixin template Vulkan_State_Pointer() {
 	bool isValid() 						{ return vk_ptr !is null; }
 }
 
+
 struct Vulkan {
-	const( VkAllocationCallbacks )*	allocator = null;
-	VkInstance			instance = null;
-	
-	Device_Resource		device_resource;
-	alias 				device_resource this;
-
-	VkQueue				graphic_queue = VK_NULL_HANDLE;
-	uint32_t			graphic_queue_family_index;
-
-	VkQueue				compute_queue = VK_NULL_HANDLE;
-	uint32_t			compute_queue_family_index;
+	const( VkAllocationCallbacks )*		allocator = null;
+	VkInstance							instance = VK_NULL_HANDLE;
+	VkDevice							device = VK_NULL_HANDLE;
+	VkPhysicalDevice					gpu = VK_NULL_HANDLE;
+	VkPhysicalDeviceMemoryProperties 	memory_properties;
 }
-
-
-
-private struct Device_Resource {
-	
-	VkDevice			device = VK_NULL_HANDLE;
-	VkPhysicalDevice	gpu = VK_NULL_HANDLE;
-	VkPhysicalDeviceMemoryProperties memory_properties;
-
-	// Queues
-}
-
 
 
 void initInstance( T )( ref Vulkan vk, T extensionNames, T layerNames )
@@ -193,10 +176,8 @@ if( is( T == string ) | is( T == string[] ) | is( T == Array!( const( char )* ))
 	loadDeviceLevelFunctions( vk.device );
 
 	// get and store the memory properties of the current gpu
-	// TODO(pp): the memory properties print uints instaed of enum flags, fix this
+	// Todo(pp): the memory properties print uints instaed of enum flags, fix this
 	vk.memory_properties = vk.gpu.listMemoryProperties( false );
-
-
 
 	return vk.device;
 }
