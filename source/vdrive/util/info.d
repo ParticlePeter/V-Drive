@@ -260,12 +260,12 @@ private void inspect( T )( T info, string before = "" ) {
 ////////////////
 
 /// list all available ( layer per ) instance / device extensions
-auto listExtensions( VkPhysicalDevice gpu, char* layer, bool printInfo = true ) {
+auto listExtensions( VkPhysicalDevice gpu, const( char )* layer, bool printInfo = true ) {
 
 	// Enumerate Instance or Device extensions
 	auto extension_properties = gpu == VK_NULL_HANDLE ?
-		listVulkanProperty!( VkExtensionProperties, vkEnumerateInstanceExtensionProperties, char* )( layer ) :
-		listVulkanProperty!( VkExtensionProperties, vkEnumerateDeviceExtensionProperties, VkPhysicalDevice, char* )( gpu, layer );
+		listVulkanProperty!( VkExtensionProperties, vkEnumerateInstanceExtensionProperties, const( char )* )( layer ) :
+		listVulkanProperty!( VkExtensionProperties, vkEnumerateDeviceExtensionProperties, VkPhysicalDevice, const( char )* )( gpu, layer );
 
 	if( printInfo ) {
 		if(	extension_properties.length == 0 )  {
@@ -282,31 +282,33 @@ auto listExtensions( VkPhysicalDevice gpu, char* layer, bool printInfo = true ) 
 }
 
 /// get the version of any available instance / device / layer extension
-auto extensionVersion( T )( T extension, VkPhysicalDevice gpu, char* layer = null, bool printInfo = true ) if( is( T == string )| is( T : const( char* )) | is( T : char[] )) {
+auto extensionVersion( T )( T extension, VkPhysicalDevice gpu, const( char )* layer = null, bool printInfo = true ) if( is( T == string ) || is( T : const( char )* ) || is( T : char[] )) {
 	uint32_t result = 0;
 	auto extension_properties = listExtensions( gpu, layer, false );
 	foreach( ref properties; extension_properties ) {
-		static if( is( T : const( char* ))) {
+		static if( is( T : const( char )* )) {
 			import core.stdc.string : strcmp;
 			if( strcmp( properties.extensionName.ptr, extension )) {
 				result = properties.specVersion;
 				break;
 			}
 		} else {
-			import core.stdc.string : strncmp;
-			if( extension.length == properties.extensionName.ptr.strlen && strncmp( properties.extensionName.ptr, extension.ptr, extension.length ) == 0 ) {
+			import core.stdc.string : strncmp, strlen;
+			if( extension.length == properties.extensionName.ptr.strlen
+			&&  strncmp( properties.extensionName.ptr, extension.ptr, extension.length ) == 0 ) {
 				result = properties.specVersion;
 				break;
 			}
 		}
 	}
-
+	//pragma( msg, T.stringof );
 	if( printInfo ) {
-		static if( is( T : const( char* )))	{
+		static if( is( T : const( char )* ))	{
 			printf( "%s version: %u\n", layer, result );
 		} else {
-			auto layer_strz = layer.toStringz;
-			printf( "%s version: %u\n", layer_strz.ptr, result );
+			// Todo(pp): why is this here evaluated in the case of  T : const( char )* ?????
+			//auto layer_strz = layer.toStringz;
+			//printf( "%s version: %u\n", layer_strz.ptr, result );
 		}
 	}
 
@@ -314,12 +316,12 @@ auto extensionVersion( T )( T extension, VkPhysicalDevice gpu, char* layer = nul
 }
 
 /// check if an instance / device / layer extension of any version is available
-auto isExtension( T )( T extension, VkPhysicalDevice gpu = VK_NULL_HANDLE, char* layer = null, bool printInfo = true )
-if( is( T == string )| is( T : const( char* )) | is( T : char[] )) {
+auto isExtension( T )( T extension, VkPhysicalDevice gpu = VK_NULL_HANDLE, const( char )* layer = null, bool printInfo = true )
+if( is( T == string ) || is( T : const( char )* ) || is( T : char[] )) {
 
 	auto result = extension.extensionVersion( gpu, layer, false ) > 0;
 	if( printInfo ) {
-		static if( is( T : const( char* )))	{
+		static if( is( T : const( char )* ))	{
 			printf( "%s available: %u\n", extension, result );
 		} else {
 			auto layer_strz = extension.toStringz;
@@ -328,6 +330,8 @@ if( is( T == string )| is( T : const( char* )) | is( T : char[] )) {
 	}
 	return result;
 }
+
+
 
 unittest {
 	string surfaceString = "VK_KHR_surface";
@@ -388,12 +392,12 @@ auto listLayers( VkPhysicalDevice gpu, bool printInfo = true  ) {
 
 /// get the version of any available instance / device layer
 auto layerVersion( T )( T layer, VkPhysicalDevice gpu = null, bool printInfo = true )
-if( is( T == string ) | is( T : const( char* )) | is( T : char[] )) {
+if( is( T == string ) || is( T : const( char )* ) || is( T : char[] )) {
 
 	uint32_t result = 0;									// version result
 	auto layer_properties = listLayers( gpu, false );		// list all layers
 	foreach( ref properties; layer_properties ) {			// search for requested layer
-		static if( is( T : const( char* ))) {
+		static if( is( T : const( char )* )) {
 			import core.stdc.string : strcmp;
 			if( strcmp( properties.layerName.ptr, layer ) == 0 ) {
 				result = properties.implementationVersion;
@@ -409,7 +413,7 @@ if( is( T == string ) | is( T : const( char* )) | is( T : char[] )) {
 	}
 
 	if( printInfo ) {
-		static if( is( T : const( char* )))	{
+		static if( is( T : const( char )* ))	{
 			printf( "%s version: %u\n", layer, result );
 		} else {
 			auto layer_strz = layer.toStringz;
@@ -422,11 +426,11 @@ if( is( T == string ) | is( T : const( char* )) | is( T : char[] )) {
 
 /// check if an instance / device layer of any version is available
 auto isLayer( T )( T layer, VkPhysicalDevice gpu, bool printInfo = true )
-if( is( T == string )| is( T : const( char* )) | is( T : char[] )) {
+if( is( T == string ) || is( T : const( char )* ) || is( T : char[] )) {
 
 	auto result = layer.layerVersion( gpu, false ) > 0;
 	if( printInfo ) {
-		static if( is( T : const( char* )))	{
+		static if( is( T : const( char )* ))	{
 			printf( "%s available: %u\n", layer, result );
 		} else {
 			auto layer_strz = layer.toStringz;
@@ -517,6 +521,12 @@ auto presentSupport( VkPhysicalDevice gpu, VkSurfaceKHR surface ) {
 	uint32_t queue_family_property_count;
 	vkGetPhysicalDeviceQueueFamilyProperties( gpu, &queue_family_property_count, null );
 
+	// the following two code lines exist only to silence a validation layer warning
+	// queue_family_properties is not used, however it is expected to call
+	// vkGetPhysicalDeviceQueueFamilyProperties twice, one with null pointer and the second with memory pointer
+	auto queue_family_properties = sizedArray!VkQueueFamilyProperties( queue_family_property_count );
+	vkGetPhysicalDeviceQueueFamilyProperties( gpu, &queue_family_property_count, queue_family_properties.ptr );
+
 	VkBool32 present_supported;
 	foreach( family_index; 0 .. queue_family_property_count ) {
 		vkGetPhysicalDeviceSurfaceSupportKHR( gpu, family_index, surface, &present_supported );
@@ -533,12 +543,10 @@ auto presentSupport( VkPhysicalDevice gpu, VkSurfaceKHR surface ) {
 auto listQueues( VkPhysicalDevice gpu, bool printInfo = true, VkSurfaceKHR surface = VK_NULL_ND_HANDLE ) {
 
 	uint32_t queue_family_property_count;
-	Array!VkQueueFamilyProperties queue_family_properties;
-
 	vkGetPhysicalDeviceQueueFamilyProperties( gpu, &queue_family_property_count, null );
 	assert( queue_family_property_count >= 1 );
 
-	queue_family_properties.length = queue_family_property_count;
+	auto queue_family_properties = sizedArray!VkQueueFamilyProperties( queue_family_property_count );
 	vkGetPhysicalDeviceQueueFamilyProperties( gpu, &queue_family_property_count, queue_family_properties.ptr );
 	assert( queue_family_property_count >= 1 );
 
@@ -584,18 +592,13 @@ struct Queue_Family {
 	auto family_index() { return index; }
 
 	// get a readonly reference to the wrapped VkQueueFamilyProperties 
-	ref const( VkQueueFamilyProperties ) vk_queue_family_properties() {
+	ref const( VkQueueFamilyProperties ) vkQueueFamilyProperties() {
 		return queue_family_properties;
 	}
 
 	// VkQueueFamilyProperties can be reached
-	alias vk_queue_family_properties this;
+	alias vkQueueFamilyProperties this;
 
-/*	// return a copy of the internal physical device;
-	VkPhysicalDevice vk_physical_device() {
-		return gpu;
-	}
-*/
 	// query the count of queues available in the wrapped VkQueueFamilyProperties 
 	uint32_t maxQueueCount() { 
 		return queue_family_properties.queueCount;
@@ -648,13 +651,21 @@ struct Queue_Family {
 	}
 }
 
+/// get list of Queue_Family structs
+/// the struct wraps VkQueueFamilyProperties with its family index
+/// moreover with a priority array the count of queues an their priorities can be specified
+/// filter functions exist to get queues with certain properties exist for this Array!Queue_Families
+/// the initDevice function consumes an array of these structs to specify queue families and queues to be created
+///	Params:
+///		gpu = reference to a VulkanState struct
+///		printInfo = optional: if true prints struct content to stdout
+///		surface = optional: if passed in the printed info includes whether a queue supports presenting to that surface
+///	Returns: Array!Queue_Family 
 auto listQueueFamilies( VkPhysicalDevice gpu, bool printInfo = true, VkSurfaceKHR surface = VK_NULL_ND_HANDLE ) {
-	auto queue_family_properties = listQueues( gpu, printInfo, surface );
-	Array!Queue_Family family_queues;
+	auto queue_family_properties = listQueues( gpu, printInfo, surface );	// get Array!VkQueueFamilyProperties
+	auto family_queues = sizedArray!Queue_Family( queue_family_properties.length );
 	foreach( family_index, ref family; queue_family_properties.data ) {
-		family_queues.insert( Queue_Family( cast( uint32_t )family_index, /*gpu,*/ family ));
-		//family_queues[$-1].queue_family_properties = family;
-		//family_queues[$-1].gpu = gpu;
+		family_queues[ family_index ] = Queue_Family( cast( uint32_t )family_index, family );
 	}
 	return family_queues;	
 }
@@ -706,12 +717,12 @@ auto listExtensions( bool printInfo = true ) {
 	return listExtensions( VK_NULL_HANDLE, null, printInfo );
 }
 
-/// list all available per layere instance extensions
-auto listExtensions( char* layer, bool printInfo = true ) {
+/// list all available per layer instance extensions
+auto listExtensions( const( char )* layer, bool printInfo = true ) {
 	if ( printInfo ) {
 		println;
-		printf( "Instance Layere Extensions\n" );
-		printf( "==========================\n" );
+		printf( "Instance Layer Extensions\n" );
+		printf( "=========================\n" );
 	}
 	return listExtensions( VK_NULL_HANDLE, layer, printInfo );	
 }
@@ -727,7 +738,7 @@ auto listExtensions( VkPhysicalDevice gpu, bool printInfo = true ) {
 }
 
 /// list all available layer per device extensions
-auto list_device_layer_extensions( VkPhysicalDevice gpu, char* layer, bool printInfo = true ) {
+auto listDeviceLayerExtensions( VkPhysicalDevice gpu, const( char )* layer, bool printInfo = true ) {
 	if ( printInfo ) {
 		println;
 		printf( "Physical Device Layer Extensions\n" );
@@ -738,25 +749,31 @@ auto list_device_layer_extensions( VkPhysicalDevice gpu, char* layer, bool print
 
 
 // Get the version of a instance layer extension
-auto extensionVersion( T )( T extension, char* layer, bool printInfo = false ) if( is( T == string )| is( T : const( char* )) | is( T : char[] )) {
+auto extensionVersion( T )( T extension, const( char )* layer, bool printInfo = false ) if( is( T == string ) || is( T : const( char )* ) || is( T : char[] )) {
 	return extensionVersion( extension, VK_NULL_HANDLE, layer, printInfo );
 }
 
 // Get the version of a instance extension
-auto extensionVersion( T )( T extension, bool printInfo ) if( is( T == string )| is( T : const( char* )) | is( T : char[] )) {
+auto extensionVersion( T )( T extension, bool printInfo ) if( is( T == string ) || is( T : const( char )* ) || is( T : char[] )) {
 	return extensionVersion( extension, VK_NULL_HANDLE, null, printInfo );
 }
 
 /// check if an instance layer extension of any version is available
-auto isExtension( T )( T extension, char* layer, bool printInfo = true )
-if( is( T == string )| is( T : const( char* )) | is( T : char[] )) {
+auto isExtension( T )( T extension, const( char )* layer, bool printInfo = true )
+if( is( T == string ) || is( T : const( char )* ) || is( T : char[] )) {
 	return extension.isExtension( VK_NULL_HANDLE, layer, printInfo );
 }
 
 /// check if an instance extension of any version is available
 auto isExtension( T )( T extension, bool printInfo )
-if( is( T == string )| is( T : const( char* )) | is( T : char[] )) {
+if( is( T == string ) || is( T : const( char )* ) || is( T : char[] )) {
 	return extension.isExtension( VK_NULL_HANDLE, null, printInfo );
+}
+
+/// check if a device extension of any version is available
+auto isExtension( T )( T extension, VkPhysicalDevice gpu, bool printInfo = true )
+if( is( T == string ) || is( T : const( char )* ) || is( T : char[] )) {
+	return extension.isExtension( gpu, null, printInfo );
 }
 
 // list all instance layers
@@ -771,6 +788,6 @@ auto listLayers( bool printInfo = true ) {
 
 /// check if an instance layer of any version is available
 auto isLayer( T )( T layer, bool printInfo = true )
-if( is( T == string )| is( T : const( char* )) | is( T : char[] )) {
+if( is( T == string ) || is( T : const( char )* ) || is( T : char[] )) {
 	return layer.isLayer( VK_NULL_HANDLE, printInfo );
 }
