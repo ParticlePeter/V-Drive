@@ -4,16 +4,100 @@ import erupted;
 import std.container.array;
 
 
+
+
+
+/// check bool condition
+void vkEnforce(
+	bool assert_value,
+	const( char )* message = null,
+	string file = __FILE__,
+	size_t line = __LINE__,
+	string func = __FUNCTION__ ) nothrow @nogc {
+
+	// Todo(pp): print to stderr
+	// Todo(pp): print to custom logger
+	if( !assert_value ) {
+		import core.stdc.stdio : printf;
+		printf( "\n! ERROR !\n=========\n" );
+		printHelper( message, file, line, func );
+	}
+	assert( assert_value );
+}
+
+
 /// check the correctness of a vulkan result
-void vkEnforce( VkResult vkResult ) nothrow @nogc {
-	import std.conv : to;
-	//import std.exception : enforce;
-	//enforce( vkResult == VK_SUCCESS, vkResult.to!string );
-	//assert( vkResult == VK_SUCCESS, vkResult.to!string );
-	// Todo(pp): create lookup table from VkResult to its coresponding char or string and use instead of vkResult.to!string
+void vkEnforce(
+	VkResult vkResult, 
+	const( char )* message = null,
+	string file = __FILE__,
+	size_t line = __LINE__,
+	string func = __FUNCTION__ ) nothrow @nogc {
+
+	// Todo(pp): print to stderr
+	// Todo(pp): print to custom logger
+	if( vkResult != VK_SUCCESS ) {
+		import core.stdc.stdio : printf;
+		printf( "\n! ERROR !\n=========\n" );
+		printf( "\tVkResult : %s\n", vkResult.toChar );
+		printHelper( message, file, line, func );
+	}
 	assert( vkResult == VK_SUCCESS );
 }
 
+
+private char[256] buffer;
+private void printHelper( const( char )* message, string file, size_t line, string func ) nothrow @nogc {
+	import core.stdc.string : memcpy;
+	memcpy( buffer.ptr, file.ptr, file.length );
+	buffer[ file.length ] = '\0';
+
+	import core.stdc.stdio : printf;
+	printf( "\tFile     : %s\n", buffer.ptr );
+	printf( "\tLine     : %d\n", line );
+
+	memcpy( buffer.ptr, func.ptr, func.length );
+	buffer[ func.length ] = '\0';
+
+	printf( "\tFunc     : %s\n", buffer.ptr );
+	if( message ) printf( "\tMessage  : %s\n", message );
+	printf( "\n" );
+}
+
+
+const( char )* toChar( VkResult vkResult ) nothrow @nogc {
+	switch( vkResult ) {
+		case VK_SUCCESS								: return "VK_SUCCESS";
+		case VK_NOT_READY							: return "VK_NOT_READY";
+		case VK_TIMEOUT								: return "VK_TIMEOUT";
+		case VK_EVENT_SET							: return "VK_EVENT_SET";
+		case VK_EVENT_RESET							: return "VK_EVENT_RESET";
+		case VK_INCOMPLETE							: return "VK_INCOMPLETE";
+		case VK_ERROR_OUT_OF_HOST_MEMORY			: return "VK_ERROR_OUT_OF_HOST_MEMORY";
+		case VK_ERROR_OUT_OF_DEVICE_MEMORY			: return "VK_ERROR_OUT_OF_DEVICE_MEMORY";
+		case VK_ERROR_INITIALIZATION_FAILED			: return "VK_ERROR_INITIALIZATION_FAILED";
+		case VK_ERROR_DEVICE_LOST					: return "VK_ERROR_DEVICE_LOST";
+		case VK_ERROR_MEMORY_MAP_FAILED				: return "VK_ERROR_MEMORY_MAP_FAILED";
+		case VK_ERROR_LAYER_NOT_PRESENT				: return "VK_ERROR_LAYER_NOT_PRESENT";
+		case VK_ERROR_EXTENSION_NOT_PRESENT			: return "VK_ERROR_EXTENSION_NOT_PRESENT";
+		case VK_ERROR_FEATURE_NOT_PRESENT			: return "VK_ERROR_FEATURE_NOT_PRESENT";
+		case VK_ERROR_INCOMPATIBLE_DRIVER			: return "VK_ERROR_INCOMPATIBLE_DRIVER";
+		case VK_ERROR_TOO_MANY_OBJECTS				: return "VK_ERROR_TOO_MANY_OBJECTS";
+		case VK_ERROR_FORMAT_NOT_SUPPORTED			: return "VK_ERROR_FORMAT_NOT_SUPPORTED";
+		case VK_ERROR_FRAGMENTED_POOL				: return "VK_ERROR_FRAGMENTED_POOL";
+		case VK_ERROR_SURFACE_LOST_KHR				: return "VK_ERROR_SURFACE_LOST_KHR";
+		case VK_ERROR_NATIVE_WINDOW_IN_USE_KHR		: return "VK_ERROR_NATIVE_WINDOW_IN_USE_KHR";
+		case VK_SUBOPTIMAL_KHR						: return "VK_SUBOPTIMAL_KHR";
+		case VK_ERROR_OUT_OF_DATE_KHR				: return "VK_ERROR_OUT_OF_DATE_KHR";
+		case VK_ERROR_INCOMPATIBLE_DISPLAY_KHR		: return "VK_ERROR_INCOMPATIBLE_DISPLAY_KHR";
+		case VK_ERROR_VALIDATION_FAILED_EXT			: return "VK_ERROR_VALIDATION_FAILED_EXT";
+		case VK_ERROR_INVALID_SHADER_NV				: return "VK_ERROR_INVALID_SHADER_NV";
+		case VK_NV_EXTENSION_1_ERROR				: return "VK_NV_EXTENSION_1_ERROR";
+		case VK_ERROR_OUT_OF_POOL_MEMORY_KHR		: return "VK_ERROR_OUT_OF_POOL_MEMORY_KHR";
+		case VK_ERROR_INVALID_EXTERNAL_HANDLE_KHX	: return "VK_ERROR_INVALID_EXTERNAL_HANDLE_KHX";
+		default										: return "UNKNOWN_RESULT"; 
+	}
+}
 
 /// this is a general templated function to enumarate any vulkan property
 /// see usage in module surface or module util.info
