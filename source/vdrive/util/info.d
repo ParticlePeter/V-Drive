@@ -50,7 +50,7 @@ void printTypeInfo( T, size_t buffer_size = 256 )(
 		printf( "%s\n", buffer.ptr );
 	}
 
-	// indent the buffer and store a pointer posistion;
+	// indent the buffer and store a pointer position;
 	auto buffer_indent = buffer.ptr;
 	buffer_indent[ 0 ] = '\t';						buffer_indent += 1;
 	buffer_indent[ 0 .. indent.length ] = indent;	buffer_indent += indent.length;
@@ -591,7 +591,7 @@ struct Queue_Family {
 	// get a copy of the family index
 	auto family_index() { return index; }
 
-	// get a readonly reference to the wrapped VkQueueFamilyProperties 
+	// get a read only reference to the wrapped VkQueueFamilyProperties 
 	ref const( VkQueueFamilyProperties ) vkQueueFamilyProperties() {
 		return queue_family_properties;
 	}
