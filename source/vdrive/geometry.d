@@ -9,6 +9,7 @@ import vdrive.memory;
 import erupted;
 
 
+
 mixin template Meta_Geometry_Alias_This() {
 	this( ref Vulkan vk )	{	meta_geometry.meta_buffer.vk = vk;  }
 	alias						meta_geometry this;
@@ -16,7 +17,7 @@ mixin template Meta_Geometry_Alias_This() {
 }
 
 
-private alias RecordCommands = void function( VkCommandBuffer command_buffer, ref Meta_Geometry meta_geometry );
+private alias RecordCommands = void function( VkCommandBuffer command_buffer, ref Meta_Geometry meta_geometry ) nothrow;
 
 struct Meta_Geometry {
 	this( ref Vulkan vk )	{  this.meta_buffer.vk = vk;  }
@@ -32,7 +33,7 @@ struct Meta_Geometry {
 
 	RecordCommands					recordCommands;
 
-	void recordDrawCommands( VkCommandBuffer command_buffer ) {
+	void recordDrawCommands( VkCommandBuffer command_buffer ) nothrow {
 		recordCommands( command_buffer, this );
 	}	
 }
