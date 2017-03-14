@@ -102,9 +102,7 @@ mixin template Memory_Member() {
 
 private template hasMemReqs( T ) { 
 	enum hasMemReqs = __traits( hasMember, T, "memory_requirements" );
-		//&& is( typeof( __traits( getMemeber, T, "memory_requirements" )) == VkMemoryRequirements )
 }
-
 
 
 auto memoryTypeIndex( ref Meta_Buffer meta, VkMemoryPropertyFlags memory_property_flags ) {				// can't be a template function as another overload exists already (general function)
@@ -145,9 +143,8 @@ auto ref createMemoryImpl( META )( ref META meta, VkMemoryPropertyFlags memory_p
 	return meta;
 }
 
-// TODO(pp): Assert that an VkBuffer or VkImage was created and is valid already
 
-auto ref bindMemoryImpl( META )( ref META meta, VkDeviceMemory device_memory, VkDeviceSize device_memory_offset = 0 )if( hasMemReqs!META ) {
+auto ref bindMemoryImpl( META )( ref META meta, VkDeviceMemory device_memory, VkDeviceSize device_memory_offset = 0 ) if( hasMemReqs!META ) {
 	assert( meta.isValid );		// assert that meta struct is initialized with a valid vulkan state pointer
 	meta.owns_device_memory = false;
 	meta.device_memory = device_memory;
@@ -164,6 +161,30 @@ alias createMemory = createMemoryImpl!Meta_Buffer;
 alias createMemory = createMemoryImpl!Meta_Image;
 alias bindMemory = bindMemoryImpl!Meta_Buffer;
 alias bindMemory = bindMemoryImpl!Meta_Image;
+
+
+/// upload data to the VkDeviceMemory object of the coresponding buffer or image through memory mapping
+auto ref copyData( META )( ref META meta, void[] data, VkDeviceSize offset = 0 ) if( hasMemReqs!META || is( META == Meta_Memory )) {
+
+	static if( is( META == Meta_Memory ))	VkDeviceSize combined_offset = offset;
+	else									VkDeviceSize combined_offset = offset + meta.offset;
+
+	void* mapped_memory;	// map the memory
+	vkMapMemory( meta.device, meta.device_memory, combined_offset, data.length.toUint, 0, &mapped_memory ).vkEnforce;
+	mapped_memory[ 0 .. data.length ] = data[];
+
+	// flush the mapped memory
+	VkMappedMemoryRange flush_mapped_memory_range = {
+		memory	: meta.device_memory,
+		offset	: combined_offset,
+		size	: data.length.toUint,
+	};
+	vkFlushMappedMemoryRanges( meta.device, 1, &flush_mapped_memory_range );
+
+	// unmap the memory
+	vkUnmapMemory( meta.device, meta.device_memory );
+	return meta;
+}
 
 
 
@@ -223,30 +244,6 @@ auto createBuffer( ref Vulkan vk, VkBufferUsageFlags usage, VkDeviceSize size, V
 	meta.create( usage, size, sharing_mode );
 	return meta;
 }
-
-
-
-/// upload data to the VkDeviceMemory object of the coresponding buffer through memory mapping
-auto bufferData( Meta_Buffer meta, void[] data, VkDeviceSize offset = 0 ) {
-	void* mapped_memory;
-
-	// map the memory
-	vkMapMemory( meta.device, meta.device_memory, meta.offset + offset, data.length.toUint, 0, &mapped_memory ).vkEnforce;
-	mapped_memory[ 0 .. data.length ] = data[];
-
-	// flush the mapped memory
-	VkMappedMemoryRange flush_mapped_memory_range = {
-		memory	: meta.device_memory,
-		offset	: meta.offset + offset,
-		size	: data.length.toUint,
-	};
-	vkFlushMappedMemoryRanges( meta.device, 1, &flush_mapped_memory_range );
-
-	// unmap the memory
-	vkUnmapMemory( meta.device, meta.device_memory );
-	return meta;
-}
-
 
 
 /// struct to capture image and memory creation as well as binding
@@ -319,7 +316,7 @@ auto ref initImage( ref Meta_Image meta, const ref VkImageCreateInfo image_creat
 
 alias create = initImage;
 
-// TODO(pp): add chained functions to edit the meta.image_create_info and finalize with construct(), see module pipeline 
+// Todo(pp): add chained functions to edit the meta.image_create_info and finalize with construct(), see module pipeline 
 
 
 
@@ -367,14 +364,14 @@ auto ref createView( ref Meta_Image meta, VkImageSubresourceRange subresource_ra
 	return meta.createView( subresource_range, cast( VkImageViewType )meta.image_create_info.imageType, meta.image_create_info.format );
 }
 
-/// create a VkImageView with choosing a image view type and format for the underlying VkImage, component mapping is identity
+/// create a VkImageView with choosing an image view type and format for the underlying VkImage, component mapping is identity
 /// store vulkan data in argument meta image container, return container for chaining
 auto ref createView( ref Meta_Image meta, VkImageSubresourceRange subresource_range, VkImageViewType view_type, VkFormat format ) {
 	return meta.createView( subresource_range, view_type, format, VkComponentMapping(
 		VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY ));
 }
 
-/// create a VkImageView with choosing a image view type, format and VkComponentMapping for the underlying VkImage
+/// create a VkImageView with choosing an image view type, format and VkComponentMapping for the underlying VkImage
 /// store vulkan data in argument meta image container, return container for chaining
 auto ref createView( ref Meta_Image meta, VkImageSubresourceRange subresource_range, VkImageViewType view_type, VkFormat format, VkComponentMapping component_mapping ) {
 	meta.image_view_create_info.image				= meta.image;
@@ -396,9 +393,9 @@ void recordTransition(
 	VkImageLayout 			new_layout,
 	VkAccessFlags 			src_accsess_mask,
 	VkAccessFlags 			dst_accsess_mask,
-	VkDependencyFlags		dependency_flags = 0,
 	VkPipelineStageFlags	src_stage_mask = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-	VkPipelineStageFlags	dst_stage_mask = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT ) {
+	VkPipelineStageFlags	dst_stage_mask = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+	VkDependencyFlags		dependency_flags = 0, ) {
 
 	VkImageMemoryBarrier layout_transition_barrier = {
 		srcAccessMask		: src_accsess_mask,
@@ -411,6 +408,50 @@ void recordTransition(
 		subresourceRange	: subresource_range,
 	};
 
+	// Todo(pp): consider using these cases
+	
+/*	switch (old_image_layout) {
+		case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+			image_memory_barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+			break;
+
+		case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+			image_memory_barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+			break;
+
+		case VK_IMAGE_LAYOUT_PREINITIALIZED:
+			image_memory_barrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
+			break;
+
+		default:
+			break;
+    }
+
+	switch (new_image_layout) {
+		case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+			image_memory_barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+			break;
+
+		case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
+			image_memory_barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+			break;
+
+		case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
+			image_memory_barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+			break;
+
+		case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+			image_memory_barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+			break;
+
+		case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
+			image_memory_barrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+			break;
+
+		default:
+			break;
+	}
+*/
 	command_buffer.vkCmdPipelineBarrier(
 		src_stage_mask, dst_stage_mask, dependency_flags,
 		0, null, 0, null, 1, &layout_transition_barrier
