@@ -1,6 +1,6 @@
 module vdrive.util.util;
 
-import erupted;
+import erupted.types;
 import std.container.array;
 
 
@@ -10,17 +10,18 @@ import std.container.array;
 /// check bool condition
 void vkEnforce(
 	bool assert_value,
-	const( char )* message = null,
-	string file = __FILE__,
-	size_t line = __LINE__,
-	string func = __FUNCTION__ ) nothrow @nogc {
-
+	const( char )*	message = null,
+	string			file = __FILE__,
+	size_t			line = __LINE__,
+	string			func = __FUNCTION__,
+	const( char )*	msg_end = null
+	) nothrow @nogc {
 	// Todo(pp): print to stderr
 	// Todo(pp): print to custom logger
 	if( !assert_value ) {
 		import core.stdc.stdio : printf;
-		printf( "\n! ERROR !\n=========\n" );
-		printHelper( message, file, line, func );
+		printf( "\n! ERROR !\n==============\n" );
+		printHelper( message, file, line, func, msg_end );
 	}
 	assert( assert_value );
 }
@@ -29,25 +30,32 @@ void vkEnforce(
 /// check the correctness of a vulkan result
 void vkEnforce(
 	VkResult vkResult, 
-	const( char )* message = null,
-	string file = __FILE__,
-	size_t line = __LINE__,
-	string func = __FUNCTION__ ) nothrow @nogc {
-
+	const( char )*	message = null,
+	string			file = __FILE__,
+	size_t			line = __LINE__,
+	string			func = __FUNCTION__,
+	const( char )*	msg_end = null
+	) nothrow @nogc {
 	// Todo(pp): print to stderr
 	// Todo(pp): print to custom logger
 	if( vkResult != VK_SUCCESS ) {
 		import core.stdc.stdio : printf;
-		printf( "\n! ERROR !\n=========\n" );
-		printf( "\tVkResult : %s\n", vkResult.toChar );
-		printHelper( message, file, line, func );
+		printf( "\n! ERROR !\n==============\n" );
+		printf( "\tVkResult : %s\n", vkResult.toCharPtr );
+		printHelper( message, file, line, func, msg_end );
 	}
 	assert( vkResult == VK_SUCCESS );
 }
 
 
 private char[256] buffer;
-private void printHelper( const( char )* message, string file, size_t line, string func ) nothrow @nogc {
+private void printHelper(
+	const( char )* message,
+	string file,
+	size_t line,
+	string func,
+	const( char )* msg_end
+	) nothrow @nogc {
 	import core.stdc.string : memcpy;
 	memcpy( buffer.ptr, file.ptr, file.length );
 	buffer[ file.length ] = '\0';
@@ -60,12 +68,17 @@ private void printHelper( const( char )* message, string file, size_t line, stri
 	buffer[ func.length ] = '\0';
 
 	printf( "\tFunc     : %s\n", buffer.ptr );
-	if( message ) printf( "\tMessage  : %s\n", message );
-	printf( "\n" );
+	if( message ) {
+		printf(  "\tMessage  : %s", message );
+		if( msg_end ) printf( "%s", msg_end );
+		printf(  "\n" );
+	}
+
+	printf( "==============\n\n" );
 }
 
 
-const( char )* toChar( VkResult vkResult ) nothrow @nogc {
+const( char )* toCharPtr( VkResult vkResult ) nothrow @nogc {
 	switch( vkResult ) {
 		case VK_SUCCESS								: return "VK_SUCCESS";
 		case VK_NOT_READY							: return "VK_NOT_READY";
