@@ -14,6 +14,7 @@ import erupted;
 ///////////////////////////////////////
 
 
+
 /// struct to collect
 private struct Meta_Subpass {
 	VkSubpassDescriptionFlags	flags;
@@ -351,10 +352,11 @@ auto ref construct( ref Meta_Renderpass meta ) {
 
 
 
-
 //////////////////////
 // Meta_Framebuffer //
 //////////////////////
+
+
 
 struct Meta_FB( size_t framebuffer_count = 1, size_t clear_value_count = size_t.max ) {
 	mixin 		Vulkan_State_Pointer;
@@ -587,9 +589,13 @@ auto ref renderAreaExtent( META_FB )( ref META_FB meta, int32_t x, int32_t y, ui
 	return meta.renderArea( VkRect( VkOffset2D( x, y ), VkExtent( width, height )));
 }
 
-//////////////////////////////////////////////////
+
+
+/////////////////////////////////////////////////
 // connect Meta_Framebuffer to Meta_Renderpass //
-//////////////////////////////////////////////////
+/////////////////////////////////////////////////
+
+
 
 ///	set members of a Meta_Renderpass.VkRenderPassBeginInfo with the corresponding members of a Meta_Framebuffer structure
 /// this should be called once if the framebuffer related members of the VkRenderPassBeginInfo are not changing later on

@@ -151,9 +151,11 @@ auto swapchainImageViews( ref Meta_Surface meta, VkImageViewCreateInfo image_vie
 
 
 // Todo(pp): this function is only a stub and must be merged with the one above.
-// issue with the approach bellow: the two overloads above and bellow must return the same type as overloads based on return type only are not allowed
+// issue with the approach bellow: the two overloads above and bellow must return the same type
+// ... as overloads based on return type only are not allowed
 // hence both must return some kind of dynamic array which is optionally able to use scratch memory
-// moreover, to over complicate the argument amount the option to use scratch space should be set globally and recorded in the vulkan state struct
+// moreover, to not over complicate the argument amount the option to use scratch space
+// should be set globally and recorded in the vulkan state struct
 // see requirements and recipe on array in util.array module 
 auto swapchainImageViews( ref Meta_Surface meta, VkImageViewCreateInfo image_view_create_info, void* scratch = null, uint32_t* size_used = null ) {
 	// assert that meta struct is initialized with a valid vulkan state pointer

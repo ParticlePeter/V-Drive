@@ -150,8 +150,6 @@ void printTypeInfo( T, size_t buffer_size = 256 )(
 				}
 			}
 
-
-
 			else print( buffer_ptr, member_type.stringof, member_name, member_data.to!string );
 
 			/*
