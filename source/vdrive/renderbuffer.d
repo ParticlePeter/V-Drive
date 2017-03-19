@@ -1,4 +1,4 @@
-module vdrive.renderpass;
+module vdrive.renderbuffer;
 
 import core.stdc.stdio : printf;
 

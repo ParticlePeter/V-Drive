@@ -8,6 +8,6 @@ public import vdrive.surface;
 public import vdrive.geometry;
 public import vdrive.pipeline;
 public import vdrive.descriptor;
-public import vdrive.renderpass;
 public import vdrive.synchronize;
+public import vdrive.renderbuffer;
 
