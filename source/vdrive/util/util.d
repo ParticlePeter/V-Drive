@@ -8,7 +8,7 @@ import std.container.array;
 
 
 /// check bool condition
-void vkEnforce(
+void vkAssert(
 	bool			assert_value,
 	const( char )*	message = null,
 	string			file = __FILE__,
@@ -28,7 +28,7 @@ void vkEnforce(
 
 
 /// check the correctness of a vulkan result
-void vkEnforce(
+void vkAssert(
 	VkResult	vkResult, 
 	string		file = __FILE__,
 	size_t		line = __LINE__,
@@ -36,11 +36,11 @@ void vkEnforce(
 	) nothrow @nogc {
 	// Todo(pp): print to stderr
 	// Todo(pp): print to custom logger
-	vkResult.vkEnforce( null, file, line, func );
+	vkResult.vkAssert( null, file, line, func );
 }
 
 /// check the correctness of a vulkan result with additinal message(s)
-void vkEnforce(
+void vkAssert(
 	VkResult		vkResult, 
 	const( char )*	message,
 	string			file = __FILE__,
@@ -147,13 +147,13 @@ auto listVulkanProperty( ReturnType, alias vkFunc, Args... )( Args args ) {
 	*/
 
 	do {
-		vkFunc( args, &count, null ).vkEnforce;
+		vkFunc( args, &count, null ).vkAssert;
 		if( count == 0 )  break;
 		result.length = count;
 		vkResult = vkFunc( args, &count, result.ptr );
 	} while( vkResult == VK_INCOMPLETE );
 
-	vkResult.vkEnforce; // check if everything went right
+	vkResult.vkAssert; // check if everything went right
 
 	return result;
 }
@@ -170,13 +170,13 @@ auto listVulkanProperty( ReturnType, alias vkFunc, Args... )( void* scratch, Arg
 	uint32_t count;
 
 	do {
-		vkFunc( args, &count, null ).vkEnforce;
+		vkFunc( args, &count, null ).vkAssert;
 		if( count == 0 )  break;
 		result = ( cast( ReturnType* )scratch )[ 0 .. count ];
 		vkResult = vkFunc( args, &count, &result[0] );
 	} while( vkResult == VK_INCOMPLETE );
 
-	vkResult.vkEnforce; // check if everything went right
+	vkResult.vkAssert; // check if everything went right
 
 	return result;
 }

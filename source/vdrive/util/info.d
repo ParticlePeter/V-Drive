@@ -538,7 +538,7 @@ auto presentSupport( VkPhysicalDevice gpu, VkSurfaceKHR surface ) {
 ////////////
 // Queues //
 ////////////
-auto listQueues( VkPhysicalDevice gpu, bool printInfo = true, VkSurfaceKHR surface = VK_NULL_ND_HANDLE ) {
+auto listQueues( VkPhysicalDevice gpu, bool printInfo = true, VkSurfaceKHR surface = VK_NULL_HANDLE ) {
 
 	uint32_t queue_family_property_count;
 	vkGetPhysicalDeviceQueueFamilyProperties( gpu, &queue_family_property_count, null );
@@ -555,7 +555,7 @@ auto listQueues( VkPhysicalDevice gpu, bool printInfo = true, VkSurfaceKHR surfa
 			printf( "\tQueues in Family         : %d\n", queue.queueCount );
 			printf( "\tQueue timestampValidBits : %d\n", queue.timestampValidBits );
 
-			if( surface != VK_NULL_ND_HANDLE ) {
+			if( surface != VK_NULL_HANDLE ) {
 				VkBool32 present_supported;
 				vkGetPhysicalDeviceSurfaceSupportKHR( gpu, q.toUint, surface, &present_supported );
 				printf( "\tPresentation supported   : %d\n", present_supported );
@@ -659,7 +659,7 @@ struct Queue_Family {
 ///		printInfo = optional: if true prints struct content to stdout
 ///		surface = optional: if passed in the printed info includes whether a queue supports presenting to that surface
 ///	Returns: Array!Queue_Family 
-auto listQueueFamilies( VkPhysicalDevice gpu, bool printInfo = true, VkSurfaceKHR surface = VK_NULL_ND_HANDLE ) {
+auto listQueueFamilies( VkPhysicalDevice gpu, bool printInfo = true, VkSurfaceKHR surface = VK_NULL_HANDLE ) {
 	auto queue_family_properties = listQueues( gpu, printInfo, surface );	// get Array!VkQueueFamilyProperties
 	auto family_queues = sizedArray!Queue_Family( queue_family_properties.length );
 	foreach( family_index, ref family; queue_family_properties.data ) {
