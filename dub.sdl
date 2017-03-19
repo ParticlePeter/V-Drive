@@ -2,13 +2,13 @@
 name				"vdrive"
 targetName			"V-Drive"
 targetType			"sourceLibrary"
-description			"D Creative Coding"
+description			"Vulkan abstraction and D Creative Coding"
 homepage			""
 copyright			"Copyright (c) 2016 Peter Particle"
 authors				"Peter Particle"
 license				"MIT"
 
-dependencies		"erupted" version = "~>1.3.10"
+dependencies		"erupted" version = "~>1.5.1"
 
 buildRequirements	"allowWarnings"
 
@@ -18,10 +18,9 @@ subPackage {
 	name				"triangle"
 	description			"Simple Triangle"
 	targetType			"executable"
-	sourcePaths			"source" "example/00_common" "example/01_triangle"
-	dependency			"erupted" 			version = "~>1.4.9"
+	sourcePaths			"source" "example/common" "example/sw_01_triangle"
+	dependency			"erupted" 			version = "~>1.5.1"
 	dependency 			"derelict-glfw3"	version	= "~>3.1.0"
 	dependency 			"dlsl"				version	= "~>0.1.1"
-	//subConfiguration	"erupted"		"with-derelict-loader"
 }
 
