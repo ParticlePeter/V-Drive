@@ -318,7 +318,7 @@ auto allocateSet(
 /// of Meta_Descriptor_Layout, all other internal structures are obsolete
 /// after construction so that the Meta_Descriptor_Layout can be reused
 /// after being reset 
-struct Descriptor_Pool_Set_Layout {
+struct Core_Descriptor {
 	VkDescriptorPool		pool;
 	VkDescriptorSet			set;
 	VkDescriptorSetLayout	layout;
@@ -328,16 +328,16 @@ struct Descriptor_Pool_Set_Layout {
 /// destroy all wrapped Vulkan objects
 ///	Params:
 ///		vk = Vulkan state struct holding the device through which these resources were created
-///		dpsl = the wrapped VkDescriptorPool ( with it the VkDescriptorSet ) and the VkDescriptorSetLayout to destroy 
+///		core = the wrapped VkDescriptorPool ( with it the VkDescriptorSet ) and the VkDescriptorSetLayout to destroy 
 ///	Returns: the passed in Meta_Structure for function chaining 
-void destroy( ref Vulkan vk, ref Descriptor_Pool_Set_Layout	dpsl ) {
+void destroy( ref Vulkan vk, ref Core_Descriptor core ) {
 	// no nice syntax, vdrive.state.destroy overloads get confused
 	// with this one in the module scope
-	vdrive.state.destroy( vk, dpsl.layout );
-	vdrive.state.destroy( vk, dpsl.pool );
-	dpsl.layout = VK_NULL_HANDLE;
-	dpsl.pool = VK_NULL_HANDLE;
-	dpsl.set = VK_NULL_HANDLE;
+	vdrive.state.destroy( vk, core.layout );
+	vdrive.state.destroy( vk, core.pool );
+	core.layout = VK_NULL_HANDLE;
+	core.pool = VK_NULL_HANDLE;
+	core.set = VK_NULL_HANDLE;
 }
 
 
@@ -360,7 +360,7 @@ struct Meta_Descriptor_Layout {
 	/// reset all internal data and return wrapped Vulkan objects 
 	/// VkDescriptorPool, VkDescriptorSet and VkDescriptorSetLayout
 	auto reset() {
-		Descriptor_Pool_Set_Layout result = { pool, descriptor_set, descriptor_set_layout };
+		Core_Descriptor result = { pool, descriptor_set, descriptor_set_layout };
 		descriptor_types_count[] = 0;
 		descriptor_set_layout = VK_NULL_HANDLE;
 		descriptor_set = VK_NULL_HANDLE;
