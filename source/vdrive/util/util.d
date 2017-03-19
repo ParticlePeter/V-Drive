@@ -9,7 +9,7 @@ import std.container.array;
 
 /// check bool condition
 void vkEnforce(
-	bool assert_value,
+	bool			assert_value,
 	const( char )*	message = null,
 	string			file = __FILE__,
 	size_t			line = __LINE__,
@@ -29,8 +29,20 @@ void vkEnforce(
 
 /// check the correctness of a vulkan result
 void vkEnforce(
-	VkResult vkResult, 
-	const( char )*	message = null,
+	VkResult	vkResult, 
+	string		file = __FILE__,
+	size_t		line = __LINE__,
+	string		func = __FUNCTION__,
+	) nothrow @nogc {
+	// Todo(pp): print to stderr
+	// Todo(pp): print to custom logger
+	vkResult.vkEnforce( null, file, line, func );
+}
+
+/// check the correctness of a vulkan result with additinal message(s)
+void vkEnforce(
+	VkResult		vkResult, 
+	const( char )*	message,
 	string			file = __FILE__,
 	size_t			line = __LINE__,
 	string			func = __FUNCTION__,
