@@ -48,7 +48,7 @@ auto initVulkan( ref VDrive_State vd, uint32_t win_w = 1600, uint32_t win_h = 90
     glfwInit();                                         // initialize glfw
 
 
-    // set glfw window attributes and store it in the VDrive_State appstruct 
+    // set glfw window attributes and store it in the VDrive_State appstate 
     glfwWindowHint( GLFW_CLIENT_API, GLFW_NO_API );
     vd.window = glfwCreateWindow( win_w, win_h, "Vulkan Erupted", null, null );
 
