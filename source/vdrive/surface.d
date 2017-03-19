@@ -20,6 +20,7 @@ struct Meta_Surface {
 //	uint32_t					present_queue_family_index;			// does not seem to be required so far
 	VkSwapchainKHR				swapchain;
 	VkSwapchainCreateInfoKHR	create_info;
+	Array!VkImageView			present_image_views;
 
 	// convenience to get VkSurfaceFormatKHR from VkSwapchainCreateInfoKHR.imageFormat and .imageColorSpace and set vice versa
 	auto surfaceFormat() { return VkSurfaceFormatKHR( create_info.imageFormat, create_info.imageColorSpace ); }
@@ -29,13 +30,19 @@ struct Meta_Surface {
 	}
 
 	// two different resource destroy functions for two distinct places
-	void destroySurface() { instance.vkDestroySurfaceKHR( create_info.surface, vk.allocator ); }
-	void destroySwapchain() { device.vkDestroySwapchainKHR( swapchain, vk.allocator ); }
+	void destroySurface() { vk.destroy( create_info.surface ); }
+	void destroySwapchain() { vk.destroy( swapchain ); }
+	void destroyImageViews() { 
+		foreach( ref image_view; present_image_views ) {
+			vk.destroy( image_view );
+		}
+	}
 
 	// try to destroy together
 	void destroyResources() {
 		destroySwapchain;
 		destroySurface;
+		destroyImageViews;
 	}
 }
 
@@ -56,7 +63,7 @@ auto ref selectPresentMode( ref Meta_Surface meta, VkPresentModeKHR[] include_mo
 mixin( Forward_To_Inner_Struct!( Meta_Surface, VkSwapchainCreateInfoKHR, "meta.create_info" ));
 
 
-auto ref construct( ref Meta_Surface meta ) {
+auto ref createSwapchain( ref Meta_Surface meta ) {
 	// assert that meta struct is initialized with a valid vulkan state pointer
 	assert( meta.isValid );
 
@@ -110,7 +117,7 @@ auto ref construct( ref Meta_Surface meta ) {
 
 
 
-auto swapchainImageViews( ref Meta_Surface meta, VkImageAspectFlags subrecource_aspect_mask = VK_IMAGE_ASPECT_COLOR_BIT, VkImageViewType image_view_type = VK_IMAGE_VIEW_TYPE_2D ) {
+auto ref createImageViews( ref Meta_Surface meta, VkImageAspectFlags subrecource_aspect_mask = VK_IMAGE_ASPECT_COLOR_BIT, VkImageViewType image_view_type = VK_IMAGE_VIEW_TYPE_2D ) {
 	VkImageSubresourceRange image_subresource_range = {
 		aspectMask 		: VK_IMAGE_ASPECT_COLOR_BIT,
 		baseMipLevel	: 0,
@@ -118,35 +125,48 @@ auto swapchainImageViews( ref Meta_Surface meta, VkImageAspectFlags subrecource_
 		baseArrayLayer	: 0,
 		layerCount		: 1,
 	};
-	return swapchainImageViews( meta, image_subresource_range, image_view_type );
+
+	meta.createImageViews( image_subresource_range, image_view_type );
+	return meta;
 }
 
 
-auto swapchainImageViews( ref Meta_Surface meta, VkImageSubresourceRange image_subresource_range, VkImageViewType image_view_type = VK_IMAGE_VIEW_TYPE_2D ) {
+auto ref createImageViews( ref Meta_Surface meta, VkImageSubresourceRange image_subresource_range, VkImageViewType image_view_type = VK_IMAGE_VIEW_TYPE_2D ) {
 	VkImageViewCreateInfo image_view_create_info = {
 		viewType 			: image_view_type,
 		format				: meta.imageFormat,
 		components			: { VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY },
 		subresourceRange	: image_subresource_range,
 	};
-	return swapchainImageViews( meta, image_view_create_info );
+
+	meta.createImageViews( image_view_create_info );
+	return meta;
 }
 
 
-auto swapchainImageViews( ref Meta_Surface meta, VkImageViewCreateInfo image_view_create_info ) {
+auto ref createImageViews( ref Meta_Surface meta, VkImageViewCreateInfo image_view_create_info ) {
 	// assert that meta struct is initialized with a valid vulkan state pointer
 	assert( meta.isValid );
+
+	// destroy old image views if they exist
+	foreach( ref image_view; meta.present_image_views ) meta.destroy( image_view );
 
 	// Create image views of the swapchain images in the passed in argument present_image_views
 	auto present_images = listVulkanProperty!( VkImage, vkGetSwapchainImagesKHR, VkDevice, VkSwapchainKHR )( meta.device, meta.swapchain );
 
 	// allocate storage for image views and create one view per swapchain image in a loop
-	auto present_image_views = sizedArray!VkImageView( present_images.length );
-	foreach( i; 0 .. present_image_views.length ) {
+	meta.present_image_views.length = present_images.length;
+	foreach( i; 0 .. present_images.length ) {
 		image_view_create_info.image = present_images[i];	// complete VkImageViewCreateInfo with image i:
-		vkCreateImageView( meta.device, &image_view_create_info, meta.allocator, &present_image_views[i] ).vkEnforce;
+		vkCreateImageView( meta.device, &image_view_create_info, meta.allocator, &meta.present_image_views[i] ).vkEnforce;
 	}
-	return present_image_views;
+	
+	return meta;
+}
+
+
+auto ref construct( ref Meta_Surface meta ) {
+	return meta.createSwapchain.createImageViews;
 }
 
 
