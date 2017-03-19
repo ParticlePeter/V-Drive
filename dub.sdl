@@ -1,26 +1,26 @@
 
-name				"vdrive"
-targetName			"V-Drive"
-targetType			"sourceLibrary"
-description			"Vulkan abstraction and D Creative Coding"
-homepage			""
-copyright			"Copyright (c) 2016 Peter Particle"
-authors				"Peter Particle"
-license				"MIT"
+name                "vdrive"
+targetName          "V-Drive"
+targetType          "sourceLibrary"
+description         "Vulkan abstraction and D Creative Coding"
+homepage            ""
+copyright           "Copyright (c) 2016 Peter Particle"
+authors             "Peter Particle"
+license             "MIT"
 
-dependencies		"erupted" version = "~>1.5.1"
+dependencies        "erupted" version = "~>1.5.1"
 
-buildRequirements	"allowWarnings"
+buildRequirements   "allowWarnings"
 
 
 // example hello triangle
 subPackage {
-	name				"triangle"
-	description			"Simple Triangle"
-	targetType			"executable"
-	sourcePaths			"source" "example/common" "example/sw_01_triangle"
-	dependency			"erupted" 			version = "~>1.5.1"
-	dependency 			"derelict-glfw3"	version	= "~>3.1.0"
-	dependency 			"dlsl"				version	= "~>0.1.1"
+    name                "triangle"
+    description         "Simple Triangle"
+    targetType          "executable"
+    sourcePaths         "source" "example/common" "example/sw_01_triangle"
+    dependency          "erupted"           version = "~>1.5.1"
+    dependency          "derelict-glfw3"    version = "~>3.1.0"
+    dependency          "dlsl"              version = "~>0.1.1"
 }
 
