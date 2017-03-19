@@ -358,26 +358,68 @@ auto ref construct( ref Meta_Renderpass meta ) {
 
 
 
-struct Meta_FB( size_t framebuffer_count = 1, size_t clear_value_count = size_t.max ) {
+struct Meta_FB( uint32_t framebuffer_count = 1, size_t clear_value_count = uint32_t.max ) {
 	mixin 		Vulkan_State_Pointer;
-		 static if( framebuffer_count == 1 )			VkFramebuffer						framebuffer;
-	else static if( framebuffer_count == size_t.max )	Array!VkFramebuffer					framebuffer;
-	else												VkFramebuffer[ framebuffer_count ]	framebuffer;
-	VkRect2D	render_area;
-		 static if( clear_value_count == 1 )			VkClearValue						clear_value;
-	else static if( clear_value_count == size_t.max )	Array!VkClearValue					clear_value;
-	else												VkClearValue[ clear_value_count ]	clear_value;
+
+	// required for template functions
+	alias fb_count = framebuffer_count;
+	alias cv_count = clear_value_count;
+
+	static if( fb_count == uint32_t.max ) 	Array!VkFramebuffer			framebuffers;
+	else {									VkFramebuffer[ fb_count ]	framebuffers;
+											uint32_t					framebuffers_length;
+	}
+
+	VkRect2D render_area;
+
+	static if( cv_count == uint32_t.max )	Array!VkClearValue			clear_values;
+	else {									VkClearValue[ cv_count ]	clear_values;
+											uint32_t					clear_values_length;
+	}
+
+	auto ref opCall( ref Vulkan vk ) {
+		this.vk( vk );
+		return this;
+	}
+
+	auto opCall( uint32_t index = 0, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+		vkEnforce( !empty, "No Framebuffers created so far", file, line, func );
+		return framebuffers[ index ];
+	}
+
+	auto framebuffer( uint32_t index = 0, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+		vkEnforce( !empty, "No Framebuffers created so far", file, line, func );
+		return framebuffers[ index ];
+	}
+
+	auto ptr() {
+		return framebuffers.ptr;
+	}
+
+	auto length() {
+		static if( fb_count == uint32_t.max ) 	return framebuffers.length.toUint;
+		else									return framebuffers_length;
+	}
+
+	bool empty() {
+		static if( fb_count == uint32_t.max ) 	return framebuffers.empty;
+		else									return framebuffers_length > 0;
+	}
 
 	void destroyResources() {
-		static if( framebuffer_count == 1 )	vk.device.vkDestroyFramebuffer( framebuffer, vk.allocator );
-		else foreach( fb; framebuffer )		vk.device.vkDestroyFramebuffer( fb, vk.allocator );
+		foreach( fb; framebuffers )  vk.destroy( fb );
+		static if( fb_count == uint32_t.max ) 	framebuffers.clear;
+		else									framebuffers_length = 0;
+
 		// Required if this struct should be reused for proper render_area reinitialization
 		render_area = VkRect2D( VkOffset2D( 0, 0 ), VkExtent2D( 0, 0 ));
+		static if( cv_count == uint32_t.max )	clear_values.clear;
+		else									clear_values_length = 0;
 	}
 }
 
-alias Meta_Framebuffer  = Meta_FB!( 1, size_t.max );
-alias Meta_Framebuffers = Meta_FB!( size_t.max, size_t.max );
+alias Meta_Framebuffer  = Meta_FB!( 1, uint32_t.max );
+alias Meta_Framebuffers = Meta_FB!( uint32_t.max, uint32_t.max );
 
 
 /// template to determine if a type is a Meta_Framebuffer or Meta_Framebuffers
@@ -394,10 +436,19 @@ template IS_FB( META_FB ) {  enum IS_FB = ( is( META_FB == Meta_Framebuffer ) ||
 ///		b		= blue clear value
 ///		a		= alpha clear value
 ///	Returns: the passed in Meta_Structure for function chaining
-auto ref setClearValue( META_FB, T )( ref META_FB meta, size_t index, T r, T g, T b, T a )
-if( IS_FB!META_FB && ( is( T == float ) || is( T == int32_t ) || is( T == uint32_t ))) {
+auto ref setClearValue( META_FB, T )(
+	ref META_FB	meta,
+	uint32_t	index,
+	T 			r,
+	T 			g,
+	T 			b,
+	T 			a,
+	string		file = __FILE__,
+	size_t		line = __LINE__,
+	string		func = __FUNCTION__
+	) if( IS_FB!META_FB && ( is( T == float ) || is( T == int32_t ) || is( T == uint32_t ))) {
 	T[4] rgba = [ r, g, b, a ];
-	return setClearValue( meta, index, rgba );
+	return setClearValue( meta, index, rgba, file, line, func );
 }
 
 
@@ -408,13 +459,19 @@ if( IS_FB!META_FB && ( is( T == float ) || is( T == int32_t ) || is( T == uint32
 ///		index	= framebuffer attachment index
 ///		rgba	= the rgba clear value as array or four component math vector
 ///	Returns: the passed in Meta_Structure for function chaining
-auto ref setClearValue( META_FB, T )( ref META_FB meta, size_t index, T[4] rgba )
-if( IS_FB!META_FB && ( is( T == float ) || is( T == int32_t ) || is( T == uint32_t ))) {
+auto ref setClearValue( META_FB, T )(
+	ref META_FB	meta,
+	uint32_t	index,
+	T[4] 		rgba,
+	string		file = __FILE__,
+	size_t		line = __LINE__,
+	string		func = __FUNCTION__
+	) if( IS_FB!META_FB && ( is( T == float ) || is( T == int32_t ) || is( T == uint32_t ))) {
 	VkClearValue clear_value;
 			static if( is( T == float ))	clear_value.color.float32	= rgba;
 	else	static if( is( T == int32_t ))	clear_value.color.int32		= rgba;
 	else	static if( is( T == uint32_t ))	clear_value.color.uint32	= rgba;
-	return	setClearValue( meta, index, clear_value );
+	return	setClearValue( meta, index, clear_value, file, line, func );
 } 
 
 
@@ -426,9 +483,17 @@ if( IS_FB!META_FB && ( is( T == float ) || is( T == int32_t ) || is( T == uint32
 ///		depth	= the depth clear value
 ///		stencil = the stencil clear value, defaults to 0
 ///	Returns: the passed in Meta_Structure for function chaining
-auto ref setClearValue( META_FB, U )( ref META_FB meta, size_t index, float depth, U stencil = 0 ) if( IS_FB!META_FB && is( U : uint32_t )) {
+auto ref setClearValue( META_FB, U )(
+	ref META_FB	meta,
+	uint32_t	index,
+	float		depth,
+	U 			stencil = 0,
+	string		file = __FILE__,
+	size_t		line = __LINE__,
+	string		func = __FUNCTION__
+	) if( IS_FB!META_FB && is( U : uint32_t )) {
 	VkClearValue clear_value = { depthStencil : VkClearDepthStencilValue( depth, stencil ) };
-	return setClearValue( meta, index, clear_value );
+	return setClearValue( meta, index, clear_value, file, line, func );
 }
 
 
@@ -439,12 +504,36 @@ auto ref setClearValue( META_FB, U )( ref META_FB meta, size_t index, float dept
 ///		index		= framebuffer attachment index
 ///		clear_value	= the VkClearValue clear value
 ///	Returns: the passed in Meta_Structure for function chaining
-auto ref setClearValue( META_FB )( ref META_FB meta, size_t index, VkClearValue clear_value ) if( IS_FB!META_FB ) {
-	if( index == size_t.max )					// signal to append clear_value instead of setting to a specific index ...
-		index = meta.clear_value.length;		// ... hence set the index to the length of the current array length
-	if( meta.clear_value.length <= index )		// if index is greater then the array ...
-		meta.clear_value.length  = index + 1;	// ... resize the array
-	meta.clear_value[ index ] = clear_value;
+auto ref setClearValue( META_FB )(
+	ref META_FB		meta,
+	uint32_t		index,
+	VkClearValue	clear_value,
+	string			file = __FILE__,
+	size_t			line = __LINE__,
+	string			func = __FUNCTION__
+	) if( IS_FB!META_FB ) {
+
+	// if using dynamic arrays
+	static if( META_FB.cv_count == uint32_t.max ) {
+		if( index == uint32_t.max )						// signal to append clear_value instead of setting to a specific index ...
+			index = meta.clear_values.length.toUint;	// ... hence set the index to the length of the current array length
+		if( meta.clear_values.length <= index ) {		// if index is greater then the array ...
+			meta.clear_values.length  = index + 1;		// ... resize the array
+		}
+		meta.clear_values[ index ] = clear_value;
+	}
+
+	// if using static arrays
+	else {
+		if( index == uint32_t.max )					// signal to append clear_value instead of setting to a specific index ...
+			index = clear_values_length;			// ... hence set the index to the length of the current array length
+		vkEnforce( index < META_FB.cv_count, 		// assert that the current index fits into the static array bounds
+			"Meta_Framebuffer with static clear value array param index must be greater than the static array length", 
+			file, line, func );
+		clear_values_length = index + 1;			// set the occupied length of the static clear_value array
+		meta.clear_values[ index ] = clear_value;
+	}
+	
 	return meta;
 }
 
@@ -458,8 +547,17 @@ auto ref setClearValue( META_FB )( ref META_FB meta, size_t index, VkClearValue 
 ///		b		= blue clear value
 ///		a		= alpha clear value
 ///	Returns: the passed in Meta_Structure for function chaining
-auto ref addClearValue( META_FB, T )( ref META_FB meta, T r, T g, T b, T a ) if( IS_FB!META_FB && ( is( T == float ) || is( T == int32_t ) || is( T == uint32_t ))) {
-	return setClearValue( meta, size_t.max, r, g, b, a );
+auto ref addClearValue( META_FB, T )(
+	ref META_FB	meta,
+	T 			r,
+	T 			g,
+	T 			b,
+	T 			a,
+	string		file = __FILE__,
+	size_t		line = __LINE__,
+	string		func = __FUNCTION__
+	) if( IS_FB!META_FB && ( is( T == float ) || is( T == int32_t ) || is( T == uint32_t ))) {
+	return setClearValue( meta, uint32_t.max, r, g, b, a, file, line, func );
 }
 
 
@@ -469,8 +567,14 @@ auto ref addClearValue( META_FB, T )( ref META_FB meta, T r, T g, T b, T a ) if(
 ///		meta	= reference to a Meta_Framebuffer or Meta_Framebuffers struct
 ///		rgba	= the rgba clear value as array or four component math vector
 ///	Returns: the passed in Meta_Structure for function chaining
-auto ref addClearValue( META_FB, T )( ref META_FB meta, T[4] rgba ) if( IS_FB!META_FB && ( is( T == float ) || is( T == int32_t ) || is( T == uint32_t ))) {
-	return setClearValue( meta, size_t.max, rgba );
+auto ref addClearValue( META_FB, T )(
+	ref META_FB	meta,
+	T[4] 		rgba,
+	string		file = __FILE__,
+	size_t		line = __LINE__,
+	string		func = __FUNCTION__
+	) if( IS_FB!META_FB && ( is( T == float ) || is( T == int32_t ) || is( T == uint32_t ))) {
+	return setClearValue( meta, uint32_t.max, rgba, file, line, func );
 }
 
 
@@ -481,8 +585,15 @@ auto ref addClearValue( META_FB, T )( ref META_FB meta, T[4] rgba ) if( IS_FB!ME
 ///		depth	= the depth clear value
 ///		stencil = the stencil clear value, defaults to 0
 ///	Returns: the passed in Meta_Structure for function chaining
-auto ref addClearValue( META_FB, U )( ref META_FB meta, float depth, U stencil = 0 ) if( IS_FB!META_FB && is( U : uint32_t )) {
-	return setClearValue( meta, size_t.max, depth, stencil );
+auto ref addClearValue( META_FB, U )(
+	ref META_FB	meta,
+	float		depth,
+	U 			stencil = 0,
+	string		file = __FILE__,
+	size_t		line = __LINE__,
+	string		func = __FUNCTION__
+	) if( IS_FB!META_FB && is( U : uint32_t )) {
+	return setClearValue( meta, uint32_t.max, depth, stencil, file, line, func );
 }
 
 
@@ -492,8 +603,14 @@ auto ref addClearValue( META_FB, U )( ref META_FB meta, float depth, U stencil =
 ///		meta		= reference to a Meta_Framebuffer or Meta_Framebuffers struct
 ///		clear_value	= the VkClearValue clear value
 ///	Returns: the passed in Meta_Structure for function chaining
-auto ref addClearValue( META_FB )( ref META_FB meta, VkClearValue clear_value ) if( IS_FB!META_FB ) {
-	return setClearValue( meta, size_t.max, clear_value );
+auto ref addClearValue( META_FB )(
+	ref META_FB		meta,
+	VkClearValue	clear_value,
+	string			file = __FILE__,
+	size_t			line = __LINE__,
+	string			func = __FUNCTION__
+	) if( IS_FB!META_FB ) {
+	return setClearValue( meta, uint32_t.max, clear_value, file, line, func );
 }
 
 
@@ -606,10 +723,10 @@ auto ref renderAreaExtent( META_FB )( ref META_FB meta, int32_t x, int32_t y, ui
 ///	Returns: the passed in Meta_Structure for function chaining
 auto ref attachFramebuffer( ref Meta_Renderpass meta_renderpass, ref Meta_Framebuffer meta_framebuffer ) {
 	with( meta_renderpass.begin_info ) {
-		framebuffer		= meta_framebuffer.framebuffer;
+		framebuffer		= meta_framebuffer( 0 );
 		renderArea		= meta_framebuffer.render_area;
-		pClearValues	= meta_framebuffer.clear_value.ptr;
-		clearValueCount	= meta_framebuffer.clear_value.length.toUint;
+		pClearValues	= meta_framebuffer.clear_values.ptr;
+		clearValueCount	= meta_framebuffer.clear_values.length.toUint;
 	} return meta_renderpass;
 }
 
@@ -619,14 +736,14 @@ auto ref attachFramebuffer( ref Meta_Renderpass meta_renderpass, ref Meta_Frameb
 ///	Params:
 ///		meta_renderpass  = reference to a Meta_Renderpass structure holding the VkRenderPassBeginInfo
 ///		meta_framebuffers = reference to the Meta_Framebuffer structure whose framebuffer and resources will be attached
-///		framebuffer_index = the index to select a framebuffer from the member framebuffer array
+///		framebuffer_length = the index to select a framebuffer from the member framebuffer array
 ///	Returns: the passed in Meta_Structure for function chaining
-auto ref attachFramebuffer( ref Meta_Renderpass meta_renderpass, ref Meta_Framebuffers meta_framebuffers, size_t framebuffer_index ) {
+auto ref attachFramebuffer( ref Meta_Renderpass meta_renderpass, ref Meta_Framebuffers meta_framebuffers, uint32_t framebuffer_index ) {
 	with( meta_renderpass.begin_info ) {
-		framebuffer		= meta_framebuffers.framebuffer[ framebuffer_index ];
+		framebuffer		= meta_framebuffers( framebuffer_index );
 		renderArea		= meta_framebuffers.render_area;
-		pClearValues	= meta_framebuffers.clear_value.ptr;
-		clearValueCount	= meta_framebuffers.clear_value.length.toUint;
+		pClearValues	= meta_framebuffers.clear_values.ptr;
+		clearValueCount	= meta_framebuffers.clear_values.length.toUint;
 	} return meta_renderpass;
 }
 
@@ -658,7 +775,10 @@ auto ref initFramebuffer(
 	string					func = __FUNCTION__
 	) {
 	// assert that meta struct is initialized with a valid vulkan state pointer
-	vkEnforce( meta.isValid, "Meta_Struct is not initialized with a valid vulkan state pointer!", file, line, func );
+	vkEnforce( meta.isValid, "Meta_Struct is not initialized with a vulkan state pointer!", file, line, func );
+
+	// if we have some old resources we delete them first
+	if( !meta.empty ) meta.destroyResources;
 
 	// the framebuffer_extent is not(!) the render_area, but rather a specification of how big the framebuffer is
 	// the render area specifies a render able window into this framebuffer
@@ -677,7 +797,9 @@ auto ref initFramebuffer(
 	};
 
 	// create the VkFramebuffer
-	vkCreateFramebuffer( meta.device, &framebuffer_create_info, meta.allocator, &meta.framebuffer ).vkEnforce;
+	meta.device
+		.vkCreateFramebuffer( &framebuffer_create_info, meta.allocator, meta.framebuffers.ptr )
+		.vkEnforce( file, line, func );
 
 	return meta;
 }
@@ -733,7 +855,10 @@ auto ref initFramebuffers(
 	string					func = __FUNCTION__
 	) {
 	// assert that meta struct is initialized with a valid vulkan state pointer
-	vkEnforce( meta.isValid, "Meta_Struct is not initialized with a valid vulkan state pointer!", file, line, func );
+	vkEnforce( meta.isValid, "Meta_Struct is not initialized with a vulkan state pointer!", file, line, func );
+
+	// if we have some old resources we delete them first
+	if( !meta.empty ) meta.destroyResources;
 
 	// the framebuffer_extent is not(!) the render_area, but rather a specification of how big the framebuffer is
 	// the render area specifies a render able window into this framebuffer
@@ -758,10 +883,12 @@ auto ref initFramebuffers(
 	};
 
 	// create a framebuffer per dynamic_image_view (e.g. for each swapchain image view)
-	meta.framebuffer.length = dynamic_image_views.length;
-	foreach( i, ref fb; meta.framebuffer.data ) {
+	meta.framebuffers.length = dynamic_image_views.length;
+	foreach( i, ref fb; meta.framebuffers.data ) {
 		image_views[ first_image_views.length ] = dynamic_image_views[ i ];
-		vkCreateFramebuffer( meta.device, &framebuffer_create_info, meta.allocator, &fb ).vkEnforce;
+		meta.device
+			.vkCreateFramebuffer( &framebuffer_create_info, meta.allocator, &fb )
+			.vkEnforce( file, line, func );
 	}
 
 	return meta;
