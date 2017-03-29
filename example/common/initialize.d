@@ -38,14 +38,17 @@ mixin DerelictGLFW3_VulkanBind;
 
 
 // Todo(pp): if initialization fails an error should be returned
-// programm termination would than happen gracefully in module main
+// program termination would than happen gracefully in module main
 // pass Vulkan struct as reference parameter into this function 
 auto initVulkan( ref VDrive_State vd, uint32_t win_w = 1600, uint32_t win_h = 900 ) {
 
     // Initialize GLFW3 and Vulkan related glfw functions
-    DerelictGLFW3.load( "external/lib/glfw3_x64.dll" ); // load the lib
-    DerelictGLFW3_loadVulkan();                         // load vulkan specific glfw function pointers  
-    glfwInit();                                         // initialize glfw
+    version( Windows )
+        DerelictGLFW3.load( "external/lib/glfw3_x64.dll" ); // load the lib in this repo
+    else
+        DerelictGLFW3.load;                                 // load default system lib othervise, must be 64 bit
+    DerelictGLFW3_loadVulkan();                             // load vulkan specific glfw function pointers  
+    glfwInit();                                             // initialize glfw
 
 
     // set glfw window attributes and store it in the VDrive_State appstate 
