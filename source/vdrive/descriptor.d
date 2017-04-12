@@ -27,7 +27,7 @@ auto createSampler(
     VkBorderColor           border_color        = VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK,
     float                   mip_lod_bias        = 0,
     VkBool32                anisotropy_enable   = VK_FALSE,
-    float                   max_anisotropy      = 0,
+    float                   max_anisotropy      = 1,
     VkBool32                compare_enable      = VK_FALSE,
     VkCompareOp             compare_op          = VK_COMPARE_OP_NEVER,
     float                   min_lod             = 0,
