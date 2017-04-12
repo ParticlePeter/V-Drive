@@ -50,10 +50,19 @@ auto ref createResources( ref VDrive_State vd, bool recreate = false ) {
     // create depth image //
     ////////////////////////
     
+    // prefer getting the depth image into a device local heap
+    // first we need to find out if such a heap exist on the current device
+    // we do not check the size of the heap, the depth image will probably fit if such heap exists
+    // Todo(pp): the assumption above is NOT guaranteed, add additional functions to memory module
+    // which consider a minimum heap size for the memory type, heap as well as memory cretaion functions
     import vdrive.memory;
+    auto depth_image_memory_property = vd.memory_properties.hasMemoryHeapType( VK_MEMORY_HEAP_DEVICE_LOCAL_BIT )
+        ? VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+        : VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+    
     vd.depth_image( vd )
         .create( VK_FORMAT_D16_UNORM, vd.surface.imageExtent, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, vd.sample_count )
-        .createMemory( VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT )
+        .createMemory( depth_image_memory_property )
         .createView( VkImageSubresourceRange( VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1 ));
 
 
