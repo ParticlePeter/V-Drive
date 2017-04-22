@@ -666,8 +666,8 @@ auto ref createView( ref Meta_Image meta, VkImageSubresourceRange subresource_ra
 
 /// records a VkImage transition command in argument command buffer
 void recordTransition(
+    VkCommandBuffer         cmd_buffer,
     VkImage                 image,
-    VkCommandBuffer         command_buffer,
     VkImageSubresourceRange subresource_range,
     VkImageLayout           old_layout,
     VkImageLayout           new_layout,
@@ -732,7 +732,7 @@ void recordTransition(
             break;
     }
 */
-    command_buffer.vkCmdPipelineBarrier(
+    cmd_buffer.vkCmdPipelineBarrier(
         src_stage_mask, dst_stage_mask, dependency_flags,
         0, null, 0, null, 1, &layout_transition_barrier
     );

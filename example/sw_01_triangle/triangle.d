@@ -289,8 +289,8 @@ auto ref createResources( ref VDrive_State vd, bool recreate = false ) {
     {
 
         // continue recording into cmd_buffer_init, record the depth image transition
-        vd.depth_image.image.recordTransition(
-            cmd_buffer_init,
+        cmd_buffer_init.recordTransition(
+            vd.depth_image.image,
             vd.depth_image.image_view_create_info.subresourceRange,
             VK_IMAGE_LAYOUT_UNDEFINED,
             VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
