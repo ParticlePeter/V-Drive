@@ -13,7 +13,7 @@ import erupted;
 // general memory functions //
 //////////////////////////////
 
-// memory_type_bits is a bitfield where if bit i is set, it means that the VkMemoryType i 
+// memory_type_bits is a bitfield where if bit i is set, it means that the VkMemoryType i
 // of the VkPhysicalDeviceMemoryProperties structure satisfies the memory requirements
 auto memoryTypeIndex(
     VkPhysicalDeviceMemoryProperties    memory_properties,
@@ -54,7 +54,7 @@ auto memoryHeapIndex(
 auto hasMemoryHeapType(
     VkPhysicalDeviceMemoryProperties    memory_properties,
     VkMemoryHeapFlags                   memory_heap_flags
-     ) {
+    ) {
     return memoryHeapIndex( memory_properties, memory_heap_flags ) < uint32_t.max;
 }
 
@@ -65,7 +65,7 @@ auto memoryHeapSize(
     ) {
     vkAssert( memory_heap_index < memory_properties.memoryHeapCount );
     return memory_properties.memoryHeaps[ memory_heap_index ].size;
-} 
+}
 
 
 auto allocateMemory( ref Vulkan vk, VkDeviceSize allocation_size, uint32_t memory_type_index ) {
@@ -88,11 +88,12 @@ auto mapMemory(
     VkDeviceMemory      memory,
     VkDeviceSize        size,
     VkDeviceSize        offset  = 0,
-    VkMemoryMapFlags    flags   = 0,
+//  VkMemoryMapFlags    flags   = 0,        // for future use
     string              file    = __FILE__,
     size_t              line    = __LINE__,
     string              func    = __FUNCTION__
     ) {
+    VkMemoryMapFlags flags;
     void* mapped_memory;
     vk.device.vkMapMemory( memory, offset, size, flags, &mapped_memory ).vkAssert( file, line, func );
     return mapped_memory;
@@ -103,6 +104,45 @@ void unmapMemory( ref Vulkan vk, VkDeviceMemory memory ) {
     vk.device.vkUnmapMemory( memory );
 }
 
+
+auto createMappedMemoryRange(
+    ref Vulkan          vk,
+    VkDeviceMemory      memory,
+    VkDeviceSize        size    = 0,
+    VkDeviceSize        offset  = 0,
+    string              file    = __FILE__,
+    size_t              line    = __LINE__,
+    string              func    = __FUNCTION__
+    ) {
+    VkMappedMemoryRange mapped_memory_range = {
+        memory  : memory,
+        size    : size > 0 ? size : VK_WHOLE_SIZE,
+        offset  : offset,
+    };
+    return mapped_memory_range;
+}
+
+
+void flushMappedMemoryRange(
+    ref Vulkan              vk,
+    VkMappedMemoryRange     mapped_memory_range,
+    string                  file    = __FILE__,
+    size_t                  line    = __LINE__,
+    string                  func    = __FUNCTION__
+    ) {
+    vk.device.vkFlushMappedMemoryRanges( 1, & mapped_memory_range ).vkAssert( file, line, func );
+}
+
+
+void flushMappedMemoryRanges(
+    ref Vulkan              vk,
+    VkMappedMemoryRange[]   mapped_memory_ranges,
+    string                  file    = __FILE__,
+    size_t                  line    = __LINE__,
+    string                  func    = __FUNCTION__
+    ) {
+    vk.device.vkFlushMappedMemoryRanges( mapped_memory_ranges.length.toUint, mapped_memory_ranges.ptr ).vkAssert( file, line, func );
+}
 
 
 ///////////////////////////////////////
@@ -160,7 +200,7 @@ auto ref memoryType( ref Meta_Memory meta, VkMemoryPropertyFlags memory_property
 }
 
 
-/// Here we use a trick, we set a very memory type with the lowest index 
+/// Here we use a trick, we set a very memory type with the lowest index
 /// but set the (same or higher) index manually, the index can be only increased but not decreased
 auto ref memoryTypeIndex( ref Meta_Memory meta, uint32_t minimum_index ) {
     if( meta.memory_property_flags == 0 ) meta.memory_property_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
@@ -236,7 +276,7 @@ mixin template Memory_Member() {
     auto memRequirements()  { return memory_requirements; }
 }
 
-private template hasMemReqs( T ) { 
+private template hasMemReqs( T ) {
     enum hasMemReqs = __traits( hasMember, T, "memory_requirements" );
 }
 
@@ -267,7 +307,7 @@ auto alignedOffset( META )( ref META meta, VkDeviceSize device_memory_offset ) i
 
 /// allocate and bind a VkDeviceMemory object to the VkBuffer/VkImage (which must have been created beforehand) in the meta struct
 /// the memory properties of the underlying VkPhysicalDevicethe are used and the resulting memory object is stored
-/// The memory object is allocated of the size required by the buffer, another function overload will exist with an argument 
+/// The memory object is allocated of the size required by the buffer, another function overload will exist with an argument
 /// for an existing memory object where the buffer is supposed to suballocate its memory from
 /// the Meta_Buffer struct is returned for function chaining
 auto ref createMemoryImpl( META )(
@@ -308,7 +348,7 @@ auto ref bindMemoryImpl( META )(
 
 
 // alias buffer this (in e.g. Meta_Goemetry) does not work with the Impl functions above
-// but it does work with the aliases for that functions bellow  
+// but it does work with the aliases for that functions bellow
 alias createMemory = createMemoryImpl!Meta_Buffer;
 alias createMemory = createMemoryImpl!Meta_Image;
 alias bindMemory = bindMemoryImpl!Meta_Buffer;
@@ -326,7 +366,7 @@ auto mapMemory( META )(
     size_t              line    = __LINE__,
     string              func    = __FUNCTION__
     ) if( hasMemReqs!META || is( META == Meta_Memory )) {
-    // if we want to map the memory of an underlying buffer or image, 
+    // if we want to map the memory of an underlying buffer or image,
     // we need to account for the buffer or image offset into its VkDeviceMemory
     static if( is( META == Meta_Memory ))   VkDeviceSize combined_offset = offset;
     else                                    VkDeviceSize combined_offset = offset + meta.device_memory_offset;
@@ -349,26 +389,31 @@ auto mapMemory( META )(
     size_t              line    = __LINE__,
     string              func    = __FUNCTION__
     ) if( hasMemReqs!META || is( META == Meta_Memory )) {
-    // if we want to map the memory of an underlying buffer or image, 
+    // if we want to map the memory of an underlying buffer or image,
     // we need to account for the buffer or image offset into its VkDeviceMemory
     static if( is( META == Meta_Memory ))   VkDeviceSize combined_offset = offset;
     else                                    VkDeviceSize combined_offset = offset + meta.device_memory_offset;
 
     // the same combined_offset logic is applied in the function bellow, so we must pass
     // the original offset to not apply the Meta_Buffer or Meta_Image.device_memory_offset twice
-    auto mapped_memory = meta.mapMemory( data.length.toUint, offset, file, line, func );
+    auto mapped_memory = meta.mapMemory( meta.device_memory, data.length, combined_offset, file, line, func );
     mapped_memory[ 0 .. data.length ] = data[];
 
     // required for the mapped memory flush
-    VkMappedMemoryRange flush_mapped_memory_range = {
-        memory  : meta.device_memory,
-        offset  : combined_offset,
-        size    : data.length.toUint,
-    };
+    //VkMappedMemoryRange mapped_memory_range = {
+    //    memory  : meta.device_memory,
+    //    offset  : combined_offset,
+    //    size    : data.length,
+    //};
+
+    VkMappedMemoryRange mapped_memory_range =
+        meta.createMappedMemoryRange( meta.device_memory, data.length, combined_offset, file, line, func );
+
+
 
     // flush the mapped memory range so that its visible to the device memory space
     meta.device
-        .vkFlushMappedMemoryRanges( 1, &flush_mapped_memory_range )
+        .vkFlushMappedMemoryRanges( 1, &mapped_memory_range )
         .vkAssert( file, line, func );
     return mapped_memory;
 }
@@ -378,6 +423,18 @@ auto mapMemory( META )(
 auto ref unmapMemory( META )( ref META meta ) if( hasMemReqs!META || is( META == Meta_Memory )) {
     meta.device.vkUnmapMemory( meta.device_memory );
     return meta;
+}
+
+
+auto createMappedMemoryRange( META )(
+    ref META            meta,
+    VkDeviceSize        size    = 0,
+    VkDeviceSize        offset  = 0,
+    string              file    = __FILE__,
+    size_t              line    = __LINE__,
+    string              func    = __FUNCTION__
+    ) if( hasMemReqs!META || is( META == Meta_Memory )) {
+    return meta.createMappedMemoryRange( meta.device_memory, size, offset, file, line, func );
 }
 
 
@@ -437,7 +494,7 @@ auto ref initBuffer( ref Meta_Buffer meta, VkBufferUsageFlags usage, VkDeviceSiz
     meta.buffer_create_info.size        = size; // size in Bytes
     meta.buffer_create_info.usage       = usage;
     meta.buffer_create_info.sharingMode = sharing_mode;
-    
+
     meta.device.vkCreateBuffer( &meta.buffer_create_info, meta.allocator, &meta.buffer ).vkAssert;
     meta.device.vkGetBufferMemoryRequirements( meta.buffer, &meta.memory_requirements );
 
@@ -459,7 +516,7 @@ auto createBuffer( ref Vulkan vk, VkBufferUsageFlags usage, VkDeviceSize size, V
 
 /// struct to capture image and memory creation as well as binding
 /// the struct can travel through several methods and can be filled with necessary data
-/// first thing after creation of this struct must be the assignment of the address of a valid vulkan state struct  
+/// first thing after creation of this struct must be the assignment of the address of a valid vulkan state struct
 struct Meta_Image {
     mixin                   Vulkan_State_Pointer;
     VkImage                 image = VK_NULL_HANDLE;
@@ -493,8 +550,8 @@ struct Meta_Image {
 //////////////////////////////////////
 
 /// init a simple VkImage with one level and one layer, assume VK_IMAGE_TILING_OPTIMAL and VK_SHARING_MODE_EXCLUSIVE
-/// store vulkan data in argument Meta_Image container, return container for chaining 
-auto ref initImage( 
+/// store vulkan data in argument Meta_Image container, return container for chaining
+auto ref initImage(
     ref Meta_Image          meta,
     VkFormat                image_format,
     VkExtent2D              image_extent,
@@ -521,11 +578,11 @@ auto ref initImage(
     return meta.create( image_create_info );
 }
 
-/// init a VkImage, general create image function, gets a VkImageCreateInfo as argument 
+/// init a VkImage, general create image function, gets a VkImageCreateInfo as argument
 /// store vulkan data in argument Meta_Image container, return container for chaining
 auto ref initImage( ref Meta_Image meta, const ref VkImageCreateInfo image_create_info ) {
     vkAssert( meta.isValid, "Vulkan state not assigned" ); // meta struct must be initialized with a valid vulkan state pointer
-    if( meta.image != VK_NULL_HANDLE )                      // if an VkImage was created with this meta struct already      
+    if( meta.image != VK_NULL_HANDLE )                      // if an VkImage was created with this meta struct already
         meta.destroy( meta.image );                         // destroy it first
     meta.image_create_info = image_create_info;
     meta.device.vkCreateImage( &meta.image_create_info, meta.allocator, &meta.image ).vkAssert;
@@ -535,11 +592,11 @@ auto ref initImage( ref Meta_Image meta, const ref VkImageCreateInfo image_creat
 
 alias create = initImage;
 
-// Todo(pp): add chained functions to edit the meta.image_create_info and finalize with construct(), see module pipeline 
+// Todo(pp): add chained functions to edit the meta.image_create_info and finalize with construct(), see module pipeline
 
 
 
-/// create a VkImage, general init image function, gets a VkImageCreateInfo as argument 
+/// create a VkImage, general init image function, gets a VkImageCreateInfo as argument
 /// store vulkan data in argument Meta_Image container, return container for chaining
 auto createImage( ref Vulkan vk, const ref VkImageCreateInfo image_create_info ) {
     Meta_Image meta = vk;
@@ -548,7 +605,7 @@ auto createImage( ref Vulkan vk, const ref VkImageCreateInfo image_create_info )
 }
 
 /// create a simple VkImage with one level and one layer, assume VK_IMAGE_TILING_OPTIMAL and VK_SHARING_MODE_EXCLUSIVE as default args
-/// store vulkan data in argument Meta_Image container, return container for chaining 
+/// store vulkan data in argument Meta_Image container, return container for chaining
 auto createImage(
     ref Vulkan              vk,
     VkFormat                image_format,
@@ -560,14 +617,14 @@ auto createImage(
     Meta_Image meta = vk;
     meta.create( image_format, image_extent, image_usage, image_samples, sharing_mode );
     return meta;
-} 
+}
 
 
 // TODO(pp): assert that valid memory was bound already to the VkBuffer or VkImage
 
 /// create a VkImageView which closely corresponds to the underlying VkImage type
 /// store vulkan data in argument Meta_Image container, return container for chaining
-auto ref createView( ref Meta_Image meta, VkImageAspectFlags subrecource_aspect_mask ) {
+auto ref createView( ref Meta_Image meta, VkImageAspectFlags subrecource_aspect_mask = VK_IMAGE_ASPECT_COLOR_BIT ) {
     VkImageSubresourceRange subresource_range = {
         aspectMask      : subrecource_aspect_mask,
         baseMipLevel    : cast( uint32_t )0,
@@ -607,7 +664,7 @@ auto ref createView( ref Meta_Image meta, VkImageSubresourceRange subresource_ra
 }
 
 
-/// records a VkImage transition command in argument command buffer 
+/// records a VkImage transition command in argument command buffer
 void recordTransition(
     VkImage                 image,
     VkCommandBuffer         command_buffer,
@@ -632,7 +689,7 @@ void recordTransition(
     };
 
     // Todo(pp): consider using these cases
-    
+
 /*  switch (old_image_layout) {
         case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
             image_memory_barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
