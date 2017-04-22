@@ -11,6 +11,27 @@ import erupted;
 
 
 
+/// Wraps the essential Vulkan objects created with the editing procedure
+/// of Meta_Graphics and Meta_Compute, all other internal structures are obsolete
+/// after construction so that the Meta_Descriptor_Layout can be reused
+/// after being reset
+struct Core_Pipeline {
+    VkPipeline          pipeline;
+    VkPipelineLayout    pipeline_layout;
+}
+
+
+/// destroy all wrapped Vulkan objects
+/// Params:
+///     vk = Vulkan state struct holding the device through which these resources were created
+///     core = the wrapped VkDescriptorPool ( with it the VkDescriptorSet ) and the VkDescriptorSetLayout to destroy
+/// Returns: the passed in Meta_Structure for function chaining
+void destroy( ref Vulkan vk, ref Core_Pipeline core ) {
+    vdrive.state.destroy( vk, core.pipeline );          // no nice syntax, vdrive.state.destroy overloads
+    vdrive.state.destroy( vk, core.pipeline_layout );   // get confused with this one in the module scope
+}
+
+
 
 struct Meta_Graphics {
     mixin                                       Vulkan_State_Pointer;
@@ -31,10 +52,10 @@ struct Meta_Graphics {
     Array!VkViewport                            viewports;
     Array!VkRect2D                              scissors;
 
-    VkPipelineRasterizationStateCreateInfo      rasterization_state = { frontFace : VK_FRONT_FACE_CLOCKWISE, depthBiasConstantFactor : 0, depthBiasClamp : 0, depthBiasSlopeFactor : 0, lineWidth : 1 }; 
+    VkPipelineRasterizationStateCreateInfo      rasterization_state = { frontFace : VK_FRONT_FACE_CLOCKWISE, depthBiasConstantFactor : 0, depthBiasClamp : 0, depthBiasSlopeFactor : 0, lineWidth : 1 };
     VkPipelineMultisampleStateCreateInfo        multisample_state   = { rasterizationSamples : VK_SAMPLE_COUNT_1_BIT, minSampleShading : 0 };
     VkPipelineDepthStencilStateCreateInfo       depth_stencil_state = { minDepthBounds : 0, maxDepthBounds : 0 };
-    VkPipelineColorBlendStateCreateInfo         color_blend_state   = { blendConstants : [ 0, 0, 0, 0 ] }; 
+    VkPipelineColorBlendStateCreateInfo         color_blend_state   = { blendConstants : [ 0, 0, 0, 0 ] };
     Array!VkPipelineColorBlendAttachmentState   color_blend_states;
 
     //VkPipelineDynamicStateCreateInfo          dynamic_state_create_info;
@@ -50,17 +71,36 @@ struct Meta_Graphics {
     VkPipeline                                  base_pipeline_handle = VK_NULL_HANDLE;
     //int32_t                                   base_pipeline_index  = -1;
 
+    /// reset all internal data and return wrapped Vulkan objects
+    /// VkPipeline and VkPipelineLayout
+    auto reset() {
+        Core_Pipeline result = { pipeline, pipeline_layout };
+        //shader_stages.clear;
+        //vertex_input_binding_descriptions.clear;
+        //vertex_input_attribute_descriptions.clear;
+        //viewports.clear;
+        //scissors.clear;
+        //color_blend_states.clear;
+        //dynamic_states.clear;
+        //descriptor_set_layouts.clear;
+        //push_constant_ranges.clear;
+        return result;
+    }
+
     void destroyResources() {
         vk.device.vkDestroyPipeline( pipeline, vk.allocator );
         vk.device.vkDestroyPipelineLayout( pipeline_layout, vk.allocator );
     }
-
-    void destroyShaderModules() {
-        foreach( ref shader_stage; shader_stages )
-            vk.device.vkDestroyShaderModule( shader_stage._module, vk.allocator );
-    }
 }
 
+
+auto ref destroyShaderModules( ref Meta_Graphics meta ) {
+    foreach( ref shader_stage; meta.shader_stages )
+        //vk.device.vkDestroyShaderModule( shader_stage._module, vk.allocator );
+        vdrive.state.destroy( meta, shader_stage._module );
+    meta.shader_stages.clear;
+    return meta;
+}
 
 
 
@@ -249,7 +289,7 @@ auto ref stencilStateBack(
 }
 
 auto ref stencilStateFront(
-    ref Meta_Graphics   meta, 
+    ref Meta_Graphics   meta,
     VkStencilOp         fail_op,
     VkStencilOp         pass_op,
     VkStencilOp         depth_fail_op,
@@ -259,13 +299,13 @@ auto ref stencilStateFront(
     uint32_t            reference,
     VkBool32            stencil_test_enable = VK_TRUE ) {
     return meta.stencilStateFront(
-        VkStencilOpState( fail_op, pass_op, depth_fail_op, compare_op, compare_mask, write_mask, reference ), 
+        VkStencilOpState( fail_op, pass_op, depth_fail_op, compare_op, compare_mask, write_mask, reference ),
         stencil_test_enable
     );
 }
 
 auto ref stencilStateBack(
-    ref Meta_Graphics   meta, 
+    ref Meta_Graphics   meta,
     VkStencilOp         fail_op,
     VkStencilOp         pass_op,
     VkStencilOp         depth_fail_op,
@@ -297,17 +337,18 @@ auto ref addColorBlendState( ref Meta_Graphics meta, VkPipelineColorBlendAttachm
     return meta;
 }
 
+// deafult values from: https://vulkan-tutorial.com/Drawing_a_triangle/Graphics_pipeline_basics/Fixed_functions#page_Color_blending
 auto ref addColorBlendState(
     ref Meta_Graphics       meta,
     VkBool32                blendEnable         = VK_FALSE,
-    VkBlendFactor           srcColorBlendFactor = VK_BLEND_FACTOR_SRC_COLOR,
-    VkBlendFactor           dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_DST_COLOR,
+    VkBlendFactor           srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA,
+    VkBlendFactor           dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA,
     VkBlendOp               colorBlendOp        = VK_BLEND_OP_ADD,
-    VkBlendFactor           srcAlphaBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA,
-    VkBlendFactor           dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA,
+    VkBlendFactor           srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE,
+    VkBlendFactor           dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO,
     VkBlendOp               alphaBlendOp        = VK_BLEND_OP_ADD,
     VkColorComponentFlags   colorWriteMask      = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT ) {
-    return meta.addColorBlendState( 
+    return meta.addColorBlendState(
         VkPipelineColorBlendAttachmentState(
             blendEnable, srcColorBlendFactor, dstColorBlendFactor, colorBlendOp, srcAlphaBlendFactor, dstAlphaBlendFactor, alphaBlendOp, colorWriteMask
         )
