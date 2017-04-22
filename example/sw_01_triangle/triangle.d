@@ -188,7 +188,7 @@ auto ref createResources( ref VDrive_State vd, bool recreate = false ) {
             .addDescriptorSetLayout( vd.wvpm_descriptor.descriptor_set_layout )         // describe pipeline layout
             .renderPass( vd.render_pass.render_pass )                                   // describe COMPATIBLE render pass
             .construct                                                                  // construct the Pipleine Layout and Pipleine State Object (PSO)
-            .destroyShaderModules                                                       // shader modules compiled into pipeline, not shared, can be deleted now
+            .destroyShaderModules;                                                      // shader modules compiled into pipeline, not shared, can be deleted now
 
 
 
