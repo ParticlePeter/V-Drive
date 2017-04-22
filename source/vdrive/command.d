@@ -8,6 +8,7 @@ import vdrive.state;
 
 import erupted;
 
+nothrow:
 
 auto createCommandPool( ref Vulkan vk, uint32_t queue_family_index, VkCommandPoolCreateFlags command_pool_create_flags = 0 ) {
     VkCommandPoolCreateInfo command_pool_create_info = {
@@ -48,8 +49,18 @@ auto allocateCommandBuffers( ref Vulkan vk, VkCommandPool command_pool, VkComman
 }
 
 
+void allocateCommandBuffers( ref Vulkan vk, VkCommandPool command_pool, VkCommandBufferLevel command_buffer_level, VkCommandBuffer[] command_buffers ) {
+    VkCommandBufferAllocateInfo command_buffer_allocation_info = {
+        commandPool         : command_pool,
+        level               : command_buffer_level,
+        commandBufferCount  : command_buffers.length.toUint,
+    };
+    vkAllocateCommandBuffers( vk.device, &command_buffer_allocation_info, command_buffers.ptr ).vkAssert;
+}
 
-auto queueSubmitInfo( 
+
+// this function cannot forward the command buffer array overload, as we need a living address
+auto queueSubmitInfo(
     const ref VkCommandBuffer   command_buffer,
     VkSemaphore[]               wait_semaphores = [],
     VkPipelineStageFlags[]      wait_dest_stage_masks = [],
@@ -69,7 +80,7 @@ auto queueSubmitInfo(
 }
 
 
-auto queueSubmitInfo( 
+auto queueSubmitInfo(
     VkCommandBuffer[]       command_buffers,
     VkSemaphore[]           wait_semaphores = [],
     VkPipelineStageFlags[]  wait_dest_stage_masks = [],
