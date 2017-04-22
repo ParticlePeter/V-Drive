@@ -13,7 +13,7 @@ import vdrive.util.array;
 
 
 
-// create resources and vulkan objects for rendering 
+// create resources and vulkan objects for rendering
 auto ref createResources( ref VDrive_State vd, bool recreate = false ) {
 
     ////////////////////////////////////////////
@@ -49,7 +49,7 @@ auto ref createResources( ref VDrive_State vd, bool recreate = false ) {
     ////////////////////////
     // create depth image //
     ////////////////////////
-    
+
     // prefer getting the depth image into a device local heap
     // first we need to find out if such a heap exist on the current device
     // we do not check the size of the heap, the depth image will probably fit if such heap exists
@@ -59,7 +59,7 @@ auto ref createResources( ref VDrive_State vd, bool recreate = false ) {
     auto depth_image_memory_property = vd.memory_properties.hasMemoryHeapType( VK_MEMORY_HEAP_DEVICE_LOCAL_BIT )
         ? VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
         : VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
-    
+
     vd.depth_image( vd )
         .create( VK_FORMAT_D16_UNORM, vd.surface.imageExtent, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, vd.sample_count )
         .createMemory( depth_image_memory_property )
@@ -169,13 +169,13 @@ auto ref createResources( ref VDrive_State vd, bool recreate = false ) {
             vec3 color;     // color
         }
 
-        // add shader stages - git repo needs only to keep track of the shader sources, 
+        // add shader stages - git repo needs only to keep track of the shader sources,
         // vdrive will compile them into spir-v with glslangValidator (must be in path!)
         import vdrive.pipeline, vdrive.surface, vdrive.shader;
         vd.pipeline( vd )
             .addShaderStageCreateInfo( vd.createPipelineShaderStage( VK_SHADER_STAGE_VERTEX_BIT,   "example/sw_01_triangle/shader/simple.vert" ))
             .addShaderStageCreateInfo( vd.createPipelineShaderStage( VK_SHADER_STAGE_FRAGMENT_BIT, "example/sw_01_triangle/shader/simple.frag" ))
-            .addBindingDescription( 0, Vertex.sizeof, VK_VERTEX_INPUT_RATE_VERTEX )     // add vertex binding and attribute descriptions    
+            .addBindingDescription( 0, Vertex.sizeof, VK_VERTEX_INPUT_RATE_VERTEX )     // add vertex binding and attribute descriptions
             .addAttributeDescription( 0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0 )             // ... consecutively and non-interleaved in ...
             .addAttributeDescription( 1, 0, VK_FORMAT_R32G32B32_SFLOAT, vec3.sizeof )   // ... consecutively and non-interleaved in ...
             .inputAssembly( VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST )                       // set the inputAssembly
@@ -187,7 +187,8 @@ auto ref createResources( ref VDrive_State vd, bool recreate = false ) {
             .addDynamicState( VK_DYNAMIC_STATE_SCISSOR )                                // add dynamic states scissor
             .addDescriptorSetLayout( vd.wvpm_descriptor.descriptor_set_layout )         // describe pipeline layout
             .renderPass( vd.render_pass.render_pass )                                   // describe COMPATIBLE render pass
-            .construct;                                                                 // finalize and construct the pipeline state object 
+            .construct                                                                  // construct the Pipleine Layout and Pipleine State Object (PSO)
+            .destroyShaderModules                                                       // shader modules compiled into pipeline, not shared, can be deleted now
 
 
 
@@ -211,9 +212,9 @@ auto ref createResources( ref VDrive_State vd, bool recreate = false ) {
         /////////////////////////////////
 
         //struct Vertex { float x, y, z; }
-        Vertex[3] triangle = [ 
-            Vertex( vec3(  1, -1, 0 ), vec3( 1, 0, 0 )), 
-            Vertex( vec3( -1, -1, 0 ), vec3( 0, 1, 0 )), 
+        Vertex[3] triangle = [
+            Vertex( vec3(  1, -1, 0 ), vec3( 1, 0, 0 )),
+            Vertex( vec3( -1, -1, 0 ), vec3( 0, 1, 0 )),
             Vertex( vec3(  0,  1, 0 ), vec3( 0, 0, 1 ))
         ];
 
@@ -237,7 +238,7 @@ auto ref createResources( ref VDrive_State vd, bool recreate = false ) {
 
             // edit the internal Meta_Buffer via alias this
             vd.triangle( vd )                                                   // init Meta_Geometry and its Meta_Buffer structs
-                .create( 
+                .create(
                     VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |                         // we want to use the geometry buffer as vertex buffer
                     VK_BUFFER_USAGE_TRANSFER_DST_BIT,                           // and as transfer data (copy) destination
                     triangle.sizeof )                                           // create the internal VkBuffer object
@@ -255,7 +256,7 @@ auto ref createResources( ref VDrive_State vd, bool recreate = false ) {
         }
 
         // now edit additional members of Meta_Geometry
-        import vdrive.geometry; 
+        import vdrive.geometry;
         vd.triangle
             .vertexCount( 3 )               // set the vertex count
             .addVertexOffset( 0 );          // register the internal buffer as first vertex attribute buffer
@@ -325,19 +326,19 @@ auto ref createResources( ref VDrive_State vd, bool recreate = false ) {
     /////////////////////////
     // create framebuffers //
     /////////////////////////
- 
+
     import vdrive.renderbuffer;
     VkImageView[1] render_targets = [ vd.depth_image.image_view ];  // compose render targets into an array
     vd.framebuffers( vd )
         .create(                                    // create the vulkan object directly with following params
-            vd.render_pass.render_pass,             // specify render pass COMPATIBILITY 
+            vd.render_pass.render_pass,             // specify render pass COMPATIBILITY
             vd.surface.imageExtent,                 // extent of the framebuffer
             render_targets,                         // first ( static ) attachments which will not change ( here only one, our depth buffer )
             vd.surface.present_image_views.data )   // next one dynamic attachment ( swapchain ) which changes per command buffer
-        .addClearValue( 1, 0 )                      // first param is the image_view index of the Meta_Framebuffer for clearing, ... 
-        .addClearValue( 0.3f, 0.3f, 0.3f, 1.0f );   // ... otherwise the clear values would be attached at each resizing / recreating 
+        .addClearValue( 1, 0 )                      // first param is the image_view index of the Meta_Framebuffer for clearing, ...
+        .addClearValue( 0.3f, 0.3f, 0.3f, 1.0f );   // ... otherwise the clear values would be attached at each resizing / recreating
 
-    // attach one of the framebuffers, the render area and clear values to the render pass begin info 
+    // attach one of the framebuffers, the render area and clear values to the render pass begin info
     // Note: attaching the framebuffer also sets the clear values and render area extent into the render pass begin info
     // setting clear values coresponding to framebuffer attachments and framebuffer extent could have happend before, e.g.:
     //      vd.render_pass.clearValues( some_clear_values );
@@ -351,7 +352,7 @@ auto ref createResources( ref VDrive_State vd, bool recreate = false ) {
     // define dynamic viewport and scissor state //
     ///////////////////////////////////////////////
 
-    vd.viewport = VkViewport( 0, 0, vd.surface.imageExtent.width, vd.surface.imageExtent.height, 0, 1 ); 
+    vd.viewport = VkViewport( 0, 0, vd.surface.imageExtent.width, vd.surface.imageExtent.height, 0, 1 );
     vd.scissors = VkRect2D( VkOffset2D( 0, 0 ), vd.surface.imageExtent );
 
 
@@ -379,7 +380,7 @@ auto ref createResources( ref VDrive_State vd, bool recreate = false ) {
         cmd_buffer.vkCmdBeginRenderPass( &vd.render_pass.begin_info, VK_SUBPASS_CONTENTS_INLINE );
 
         // bind graphics vd.geom_pipeline
-        cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, vd.pipeline.pipeline );    
+        cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, vd.pipeline.pipeline );
 
         // take care of dynamic state
         cmd_buffer.vkCmdSetViewport( 0, 1, &vd.viewport );
@@ -394,7 +395,7 @@ auto ref createResources( ref VDrive_State vd, bool recreate = false ) {
             null                                // const( uint32_t )*           pDynamicOffsets
         );
 
-        // bind vertex buffer, only one attribute stored in this buffer 
+        // bind vertex buffer, only one attribute stored in this buffer
         cmd_buffer.vkCmdBindVertexBuffers(
             0,                                          // first binding
             vd.triangle.vertex_buffers.length.toUint,   // binding count
@@ -464,7 +465,6 @@ auto ref destroyResources( ref VDrive_State vd ) {
     vd.render_pass.destroyResources;
     vd.wvpm_descriptor.destroyResources;
     vd.pipeline.destroyResources;
-    vd.pipeline.destroyShaderModules;       // shader modules might be shared among pipelines 
     vd.framebuffers.destroyResources;
 
     // command and synchronize
