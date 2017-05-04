@@ -655,7 +655,7 @@ private auto ref addDescriptorTypeUpdate(
     size_t                      line = __LINE__,
     string                      func = __FUNCTION__
     ) {
-    pragma( inline, true ); // this function should be inlined
+    //pragma( inline, true ); // this function should be inlined
 
     // shortcut to the last meta.write_descriptor_sets
     auto write_set = & meta.write_descriptor_sets[ $-1 ];
@@ -758,6 +758,7 @@ auto ref addImageInfo(
     size_t                      line = __LINE__,
     string                      func = __FUNCTION__
     ) {
+    //pragma( inline, true ); // functions in this body should be be inlined
     return addDescriptorTypeUpdate!
         ( VkDescriptorImageInfo, "image_infos", "pImageInfo" )
         ( meta, VkDescriptorImageInfo( sampler, image_view, image_layout ), file, line, func );
@@ -779,10 +780,7 @@ auto ref addBufferInfo(
     VkDeviceSize                offset = 0,
     VkDeviceSize                range = VK_WHOLE_SIZE
     ) {
-    // Todo(pp): check if compatible to meta.write_descriptor_sets[ $-1 ].descriptor_type;
-    // see spec 1.0.42 p. 382, pdf p. 391
-    // VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-    // VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC
+    //pragma( inline, true ); // functions in this body should be be inlined
     return addDescriptorTypeUpdate!
         ( VkDescriptorBufferInfo, "buffer_infos", "pBufferInfo" )
         ( meta, VkDescriptorBufferInfo( buffer, offset, range ));
@@ -796,10 +794,9 @@ auto ref addBufferInfo(
 /// Returns: the passed in Meta_Structure for function chaining
 auto ref addTexelBufferView(
     ref Meta_Descriptor_Update  meta,
-    VkBufferView                buffer_view ) {
-    // Todo(pp): check if compatible to meta.write_descriptor_sets[ $-1 ].descriptor_type;
-    // see spec 1.0.42 p. 382, pdf p. 391
-    // VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER
+    VkBufferView                buffer_view
+    ) {
+    //pragma( inline, true ); // functions in this body should be be inlined
     return addDescriptorTypeUpdate!
         ( VkBufferView, "texel_buffer_views", "pTexelBufferView" )
         ( meta, buffer_view );
@@ -959,8 +956,6 @@ private auto ref addDescriptorType(
     size_t              line = __LINE__,
     string              func = __FUNCTION__
     ) {
-    pragma( inline, true ); // this function should be inlined
-
     // shortcut to the last descriptor_set_layout_binding
     auto layout_binding = & meta.descriptor_set_layout_bindings[ $-1 ];
 
@@ -1018,6 +1013,7 @@ auto ref addImageInfo(
     size_t              line = __LINE__,
     string              func = __FUNCTION__
     ) {
+    //pragma( inline, true ); // functions in this body should be be inlined
     addDescriptorType!
         ( VkDescriptorImageInfo, "image_infos", "pImageInfo" )
         ( meta, VkDescriptorImageInfo( sampler, image_view, image_layout ), file, line, func );
@@ -1043,10 +1039,7 @@ auto ref addBufferInfo(
     size_t              line = __LINE__,
     string              func = __FUNCTION__
     ) {
-    // Todo(pp): check if compatible to meta.write_descriptor_sets[ $-1 ].descriptor_type;
-    // see spec 1.0.42 p. 382, pdf p. 391
-    // VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-    // VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC
+    //pragma( inline, true ); // functions in this body should be be inlined
     addDescriptorType!
         ( VkDescriptorBufferInfo, "buffer_infos", "pBufferInfo" )
         ( meta, VkDescriptorBufferInfo( buffer, offset, range ), file, line, func );
@@ -1066,9 +1059,7 @@ auto ref addTexelBufferView(
     size_t              line = __LINE__,
     string              func = __FUNCTION__
     ) {
-    // Todo(pp): check if compatible to meta.write_descriptor_sets[ $-1 ].descriptor_type;
-    // see spec 1.0.42 p. 382, pdf p. 391
-    // VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER
+    //pragma( inline, true ); // functions in this body should be be inlined
     addDescriptorType!
         ( VkBufferView, "texel_buffer_views", "pTexelBufferView" )
         ( meta, buffer_view, file, line, func );
