@@ -13,7 +13,7 @@ void registerCallbacks( GLFWwindow* window, void* user_pointer = null ) {
     glfwSetWindowSizeCallback( window, &windowSizeCallback );
     glfwSetMouseButtonCallback( window, &mouseButtonCallback );
     glfwSetCursorPosCallback( window, &cursorPosCallback );
-    glfwSetKeyCallback( window, &keyCallback ); 
+    glfwSetKeyCallback( window, &keyCallback );
 }
 
 
@@ -33,7 +33,7 @@ auto ref initTrackball(
     float   cam_pos_z           = -6,
     float   cam_target_x        =  0,
     float   cam_target_y        =  0,
-    float   cam_target_z        =  0, 
+    float   cam_target_z        =  0,
     ) {
     home_pos_x = cam_pos_x;
     home_pos_y = cam_pos_y;
@@ -41,7 +41,7 @@ auto ref initTrackball(
     home_trg_x = cam_target_x;
     home_trg_y = cam_target_y;
     home_trg_z = cam_target_z;
-    
+
     vd.tb.camHome;
     vd.tb.perspectiveFovyWindowHeight( perspective_fovy, window_height );
     vd.window.registerCallbacks( &vd );
@@ -50,15 +50,17 @@ auto ref initTrackball(
 
 
 /// Callback Function for capturing window resize events
-extern( C ) void windowSizeCallback( GLFWwindow * window, int w, int h ) nothrow  {
+extern( C ) void windowSizeCallback( GLFWwindow * window, int w, int h ) nothrow {
+    // the extent might change at swapchain creation when the specified extent is not usable
+    vd.swapchainExtent( w, h );
     vd.window_resized = true;
 }
 
 
 /// Callback Function for capturing mouse motion events
-extern( C ) void cursorPosCallback( GLFWwindow * window, double x, double y ) nothrow  {
+extern( C ) void cursorPosCallback( GLFWwindow * window, double x, double y ) nothrow {
     if( vd.tb.button == 0 ) return;
-    switch( vd.tb.button )  {
+    switch( vd.tb.button ) {
         case 1  : vd.tb.orbit( x, y ); break;
         case 2  : vd.tb.xform( x, y ); break;
         case 4  : vd.tb.dolly( x, y ); break;
@@ -68,9 +70,9 @@ extern( C ) void cursorPosCallback( GLFWwindow * window, double x, double y ) no
 
 
 /// Callback Function for capturing mouse motion events
-extern( C ) void mouseButtonCallback( GLFWwindow * window, int key, int val, int mod ) nothrow  {
+extern( C ) void mouseButtonCallback( GLFWwindow * window, int key, int val, int mod ) nothrow {
     // compute mouse button bittfield flags
-    switch( key )  {
+    switch( key ) {
         case 0  : vd.tb.button += 2 * val - 1; break;
         case 1  : vd.tb.button += 8 * val - 4; break;
         case 2  : vd.tb.button += 4 * val - 2; break;
@@ -87,13 +89,13 @@ extern( C ) void mouseButtonCallback( GLFWwindow * window, int key, int val, int
 
 
 /// Callback Function for capturing mouse wheel events
-extern( C ) void scrollCallback( GLFWwindow * window, double x, double y ) nothrow  {
+extern( C ) void scrollCallback( GLFWwindow * window, double x, double y ) nothrow {
 
 }
 
 
 /// Callback Function for capturing keyboard events
-extern( C ) void keyCallback( GLFWwindow * window, int key, int scancode, int val, int mod ) nothrow  {
+extern( C ) void keyCallback( GLFWwindow * window, int key, int scancode, int val, int mod ) nothrow {
     if( val != GLFW_PRESS ) return;
     switch( key ) {
         case GLFW_KEY_ESCAPE    : glfwSetWindowShouldClose( window, GLFW_TRUE ); break;

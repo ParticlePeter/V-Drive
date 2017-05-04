@@ -5,7 +5,7 @@
 *   This is a "pedal to the metal" example to show off how to get Vulkan up an displaying something
 *   It strongly relies on the concepts and abstractions of the V-Drive api
 *   However, in these example only basic features are used, heavier once will be introduced in later examples
-* 
+*
 * Example Structure:
 *   appstate    : the struct VDrive_State holds the state of the application, vulkan non- and related data
 *   triangle    : initializes all the required Vulkan non- and related data
@@ -49,11 +49,12 @@ int main() {
     printf( "\n" );
 
     // create the state object
-    VDrive_State vd;                                // VDrive state struct                              
-    auto vkResult = vd.initVulkan( 1600, 900 );     // initialize instance and (physical) device 
-    if( vkResult ) return vkResult;                 // exit if initialization failed, VK_SUCCESS = 0                        
-    vd.initTrackball( 60, 900, 0, 0, -4 );          // initialize the trackball with fov(y), win_height, cam_pos(x,y,z) 
-    vd.createResources;                             // create all required vulkan resources
+    VDrive_State vd;                                                    // VDrive state struct
+    auto vkResult = vd.initVulkan( 1600, 900 );                         // initialize instance and (physical) device
+    if( vkResult ) return vkResult;                                     // exit if initialization failed, VK_SUCCESS = 0
+    vd.initTrackball( vd.projection_fovy, vd.windowHeight, 0, 0, -4 );  // initialize the trackball with fov(y), win_height, cam_pos(x,y,z)
+    vd.createResources;                                                 // create all required vulkan resources
+
 
     // vars to compute fps and display in title
     char[32] title;
@@ -65,8 +66,8 @@ int main() {
         ++frame_count;
         double delta_time = glfwGetTime() - last_time;
         if( delta_time >= 1.0 ) {
-            //sprintf( title.ptr, "Vulkan Erupted, FPS: %.2f", frame_count / delta_time );  // frames per second
-            sprintf( title.ptr, "Vulkan Erupted, FPS: %.2f", 1000.0 / frame_count );        // milli seconds per frame
+            sprintf( title.ptr, "Vulkan Erupted, FPS: %.2f", frame_count / delta_time );    // frames per second
+            //sprintf( title.ptr, "Vulkan Erupted, FPS: %.2f", 1000.0 / frame_count );        // milli seconds per frame
             glfwSetWindowTitle( vd.window, title.ptr );
             last_time += delta_time;
             frame_count = 0;
@@ -79,7 +80,7 @@ int main() {
         // poll events in remaining frame time
         glfwPollEvents();
         if( vd.tb.dirty )
-            vd.wvpmUpdate;
+            vd.updateWVPM;
     }
 
     // drain work and destroy vulkan
