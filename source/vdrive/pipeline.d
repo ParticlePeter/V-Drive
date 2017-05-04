@@ -342,7 +342,7 @@ auto ref addColorBlendState(
     ref Meta_Graphics       meta,
     VkBool32                blendEnable         = VK_FALSE,
     VkBlendFactor           srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA,
-    VkBlendFactor           dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA,
+    VkBlendFactor           dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
     VkBlendOp               colorBlendOp        = VK_BLEND_OP_ADD,
     VkBlendFactor           srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE,
     VkBlendFactor           dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO,
@@ -467,7 +467,7 @@ auto ref allowDerivatives( ref Meta_Graphics meta ) {
 /////////////////////////////////////////
 // construct the pipeline state object //
 /////////////////////////////////////////
-auto ref construct( ref Meta_Graphics meta ) {
+auto ref construct( ref Meta_Graphics meta, VkPipelineLayout pipeline_layout = VK_NULL_HANDLE ) {
     // assert that meta struct is initialized with a valid vulkan state pointer
     assert( meta.isValid );
 
@@ -501,14 +501,17 @@ auto ref construct( ref Meta_Graphics meta ) {
         pDynamicStates                  : meta.dynamic_states.ptr,
     };
 
-    VkPipelineLayoutCreateInfo pipeline_layout_create_info = {
-        setLayoutCount                  : meta.descriptor_set_layouts.length.toUint,
-        pSetLayouts                     : meta.descriptor_set_layouts.ptr,
-        pushConstantRangeCount          : meta.push_constant_ranges.length.toUint,
-        pPushConstantRanges             : meta.push_constant_ranges.ptr,
-    };
-
-    meta.device.vkCreatePipelineLayout( &pipeline_layout_create_info, meta.allocator, &meta.pipeline_layout ).vkAssert;
+    if( pipeline_layout ) {
+        meta.pipeline_layout = pipeline_layout;
+    } else {
+        VkPipelineLayoutCreateInfo pipeline_layout_create_info = {
+            setLayoutCount                  : meta.descriptor_set_layouts.length.toUint,
+            pSetLayouts                     : meta.descriptor_set_layouts.ptr,
+            pushConstantRangeCount          : meta.push_constant_ranges.length.toUint,
+            pPushConstantRanges             : meta.push_constant_ranges.ptr,
+        };
+        meta.device.vkCreatePipelineLayout( &pipeline_layout_create_info, meta.allocator, &meta.pipeline_layout ).vkAssert;
+    }
 
     // create the pipeline object
     VkGraphicsPipelineCreateInfo pipeline_create_info = {
