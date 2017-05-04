@@ -474,9 +474,9 @@ struct Meta_Buffer {
 
     // bulk destroy the resources belonging to this meta struct
     void destroyResources() {
-        vk.device.vkDestroyBuffer( buffer, vk.allocator );
+        vk.destroy( buffer );
         if( owns_device_memory )
-            vk.device.vkFreeMemory( device_memory, vk.allocator );
+            vk.destroy( device_memory );
     }
     debug string name;
 }
@@ -534,11 +534,11 @@ struct Meta_Image {
 
     // bulk destroy the resources belonging to this meta struct
     void destroyResources() {
-        vk.device.vkDestroyImage( image, vk.allocator );
+        vk.destroy( image );
         if( image_view != VK_NULL_HANDLE )
-            vk.device.vkDestroyImageView( image_view, vk.allocator );
+            vk.destroy( image_view );
         if( owns_device_memory )
-            vk.device.vkFreeMemory( device_memory, vk.allocator );
+            vk.destroy( device_memory );
     }
     debug string name;
 }
@@ -662,6 +662,9 @@ auto ref createView( ref Meta_Image meta, VkImageSubresourceRange subresource_ra
     meta.device.vkCreateImageView( &meta.image_view_create_info, meta.allocator, &meta.image_view ).vkAssert;
     return meta;
 }
+
+
+// TODO(pp): create functions for VkImageSubresourceRange, VkBufferImageCopy and conversion functions between them
 
 
 /// records a VkImage transition command in argument command buffer
