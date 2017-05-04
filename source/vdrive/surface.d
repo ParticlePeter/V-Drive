@@ -13,7 +13,7 @@ import std.stdio;
 
 /// struct to capture buffer and memory creation as well as binding
 /// the struct can travel through several methods and can be filled with necessary data
-/// first thing after creation of this struct must be the assignment of the address of a valid vulkan state struct  
+/// first thing after creation of this struct must be the assignment of the address of a valid vulkan state struct
 struct Meta_Surface {
     mixin                       Vulkan_State_Pointer;
     VkQueue                     present_queue = VK_NULL_HANDLE;
@@ -21,6 +21,10 @@ struct Meta_Surface {
     VkSwapchainKHR              swapchain;
     VkSwapchainCreateInfoKHR    create_info;
     Array!VkImageView           present_image_views;
+
+
+    // convenience to get the swapchain image count
+    auto imageCount() { return present_image_views.length.toUint; }
 
     // convenience to get VkSurfaceFormatKHR from VkSwapchainCreateInfoKHR.imageFormat and .imageColorSpace and set vice versa
     auto surfaceFormat() { return VkSurfaceFormatKHR( create_info.imageFormat, create_info.imageColorSpace ); }
@@ -32,7 +36,7 @@ struct Meta_Surface {
     // two different resource destroy functions for two distinct places
     void destroySurface() { vk.destroy( create_info.surface ); }
     void destroySwapchain() { vk.destroy( swapchain ); }
-    void destroyImageViews() { 
+    void destroyImageViews() {
         foreach( ref image_view; present_image_views ) {
             vk.destroy( image_view );
         }
@@ -88,7 +92,7 @@ auto ref createSwapchain( ref Meta_Surface meta ) {
         VK_ERROR_FEATURE_NOT_PRESENT.vkAssert;
         return meta;
     }
-    
+
     //printf( "\nImage Count: %u\n", image_count );
 
     // Determine surface resolution
@@ -160,7 +164,7 @@ auto ref createImageViews( ref Meta_Surface meta, VkImageViewCreateInfo image_vi
         image_view_create_info.image = present_images[i];   // complete VkImageViewCreateInfo with image i:
         vkCreateImageView( meta.device, &image_view_create_info, meta.allocator, &meta.present_image_views[i] ).vkAssert;
     }
-    
+
     return meta;
 }
 
@@ -170,13 +174,21 @@ auto ref construct( ref Meta_Surface meta ) {
 }
 
 
+auto getSwapchainImages( VkDevice device, VkSwapchainKHR swapchain ) {
+    return listVulkanProperty!( VkImage, vkGetSwapchainImagesKHR, VkDevice, VkSwapchainKHR )( device, swapchain );
+}
+
+auto getSwapchainImages( Meta_Surface meta ) {
+    return listVulkanProperty!( VkImage, vkGetSwapchainImagesKHR, VkDevice, VkSwapchainKHR )( meta.device, meta.swapchain );
+}
+
 // Todo(pp): this function is only a stub and must be merged with the one above.
 // issue with the approach bellow: the two overloads above and bellow must return the same type
 // ... as overloads based on return type only are not allowed
 // hence both must return some kind of dynamic array which is optionally able to use scratch memory
 // moreover, to not over complicate the argument amount the option to use scratch space
 // should be set globally and recorded in the vulkan state struct
-// see requirements and recipe on array in util.array module 
+// see requirements and recipe on array in util.array module
 auto swapchainImageViews( ref Meta_Surface meta, VkImageViewCreateInfo image_view_create_info, void* scratch = null, uint32_t* size_used = null ) {
     // assert that meta struct is initialized with a valid vulkan state pointer
     assert( meta.isValid );
@@ -204,15 +216,15 @@ auto swapchainImageViews( ref Meta_Surface meta, VkImageViewCreateInfo image_vie
 // utility info functions //
 ////////////////////////////
 
-/// list surface formats 
+/// list surface formats
 auto listSurfaceFormats( VkPhysicalDevice gpu, VkSurfaceKHR surface, bool printInfo = true ) {
-    auto surface_formats = listVulkanProperty!( 
+    auto surface_formats = listVulkanProperty!(
         VkSurfaceFormatKHR, vkGetPhysicalDeviceSurfaceFormatsKHR, VkPhysicalDevice, VkSurfaceKHR )( gpu, surface );
 
     if( surface_formats.length == 0 ) {
         printf( "No Surface Formats available!" );
     } else if( printInfo ) {
-        foreach( surface_format; surface_formats ) 
+        foreach( surface_format; surface_formats )
             surface_format.printTypeInfo;
         println;
     }
@@ -224,8 +236,8 @@ alias filter = filterSurfaceFormats;
 auto filterSurfaceFormats( Array_T )( Array_T surface_formats, VkFormat[] include_formats, bool first_available_as_fallback = true )
 if( is( Array_T == Array!VkSurfaceFormatKHR ) || is( Array_T : VkSurfaceFormatKHR[] )) {
     // if this function returns surfac_format.format == VK_FORMAT_MAX_ENUM this means that no requested format could be found
-    auto result_format = first_available_as_fallback && surface_formats.length > 0 ? 
-        surface_formats[0] : 
+    auto result_format = first_available_as_fallback && surface_formats.length > 0 ?
+        surface_formats[0] :
         VkSurfaceFormatKHR( VK_FORMAT_MAX_ENUM, VK_COLORSPACE_SRGB_NONLINEAR_KHR );
 
     // All formats are available, pick the first requested
@@ -250,19 +262,19 @@ if( is( Array_T == Array!VkSurfaceFormatKHR ) || is( Array_T : VkSurfaceFormatKH
 
 /// list presentation modes
 auto listPresentModes( VkPhysicalDevice gpu, VkSurfaceKHR surface, bool printInfo = true ) {
-    auto present_modes = listVulkanProperty!( 
+    auto present_modes = listVulkanProperty!(
         VkPresentModeKHR, vkGetPhysicalDeviceSurfacePresentModesKHR, VkPhysicalDevice, VkSurfaceKHR )( gpu, surface );
 
     if( printInfo ) {
         if( present_modes.length == 0 )  {
             printf( "Present Modes: None\n" );
         } else {
-            printf( "VkPresentModeKHR\n=================\n" ); 
+            printf( "VkPresentModeKHR\n=================\n" );
             foreach( present_mode; present_modes ) {
                 printf( "\tPresent Mode: %s\n", present_mode.toStringz.ptr );
 
             }
-        }   
+        }
         writeln;
     }
     return present_modes;
