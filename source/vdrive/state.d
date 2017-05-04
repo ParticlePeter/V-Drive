@@ -111,11 +111,11 @@ void destroyInstance( ref Vulkan vk ) {
 }
 
 
-auto initDevice( T )( 
-    ref Vulkan vk, 
-    Queue_Family[] queue_families, 
+auto initDevice( T )(
+    ref Vulkan vk,
+    Queue_Family[] queue_families,
     T extensionNames,
-    T layerNames, 
+    T layerNames,
     VkPhysicalDeviceFeatures* gpuFeatures = null )
 if( is( T == string ) | is( T == string[] ) | is( T == Array!( const( char )* )) | is( T : const( char* )[] ) ) {
 
@@ -184,6 +184,8 @@ if( is( T == string ) | is( T == string[] ) | is( T == Array!( const( char )* ))
 }
 
 
+
+
 auto initDevice( ref Vulkan vk, Queue_Family[] queue_families, string extensionNames = "", string layerNames = "", VkPhysicalDeviceFeatures* gpuFeatures = null ) {
     return initDevice!( string )( vk, queue_families, extensionNames, layerNames, gpuFeatures );
 }
@@ -197,6 +199,8 @@ auto initDevice( ref Vulkan vk, Queue_Family[] queue_families, const( char* )[] 
     return initDevice!( const( char* )[] )( vk, queue_families, extensionNames, layerNames, gpuFeatures );
 }
 
+
+nothrow @nogc:
 
 void destroyDevice( ref Vulkan vk ) {
     destroyDevice( vk.device, vk.allocator );
@@ -251,7 +255,7 @@ template isDispatchHandle( T ... ) if( T.length == 1 ) {
     ||  is( typeof( T[0] ) == VkCommandBuffer )) {
         enum bool isDispatchHandle = true;
     } else {
-        enum bool isDispatchHandle = false; 
+        enum bool isDispatchHandle = false;
     }
 }
 
@@ -288,6 +292,6 @@ template isNonDispatchHandle( T ... ) if( T.length == 1 ) {
     ||  is( typeof( T[0] ) == VkIndirectCommandsLayoutNVX )) {
         enum bool isNonDispatchHandle = true;
     } else {
-        enum bool isNonDispatchHandle = false; 
+        enum bool isNonDispatchHandle = false;
     }
 }
