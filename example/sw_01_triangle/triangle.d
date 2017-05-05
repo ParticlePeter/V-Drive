@@ -153,9 +153,9 @@ auto ref createResources( ref VDrive_State vd, bool recreate = false ) {
 
 
 
-    //////////////////////////////////
-    // create pipeline state object //
-    //////////////////////////////////
+    ////////////////////////////////////////
+    // create pipeline state object (PSO) //
+    ////////////////////////////////////////
 
     // declare a vertex structure and use its size in the PSO
     import dlsl.vector;

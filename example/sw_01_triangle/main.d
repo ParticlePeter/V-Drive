@@ -52,7 +52,7 @@ int main() {
     VDrive_State vd;                                                    // VDrive state struct
     auto vkResult = vd.initVulkan( 1600, 900 );                         // initialize instance and (physical) device
     if( vkResult ) return vkResult;                                     // exit if initialization failed, VK_SUCCESS = 0
-    vd.initTrackball( vd.projection_fovy, vd.windowHeight, 0, 0, -4 );  // initialize the trackball with fov(y), win_height, cam_pos(x,y,z)
+    vd.initTrackball( vd.projection_fovy, vd.windowHeight, 0, 0, 4 );   // initialize the trackball with fov(y), win_height, cam_pos(x,y,z)
     vd.createResources;                                                 // create all required vulkan resources
 
 

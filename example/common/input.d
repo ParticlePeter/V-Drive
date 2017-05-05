@@ -111,7 +111,7 @@ float home_pos_x, home_pos_y, home_pos_z;   // camera home position, defined whe
 float home_trg_x, home_trg_y, home_trg_z;   // camera home target, same as above
 
 bool fb_fullscreen = false;                 // keep track if we are in fullscreen mode
-int g_win_x, g_win_y, g_win_w, g_win_h;     // remember position and size of window when switching to fullscreen mode
+int win_x, win_y, win_w, win_h;             // remember position and size of window when switching to fullscreen mode
 
 // set camera back to its initial state
 void camHome( ref TrackballButton tb ) nothrow @nogc {
@@ -122,11 +122,11 @@ void camHome( ref TrackballButton tb ) nothrow @nogc {
 void toggleFullscreen( GLFWwindow * window ) nothrow @nogc {
     if( fb_fullscreen ) {
         fb_fullscreen = false;
-        glfwSetWindowMonitor( window, null, g_win_x, g_win_y, g_win_w, g_win_h, GLFW_DONT_CARE );
+        glfwSetWindowMonitor( window, null, win_x, win_y, win_w, win_h, GLFW_DONT_CARE );
     } else {
         fb_fullscreen = true;
-        glfwGetWindowPos(  window, &g_win_x, &g_win_y );
-        glfwGetWindowSize( window, &g_win_w, &g_win_h );
+        glfwGetWindowPos(  window, &win_x, &win_y );
+        glfwGetWindowSize( window, &win_w, &win_h );
         auto monitor = glfwGetPrimaryMonitor();
         auto vidmode = glfwGetVideoMode( monitor );
         glfwSetWindowMonitor( window, glfwGetPrimaryMonitor(), 0, 0, vidmode.width, vidmode.height, vidmode.refreshRate );
