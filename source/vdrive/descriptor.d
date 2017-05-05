@@ -359,6 +359,8 @@ struct Meta_Descriptor_Layout {
     /// VkDescriptorPool, VkDescriptorSet and VkDescriptorSetLayout
     auto reset() {
         Core_Descriptor result = { pool, descriptor_set_layout, descriptor_set };
+        descriptor_set_layout_bindings.clear;
+        immutable_samplers.clear;
         descriptor_types_count[] = 0;
         descriptor_set_layout = VK_NULL_HANDLE;
         descriptor_set = VK_NULL_HANDLE;
@@ -433,19 +435,17 @@ auto ref addImmutableSampler(
     // shortcut to the last  meta.descriptor_set_layout_bindings
     auto layout_binding = & meta.descriptor_set_layout_bindings[ $-1 ];
 
-    // increase the descriptor_count of the current descriptor_type
-    ++meta.descriptor_types_count[ cast( size_t )layout_binding.descriptorType ];
+    // immutable samplers do NOT use descriptors from the descriptor pool
+    // hence they also dont increase the descriptor_count of
+    // VK_DESCRIPTOR_TYPE_SAMPLER or VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER
+    //++meta.descriptor_types_count[ cast( size_t )layout_binding.descriptorType ];
+    //++meta.descriptor_types_count[ VK_DESCRIPTOR_TYPE_SAMPLER ];
 
     // helper to store different values in the lower and upper 16 bits
     // the actual descriptorCount is stored in the lower 16 bits, see bellow
     Pack_Index_And_Count piac = layout_binding.descriptorCount;         // preserve index and count
 
     if( layout_binding.pImmutableSamplers is null ) {
-
-        // When adding immutable samplers the descriptorCount must initially be 0
-        // as it is increased with adding a sampler
-        // if no sampler was added so far we guarantee that it is 0
-        piac.count = 0;
 
         // this is not safe, the data in descriptor_array might get reallocate when descriptor is appended
         // but it will be patched in createSetLayout( ... ) function bellow with the right address
@@ -458,8 +458,8 @@ auto ref addImmutableSampler(
         piac.index = cast( ushort )( meta.immutable_samplers.length - 1 );  // setting the upper 16 bits
     }
 
-    // increase the descriptorCount of last descriptor_set_layout_bindings with the bit filter struct
-    ++piac.count;                                                       // increasing the lower 16 bits
+    // immutable samplers do NOT increase the descriptorCount of the current descriptor_set_layout_binding
+    //++piac.count;                                                     // increasing the lower 16 bits
     layout_binding.descriptorCount = piac.descriptor_count;             // assigning back to the original member
 
     return meta;
@@ -967,7 +967,11 @@ private auto ref addDescriptorType(
     }
 
     ++meta.descriptor_types_count[ cast( size_t )layout_binding.descriptorType ];
-    ++layout_binding.descriptorCount;
+    //++layout_binding.descriptorCount;
+
+    Pack_Index_And_Count piac = layout_binding.descriptorCount;         // preserve index and count
+    ++piac.count;                                                       // increasing the lower 16 bits
+    layout_binding.descriptorCount = piac.descriptor_count;             // assigning back to the original member
 
     addDescriptorTypeUpdate!
         ( DESCRIPTOR_TYPE, descriptor_array, write_pointer )
@@ -996,7 +1000,7 @@ auto ref addSampler(
 
 
 /// add a VkImageInfo with specifying its members as function params to the Meta_Descriptor
-/// several sampler less image attachments do not require a sampler specification
+/// several sampler-less image attachments do not require a sampler specification
 /// hence a VkSample is optional
 /// Params:
 ///     meta = reference to a Meta_Descriptor struct
