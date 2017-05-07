@@ -404,11 +404,49 @@ auto ref addLayoutBinding(
         descriptorType      : descriptor_type,
         descriptorCount     : descriptor_count,
         stageFlags          : shader_stage_flags,
-        pImmutableSamplers  : null, // might be added in addImmutableSampler
+        pImmutableSamplers  : null,
     };
     meta.descriptor_set_layout_bindings.append( layout_binding );
     meta.descriptor_types_count[ cast( size_t )descriptor_type ] += descriptor_count;
 
+    return meta;
+}
+
+
+/// add a VkDescriptorSetLayoutBinding to the Meta_Descriptor_Layout
+/// to configure immutable samplers, consequently this layout will only accept
+/// descriptor_type VK_DESCRIPTOR_TYPE_SAMPLER or VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER
+/// Params:
+///     meta = reference to a Meta_Descriptor_Layout struct
+///     binding = index of the layout binding
+///     descriptor_count = count of descriptors in this layout binding, must be > 0
+///     descriptor_type  = the type of the layout binding and hence descriptor(s)
+///                        allowed is only VK_DESCRIPTOR_TYPE_SAMPLER and VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER
+///     shader_stage_flags = shader stage access filter for this layout binding
+/// Returns: the passed in Meta_Structure for function chaining
+auto ref addLayoutBindingImmutable(
+    ref Meta_Descriptor_Layout meta,
+    uint32_t            binding,
+    uint32_t            descriptor_count,
+    VkDescriptorType    descriptor_type,
+    VkShaderStageFlags  shader_stage_flags,
+    string              file = __FILE__,
+    size_t              line = __LINE__,
+    string              func = __FUNCTION__
+    ) {
+    vkAssert( descriptor_type == VK_DESCRIPTOR_TYPE_SAMPLER || descriptor_type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+        "param descriptor_type of addLayoutBindingImmutable() must VK_DESCRIPTOR_TYPE_SAMPLER or VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER",
+        file, line, func );
+
+    // first call the normal addLayoutBinding()
+    meta.addLayoutBinding( binding, descriptor_count, descriptor_type, shader_stage_flags, file, line, func );
+
+    // than mark the added VkDescriptorSetLayoutBinding accepting only immutable samplers
+    // we do this by setting the pImmutableSamplers field to an arbitrary address, not null
+    // later when we actually create the VkDescriptorSetLayout we will attach the proper
+    // Meta_Descriptor_Layout.immutable_samplers to that field (anyway)
+    auto layout_binding = & meta.descriptor_set_layout_bindings[ $-1 ];     // grab the address of recently added layout binding
+    layout_binding.pImmutableSamplers = cast( VkSampler* )layout_binding;   // cast and attach it to its own pImmutableSamplers field
     return meta;
 }
 
@@ -418,7 +456,7 @@ auto ref addLayoutBinding(
 ///     meta = reference to a Meta_Descriptor_Layout struct
 ///     sampler = to immutably bound to the last added layout binding
 /// Returns: the passed in Meta_Structure for function chaining
-auto ref addImmutableSampler(
+auto ref addSampler(
     ref Meta_Descriptor_Layout  meta,
     VkSampler   sampler,
     string      file = __FILE__,
@@ -435,24 +473,18 @@ auto ref addImmutableSampler(
     // shortcut to the last  meta.descriptor_set_layout_bindings
     auto layout_binding = & meta.descriptor_set_layout_bindings[ $-1 ];
 
-    // Todo(pp): this is bug prone !!!
-    // --- Consider adding addImmutableImageInfo() ---
-    // --- Consider adding addLayoutBindingImmutable() ---
-    // Seems that immutable samplers dictate the maximum of binding count
-    // when Images are attached they must not superseed the maximum sampler count
-    // but !!! only if immutable samplers were or (!) will be attached
-    // this can only be checked at construction time, when we examin the piacs in
-    // VkDescriptorSetLayoutBinding and VkWriteDescriptorSet
-    // Add proper fix !!! The following is a quick hack
-    // For now, increase the count if the VkDescriptorType is VK_DESCRIPTOR_TYPE_SAMPLER
-    if( layout_binding.descriptorType == VK_DESCRIPTOR_TYPE_SAMPLER )
-        ++meta.descriptor_types_count[ cast( size_t )layout_binding.descriptorType ];
+    // Todo(pp): thoroughly test addLayoutBindingImmutable()
+    // add checks for correct usage in any combinations
+    // also check if enough samplers were added to satisfy the descriptorCount
+    // set by Meta_Descriptor_Layout.addLayoutBindingImmutable()
+    // do the same checks for addImageInfo( VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER )
+    ++meta.descriptor_types_count[ cast( size_t )layout_binding.descriptorType ];
 
     // helper to store different values in the lower and upper 16 bits
     // the actual descriptorCount is stored in the lower 16 bits, see bellow
     Pack_Index_And_Count piac = layout_binding.descriptorCount;         // preserve index and count
 
-    if( layout_binding.pImmutableSamplers is null ) {
+    if( layout_binding.pImmutableSamplers == cast( VkSampler* )layout_binding ) {
 
         // this is not safe, the data in descriptor_array might get reallocate when descriptor is appended
         // but it will be patched in createSetLayout( ... ) function bellow with the right address
@@ -465,25 +497,11 @@ auto ref addImmutableSampler(
         piac.index = cast( ushort )( meta.immutable_samplers.length - 1 );  // setting the upper 16 bits
     }
 
-    // Todo(pp): this is bug prone !!!
-    // see details above
-    // Add proper fix !!! The following is a quick hack
-    // For now, increase the count if the VkDescriptorType is VK_DESCRIPTOR_TYPE_SAMPLER
-    if( layout_binding.descriptorType == VK_DESCRIPTOR_TYPE_SAMPLER )
-        ++piac.count;                                                   // increasing the lower 16 bits
+    // do not increment the count, the requested count was specified with Meta_Descriptor_Layout.addLayoutBindingImmutable
     layout_binding.descriptorCount = piac.descriptor_count;             // assigning back to the original member
 
     return meta;
 }
-
-
-/// if we want to avoid dynamic array allocations within the meta struct we can directly 'set' exactly one slice or a reference
-/// to descriptor type definition structs/handles of VkSampler, VkDescriptorImageInfo, VkDescriptorBufferInfo or VkBufferView
-/// this approach is mutually exclusive per layout binding to 'add' these structs one by one
-/// memory to hold these type definition must be valid up until we call attachSet()
-// Todo(pp): is this useful? We would have to tediously create arrays of info structs our selves
-// only valid use case seems to be for immutable samplers and texel buffer views
-
 
 
 /// create the VkDescriptorSetLayout and store it as a member of the Meta_Descriptor_Layout struct
@@ -747,8 +765,8 @@ private auto ref addDescriptorTypeUpdate(
         // 2.) write_set.pBufferInfo                    = & meta.buffer_infos[ $-1 ];
         // 3.) write_set.pTexelBufferView               = & meta.texel_buffer_views[ $-1 ];
 
-        // as in the addImmutableSampler() function we need to keep track of the index in
-        // the immutable_samplers array to recreate the proper address in case of a reallocation
+        // as in the Meta_Descriptor_Layout.addSampler() overload we need to keep track of the index
+        // in the immutable_samplers array to recreate the proper address in case of a reallocation
         // we take the upper 16 bits of the latest descriptor_set_layout_bindings.descriptorCount
         // ( its unlikely that we'll ever need more than 65536 immutable samplers in one set )
         piac.index = cast( ushort )( __traits( getMember, meta, descriptor_array ).length - 1 );    // setting the upper 16 bits
@@ -966,9 +984,10 @@ struct Meta_Descriptor {
 
 /// add a VkDescriptorSetLayoutBinding to the Meta_Descriptor
 /// Parameter order is different as opposed to the Meta_Descriptor_Layout overload
-/// as the descriptor_count is optional, it will be incremented automatically while editing
-/// specifying a descriptor_count creates descriptors which at the corresponding locations
-/// which will not be updated with any of the VkWriteDescriptorSet
+/// specifying a descriptor_count (optional) creates descriptor_count descriptors
+/// that will not be updated with any of the VkWriteDescriptorSet
+/// the descriptor_count will be incremented automatically while editing
+/// and all descriptors after descriptor count will be updated
 /// Params:
 ///     meta = reference to a Meta_Descriptor struct
 ///     binding = index of the layout binding
@@ -992,7 +1011,7 @@ auto ref addLayoutBinding(
     // editing has finished they must be updated later on either using Meta_Descriptor_Update or manually
     // When editing immutable samplers there cannot be any offset, so that this value is reset to 0
     // descriptor_count = 0 cannot be passed to the Meta_Descriptor_Layout.addLayoutBinding function
-    // hence it the descriptor_count is incremented by one for the call and decremented from
+    // hence the descriptor_count is incremented by one for the call and decremented from
     // the added layout binding afterwards
     meta.add_write_descriptor = true;
     meta.meta_descriptor_layout     //descriptor_count must not be 0, increment it and add the layout binding
@@ -1007,6 +1026,46 @@ auto ref addLayoutBinding(
 }
 
 
+/// add a VkDescriptorSetLayoutBinding to the Meta_Descriptor
+/// to configure immutable samplers, consequently this layout will only accept
+/// descriptor_type VK_DESCRIPTOR_TYPE_SAMPLER or VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER
+/// Params:
+///     meta = reference to a Meta_Descriptor struct
+///     binding = index of the layout binding
+///     descriptor_type  = the type of the layout binding and hence descriptor(s)
+///                        allowed is only VK_DESCRIPTOR_TYPE_SAMPLER and VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER
+///     shader_stage_flags = shader stage access filter for this layout binding
+/// Returns: the passed in Meta_Structure for function chaining
+auto ref addLayoutBindingImmutable(
+    ref Meta_Descriptor meta,
+    uint32_t            binding,
+    VkDescriptorType    descriptor_type,
+    VkShaderStageFlags  shader_stage_flags,
+    string              file = __FILE__,
+    size_t              line = __LINE__,
+    string              func = __FUNCTION__
+    ) {
+    // descriptor_count in this case is a starting value which will increase when using
+    // Meta_Descriptor to create and update the descriptor set
+    // note however, that in this case these descriptor_count descriptors will not be updated when
+    // editing has finished they must be updated later on either using Meta_Descriptor_Update or manually
+    // When editing immutable samplers there cannot be any offset, so that this value is reset to 0
+    // descriptor_count = 0 cannot be passed to the Meta_Descriptor_Layout.addLayoutBinding function
+    // hence the descriptor_count is incremented by one for the call and decremented from
+    // the added layout binding afterwards
+    meta.add_write_descriptor = true;
+    meta.meta_descriptor_layout     //descriptor_count must not be 0, set it to 1 and add the layout binding
+        .addLayoutBindingImmutable( binding, 1, descriptor_type, shader_stage_flags, file, line, func )
+        .descriptor_set_layout_bindings[ $-1 ]      // access the added layout binding (last)
+        .descriptorCount--;     // decrement its descriptorCount - crazy that all this works!
+
+    // we also must decrement the descriptor types count of the current descriptor_type
+    // as it was increased by one too trick the meta_descriptor_layout.addLayoutBinding overload
+    --meta.meta_descriptor_layout.descriptor_types_count[ cast( size_t )descriptor_type ];
+    return meta;
+}
+
+/*
 /// add an immutable VkSampler to the last VkDescriptorSetLayoutBinding
 /// Params:
 ///     meta = reference to a Meta_Descriptor struct
@@ -1019,10 +1078,10 @@ auto ref addImmutableSampler(
     size_t              line = __LINE__,
     string              func = __FUNCTION__
     ) {
-    meta.meta_descriptor_layout.addImmutableSampler( sampler, file, line, func );
+    meta.meta_descriptor_layout.addSampler( sampler, file, line, func );
     return meta;
 }
-
+*/
 
 /// private template function, forwards to addDescriptorTypeUpdate, to add either
 /// VkDescriptorImageInfo, VkDescriptorBufferInfo or VkDescriptorBufferInfo
@@ -1083,8 +1142,21 @@ auto ref addSampler(
     size_t              line = __LINE__,
     string              func = __FUNCTION__
     ) {
-    meta.addImageInfo(
-        VK_NULL_HANDLE, VK_IMAGE_LAYOUT_UNDEFINED, sampler, file, line, func );
+    // if the pImmutableSamplers field of the latest layout binding is null then we add an VkImageInfo
+    // otherwise immutable samplers are used for this binding and we add another one
+    if( meta.descriptor_set_layout_bindings[ $-1 ].pImmutableSamplers is null ) {
+        meta.addImageInfo( VK_NULL_HANDLE, VK_IMAGE_LAYOUT_UNDEFINED, sampler, file, line, func );
+    } else {
+        // Meta_Descriptor_Layout.addSampler overload does not increment the descriptor_count
+        // as it was already specified with Meta_Descriptor_Layout.addLayoutBinding(Immutable)
+        // hence we need to incremet it here as we are dynamically editing the descriptor_count
+        meta.meta_descriptor_layout.addSampler( sampler, file, line, func );    // add the sampler to the recent layout binding
+        auto layout_binding = & meta.descriptor_set_layout_bindings[ $-1 ];     // get the recent layout binding
+        Pack_Index_And_Count piac = layout_binding.descriptorCount;             // preserve index and count
+        ++piac.count;                                                           // increase the descriptor count
+        layout_binding.descriptorCount = piac.descriptor_count;                 // assigning back to the original member
+    }
+
     return meta;
 }
 
@@ -1108,6 +1180,20 @@ auto ref addImageInfo(
     string              func = __FUNCTION__
     ) {
     //pragma( inline, true ); // functions in this body should be be inlined
+
+    // We need to catch the special case of VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER
+    // in connection with immutable samplers. Immutable samplers are used when the
+    // pImmutableSamplers filed of the recently added layout binding is not null
+    // in that case we simply attach the sampler to the Meta_Descriptor_Layout.immutable_samplers
+    // instead of calling addSampler, which would increase the required count of VK_DESCRIPTOR_TYPE_SAMPLER
+    // we should still pass the sampler on to the following function, it will become part of the
+    // created VkDescriptorImageInfo, but should be ignored by vulkan
+    auto layout_binding = & meta.descriptor_set_layout_bindings[ $-1 ];
+    if( layout_binding.descriptorType == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER
+    &&  layout_binding.pImmutableSamplers !is null )
+        meta.meta_descriptor_layout.immutable_samplers.append( sampler );
+
+    // continue normally
     addDescriptorType!
         ( VkDescriptorImageInfo, "image_infos", "pImageInfo" )
         ( meta, VkDescriptorImageInfo( sampler, image_view, image_layout ), file, line, func );
