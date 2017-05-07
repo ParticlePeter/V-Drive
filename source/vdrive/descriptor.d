@@ -818,19 +818,67 @@ auto ref addBufferInfo(
 }
 
 
-/// add a VkBufferView handle as texture or shader storage buffers
+/// add VkBufferInfos with specifying its members as function params to the Meta_Descriptor_Update
+/// offset and range are optional and common to each buffer, in this case the whole buffer will be attached
+/// if only offset is specified the buffer from offset till its end will be attached
+/// Params:
+///     meta = reference to a Meta_Descriptor_Update struct
+///     buffers = to be accessed through the VkDescriptorSet
+///     offset = optional offset into each of the buffers
+///     range  = optional range of each of the buffer access, till end if not specified
+/// Returns: the passed in Meta_Structure for function chaining
+auto ref addBufferInfos(
+    ref Meta_Descriptor_Update  meta,
+    VkBuffer[]                  buffers,
+    VkDeviceSize                offset = 0,
+    VkDeviceSize                range = VK_WHOLE_SIZE
+    ) {
+    //pragma( inline, true ); // functions in this body should be be inlined
+    foreach( ref buffer; buffers )
+        addDescriptorTypeUpdate!
+            ( VkDescriptorBufferInfo, "buffer_infos", "pBufferInfo" )
+            ( meta, VkDescriptorBufferInfo( buffer, offset, range ));
+    return meta;
+}
+
+
+/// add a VkBufferView handle as textel uniform or shader storage buffers
 /// Params:
 ///     meta = reference to a Meta_Descriptor_Update struct
 ///     buffer_view = to access the underlying VkBuffer through the VkDescriptorSet
 /// Returns: the passed in Meta_Structure for function chaining
 auto ref addTexelBufferView(
     ref Meta_Descriptor_Update  meta,
-    VkBufferView                buffer_view
+    VkBufferView                buffer_view,
+    string              file = __FILE__,
+    size_t              line = __LINE__,
+    string              func = __FUNCTION__
     ) {
     //pragma( inline, true ); // functions in this body should be be inlined
     return addDescriptorTypeUpdate!
         ( VkBufferView, "texel_buffer_views", "pTexelBufferView" )
-        ( meta, buffer_view );
+        ( meta, buffer_view, file, line,func );
+}
+
+
+/// add VkBufferView handles as texel unifor or shader storage buffers
+/// Params:
+///     meta = reference to a Meta_Descriptor_Update struct
+///     buffer_views = to access the array of VkBuffers through the VkDescriptorSet
+/// Returns: the passed in Meta_Structure for function chaining
+auto ref addTexelBufferViews(
+    ref Meta_Descriptor_Update  meta,
+    VkBufferView[]              buffer_views,
+    string              file = __FILE__,
+    size_t              line = __LINE__,
+    string              func = __FUNCTION__
+    ) {
+    //pragma( inline, true ); // functions in this body should be be inlined
+    foreach( ref buffer_view; buffer_views )
+        addDescriptorTypeUpdate!
+            ( VkBufferView, "texel_buffer_views", "pTexelBufferView" )
+            ( meta, buffer_view, file, line,func );
+    return meta;
 }
 
 
@@ -1082,7 +1130,34 @@ auto ref addBufferInfo(
 }
 
 
-/// add a VkBufferView handle as texture or shader storage buffers
+/// add VkBufferInfos with specifying its members as function params to the Meta_Descriptor
+/// offset and range are optional and common to each buffer, in this case the whole buffer will be attached
+/// if only offset is specified the buffer from offset till its end will be attached
+/// Params:
+///     meta = reference to a Meta_Descriptor_Update struct
+///     buffers = to be accessed through the VkDescriptorSet
+///     offset = optional offset into each of the buffers
+///     range  = optional range of each of the buffer access, till end if not specified
+/// Returns: the passed in Meta_Structure for function chaining
+auto ref addBufferInfos(
+    ref Meta_Descriptor meta,
+    VkBuffer[]          buffers,
+    VkDeviceSize        offset = 0,
+    VkDeviceSize        range = VK_WHOLE_SIZE,
+    string              file = __FILE__,
+    size_t              line = __LINE__,
+    string              func = __FUNCTION__
+    ) {
+    //pragma( inline, true ); // functions in this body should be be inlined
+    foreach( ref buffer; buffers )
+        addDescriptorType!
+            ( VkDescriptorBufferInfo, "buffer_infos", "pBufferInfo" )
+            ( meta, VkDescriptorBufferInfo( buffer, offset, range ), file, line, func );
+    return meta;
+}
+
+
+/// add a VkBufferView handle as texel uniform or shader storage buffers
 /// Params:
 ///     meta = reference to a Meta_Descriptor struct
 ///     buffer_view = to access the underlying VkBuffer through the VkDescriptorSet
@@ -1101,6 +1176,26 @@ auto ref addTexelBufferView(
     return meta;
 }
 
+
+/// add VkBufferView handles as texel unifor or shader storage buffers
+/// Params:
+///     meta = reference to a Meta_Descriptor_Update struct
+///     buffer_views = to access the array of VkBuffers through the VkDescriptorSet
+/// Returns: the passed in Meta_Structure for function chaining
+auto ref addTexelBufferViews(
+    ref Meta_Descriptor meta,
+    VkBufferView[]      buffer_views,
+    string              file = __FILE__,
+    size_t              line = __LINE__,
+    string              func = __FUNCTION__
+    ) {
+    //pragma( inline, true ); // functions in this body should be be inlined
+    foreach( ref buffer_view; buffer_views )
+        addDescriptorType!
+            ( VkBufferView, "texel_buffer_views", "pTexelBufferView" )
+            ( meta, buffer_view, file, line,func );
+    return meta;
+}
 
 /// construct the managed Vulkan objects, convenience function
 /// calls Meta_Descriptor_Layout allocateSet() and Meta_Descriptor_Layout attachSet()
