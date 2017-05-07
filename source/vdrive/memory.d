@@ -632,13 +632,14 @@ auto ref initImage(
     VkImageTiling           tiling = VK_IMAGE_TILING_OPTIMAL,
     VkImageLayout           initial_layout = VK_IMAGE_LAYOUT_UNDEFINED,
     uint32_t[]              sharing_family_queue_indices = [],
-    string                  file = __FILE__,
-    size_t                  line = __LINE__,
-    string                  func = __FUNCTION__
+    VkImageCreateFlags      flags   = 0,
+    string                  file    = __FILE__,
+    size_t                  line    = __LINE__,
+    string                  func    = __FUNCTION__
     ) {
     return meta.create(
         format, width, height, 0, 1, 1, usage, samples,
-        tiling, initial_layout, sharing_family_queue_indices,
+        tiling, initial_layout, sharing_family_queue_indices, flags,
         file, line, func );
 }
 
@@ -658,15 +659,17 @@ auto ref initImage(
     VkImageTiling           tiling  = VK_IMAGE_TILING_OPTIMAL,
     VkImageLayout           initial_layout = VK_IMAGE_LAYOUT_UNDEFINED,
     uint32_t[]              sharing_family_queue_indices = [],
-    string                  file = __FILE__,
-    size_t                  line = __LINE__,
-    string                  func = __FUNCTION__
+    VkImageCreateFlags      flags   = 0,
+    string                  file    = __FILE__,
+    size_t                  line    = __LINE__,
+    string                  func    = __FUNCTION__
     ) {
     vkAssert( sharing_family_queue_indices.length != 1,
         "Length of sharing_family_queue_indices must either be 0 (VK_SHARING_MODE_EXCLUSIVE) or greater 1 (VK_SHARING_MODE_CONCURRENT)",
         file, line, func );
 
     VkImageCreateInfo image_create_info = {
+        flags                   : flags,
         imageType               : height == 0 ? VK_IMAGE_TYPE_1D : depth == 0 ? VK_IMAGE_TYPE_2D : VK_IMAGE_TYPE_3D,
         format                  : format,
         extent                  : { width, height == 0 ? 1 : height, depth == 0 ? 1 : depth },
@@ -722,14 +725,15 @@ auto createImage(
     VkImageTiling           tiling = VK_IMAGE_TILING_OPTIMAL,
     VkImageLayout           initial_layout = VK_IMAGE_LAYOUT_UNDEFINED,
     uint32_t[]              sharing_family_queue_indices = [],
-    string                  file = __FILE__,
-    size_t                  line = __LINE__,
-    string                  func = __FUNCTION__
+    VkImageCreateFlags      flags   = 0,
+    string                  file    = __FILE__,
+    size_t                  line    = __LINE__,
+    string                  func    = __FUNCTION__
     ) {
     Meta_Image meta = vk;
     meta.create(    // depth = 0 signals that we want an VK_IMAGE_TYPE_2D
         format, width, height, 0, 1, 1, usage, samples,
-        tiling, initial_layout, sharing_family_queue_indices,
+        tiling, initial_layout, sharing_family_queue_indices, flags,
         file, line, func );
     return meta;
 }
@@ -750,14 +754,15 @@ auto createImage(
     VkImageTiling           tiling = VK_IMAGE_TILING_OPTIMAL,
     VkImageLayout           initial_layout = VK_IMAGE_LAYOUT_UNDEFINED,
     uint32_t[]              sharing_family_queue_indices = [],
-    string                  file = __FILE__,
-    size_t                  line = __LINE__,
-    string                  func = __FUNCTION__
+    VkImageCreateFlags      flags   = 0,
+    string                  file    = __FILE__,
+    size_t                  line    = __LINE__,
+    string                  func    = __FUNCTION__
     ) {
     Meta_Image meta = vk;
     meta.create(    // height = 0 signals we want an VK_IMAGE_TYPE_1D, else depth = 0 signals we want an VK_IMAGE_TYPE_2D, else VK_IMAGE_TYPE_3D
         format, width, height, depth, mip_levels, array_layers, usage, samples,
-        tiling, initial_layout, sharing_family_queue_indices,
+        tiling, initial_layout, sharing_family_queue_indices, flags,
         file, line, func );
     return meta;
 }
