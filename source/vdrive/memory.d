@@ -226,6 +226,12 @@ auto ref addRange( META )( ref Meta_Memory meta, ref META meta_resource ) if( ha
 }
 
 
+auto ref addRanges( META )( ref Meta_Memory meta, META[] meta_resource ) if( hasMemReqs!META ) {
+    foreach( ref resource; meta_resources ) meta.addRange( resource );
+    return meta;
+}
+
+
 auto ref allocate( ref Meta_Memory meta ) {
     vkAssert( meta.isValid, "Vulkan state not assigned" );     // meta struct must be initialized with a valid vulkan state pointer
     vkAssert( meta.device_memory_size > 0, "Must call addRange() at least onece before calling allocate()" );
