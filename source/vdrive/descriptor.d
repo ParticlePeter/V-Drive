@@ -661,16 +661,47 @@ private auto ref addDescriptorTypeUpdate(
     auto write_set = & meta.write_descriptor_sets[ $-1 ];
 
     // add proper VkImageInfo usage checks here
+    // source of checks: Spec 1.0.48, section 13.2.4 (one of Valid usage tables) p.387, pdf p. 396
+
+
     static if( is( DESCRIPTOR_TYPE == VkDescriptorImageInfo )) {
+        const( char )* msg( int code ) pure nothrow @nogc {
+            switch( code ) {
+                case 0 : return "VkImageView is VK_NULL_HANDLE and VkSampler is VK_NULL_HANDLE";
+                case 1 : return "VkImageView is VK_NULL_HANDLE and VkSampler is not VK_NULL_HANDLE";
+                case 2 : return "VkImageView is not VK_NULL_HANDLE and VkSampler is VK_NULL_HANDLE";
+                case 3 : return "VkImageView is VK_NULL_HANDLE";
+                case 4 : return "VkImageView is not VK_NULL_HANDLE";
+                case 5 : return "VkSampler is VK_NULL_HANDLE";
+                case 6 : return "VkSampler is not VK_NULL_HANDLE";
+                default: return null;
+            }
+        }
         switch( write_set.descriptorType ) {
             case VK_DESCRIPTOR_TYPE_SAMPLER : vkAssert( descriptor.sampler != VK_NULL_HANDLE && descriptor.imageView == VK_NULL_HANDLE,
-                "VK_DESCRIPTOR_TYPE_SAMPLER requires a VkSampler without VkImageView", file, line, func ); break;
+                descriptor.sampler == VK_NULL_HANDLE && descriptor.imageView != VK_NULL_HANDLE
+                    ? msg( 2 ) : descriptor.sampler == VK_NULL_HANDLE ? msg( 5 ) : descriptor.imageView != VK_NULL_HANDLE ? msg( 4 ) : null,
+                file, line, func, "\n             : VK_DESCRIPTOR_TYPE_SAMPLER requires a VkSampler without VkImageView" ); break;
+
             case VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER : vkAssert( /*descriptor.sampler != VK_NULL_HANDLE &&*/ descriptor.imageView != VK_NULL_HANDLE,  // if an immutable sampler was created at this binding we do not need to pass the sampler here again
-                "VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER requires a VkImageView and VkSampler", file, line, func ); break;
+                descriptor.imageView == VK_NULL_HANDLE ? msg( 3 ) : null,
+                file, line, func, "\n             : VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER requires a VkImageView and VkSampler" ); break;
+
             case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE : vkAssert( descriptor.sampler == VK_NULL_HANDLE && descriptor.imageView != VK_NULL_HANDLE,
-                "VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE requires a VkImageView without VkSampler", file, line, func ); break;
+                descriptor.sampler != VK_NULL_HANDLE && descriptor.imageView == VK_NULL_HANDLE
+                    ? msg( 1 ) : descriptor.sampler != VK_NULL_HANDLE ? msg( 6 ) : descriptor.imageView == VK_NULL_HANDLE ? msg( 3 ) : null,
+                file, line, func, "\n             : VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE requires a VkImageView without VkSampler" ); break;
+
+            case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE : vkAssert( descriptor.sampler == VK_NULL_HANDLE && descriptor.imageView != VK_NULL_HANDLE,
+                descriptor.sampler != VK_NULL_HANDLE && descriptor.imageView == VK_NULL_HANDLE
+                    ? msg( 1 ) : descriptor.sampler != VK_NULL_HANDLE ? msg( 6 ) : descriptor.imageView == VK_NULL_HANDLE ? msg( 3 ) : null,
+                file, line, func, "\n             : VK_DESCRIPTOR_TYPE_STORAGE_IMAGE requires a VkImageView without VkSampler" ); break;
+
             case VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT : vkAssert( descriptor.sampler == VK_NULL_HANDLE && descriptor.imageView != VK_NULL_HANDLE,
-                "VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT requires a VkImageView without VkSampler", file, line, func ); break;
+                descriptor.sampler != VK_NULL_HANDLE && descriptor.imageView == VK_NULL_HANDLE
+                    ? msg( 1 ) : descriptor.sampler != VK_NULL_HANDLE ? msg( 6 ) : descriptor.imageView == VK_NULL_HANDLE ? msg( 3 ) : null,
+                file, line, func, "\n             : VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT requires a VkImageView without VkSampler" ); break;
+
             default : vkAssert( false,
                 "VkDescriptorImageInfo is not compatible with VkDescriptorType ", file, line, func, toCharPtr( write_set.descriptorType )); break;
         }
