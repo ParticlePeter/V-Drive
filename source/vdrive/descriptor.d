@@ -70,7 +70,7 @@ auto createSampler(
 ///     format = of the view
 ///     offset = into the original buffer
 ///     range  = of the view, can be VK_WHOLE_SIZE (starting at offset)
-/// Returns: VkDescriptorPool
+/// Returns: VkBufferView
 auto createBufferView(
     ref Vulkan      vk,
     VkBuffer        buffer,
@@ -435,11 +435,18 @@ auto ref addImmutableSampler(
     // shortcut to the last  meta.descriptor_set_layout_bindings
     auto layout_binding = & meta.descriptor_set_layout_bindings[ $-1 ];
 
-    // immutable samplers do NOT use descriptors from the descriptor pool
-    // hence they also dont increase the descriptor_count of
-    // VK_DESCRIPTOR_TYPE_SAMPLER or VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER
-    //++meta.descriptor_types_count[ cast( size_t )layout_binding.descriptorType ];
-    //++meta.descriptor_types_count[ VK_DESCRIPTOR_TYPE_SAMPLER ];
+    // Todo(pp): this is bug prone !!!
+    // --- Consider adding addImmutableImageInfo() ---
+    // --- Consider adding addLayoutBindingImmutable() ---
+    // Seems that immutable samplers dictate the maximum of binding count
+    // when Images are attached they must not superseed the maximum sampler count
+    // but !!! only if immutable samplers were or (!) will be attached
+    // this can only be checked at construction time, when we examin the piacs in
+    // VkDescriptorSetLayoutBinding and VkWriteDescriptorSet
+    // Add proper fix !!! The following is a quick hack
+    // For now, increase the count if the VkDescriptorType is VK_DESCRIPTOR_TYPE_SAMPLER
+    if( layout_binding.descriptorType == VK_DESCRIPTOR_TYPE_SAMPLER )
+        ++meta.descriptor_types_count[ cast( size_t )layout_binding.descriptorType ];
 
     // helper to store different values in the lower and upper 16 bits
     // the actual descriptorCount is stored in the lower 16 bits, see bellow
@@ -458,8 +465,12 @@ auto ref addImmutableSampler(
         piac.index = cast( ushort )( meta.immutable_samplers.length - 1 );  // setting the upper 16 bits
     }
 
-    // immutable samplers do NOT increase the descriptorCount of the current descriptor_set_layout_binding
-    //++piac.count;                                                     // increasing the lower 16 bits
+    // Todo(pp): this is bug prone !!!
+    // see details above
+    // Add proper fix !!! The following is a quick hack
+    // For now, increase the count if the VkDescriptorType is VK_DESCRIPTOR_TYPE_SAMPLER
+    if( layout_binding.descriptorType == VK_DESCRIPTOR_TYPE_SAMPLER )
+        ++piac.count;                                                   // increasing the lower 16 bits
     layout_binding.descriptorCount = piac.descriptor_count;             // assigning back to the original member
 
     return meta;
