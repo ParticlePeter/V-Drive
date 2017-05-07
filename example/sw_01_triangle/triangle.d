@@ -322,7 +322,7 @@ auto ref resizeResources( ref VDrive_State vd ) {
 
     // vd.depth_image_format can be set before this function gets called
     vd.depth_image( vd )
-        .create( vd.depth_image_format, vd.surface.imageExtent, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, vd.sample_count )
+        .create( vd.depth_image_format, vd.windowWidth, vd.windowHeight, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, vd.sample_count )
         .createMemory( depth_image_memory_property )
         .createView( VK_IMAGE_ASPECT_DEPTH_BIT );
 
