@@ -355,24 +355,25 @@ struct Meta_Descriptor_Layout {
     Array!VkDescriptorSetLayoutBinding  descriptor_set_layout_bindings; // the set layout bindings of the resulting set
     Array!VkSampler                     immutable_samplers;             // slices of this member can be associated with any layout binding
 
-    /// reset all internal data and return wrapped Vulkan objects
-    /// VkDescriptorPool, VkDescriptorSet and VkDescriptorSetLayout
-    auto reset() {
-        Core_Descriptor result = { pool, descriptor_set_layout, descriptor_set };
-        descriptor_set_layout_bindings.clear;
-        immutable_samplers.clear;
-        descriptor_types_count[] = 0;
-        descriptor_set_layout = VK_NULL_HANDLE;
-        descriptor_set = VK_NULL_HANDLE;
-        pool = VK_NULL_HANDLE;
-        return result;
-    }
-
     /// destroy the VkDescriptorLayout and, if internal, the VkDescriptorPool
     void destroyResources() {
         vdrive.state.destroy( vk, descriptor_set_layout );
         if( pool != VK_NULL_HANDLE ) vdrive.state.destroy( vk, pool );
     }
+}
+
+
+/// reset all internal data and return wrapped Vulkan objects
+/// VkDescriptorPool, VkDescriptorSet and VkDescriptorSetLayout
+auto reset( ref Meta_Descriptor_Layout meta ) {
+    Core_Descriptor result = { meta.pool, meta.descriptor_set_layout, meta.descriptor_set };
+    meta.descriptor_set_layout_bindings.clear;
+    meta.immutable_samplers.clear;
+    meta.descriptor_types_count[] = 0;
+    meta.descriptor_set_layout = VK_NULL_HANDLE;
+    meta.descriptor_set = VK_NULL_HANDLE;
+    meta.pool = VK_NULL_HANDLE;
+    return result;
 }
 
 
@@ -622,15 +623,15 @@ struct Meta_Descriptor_Update {
     Array!VkDescriptorImageInfo         image_infos;                    // slices of these three members ...
     Array!VkDescriptorBufferInfo        buffer_infos;                   // ... can be associated with ...
     Array!VkBufferView                  texel_buffer_views;             // ... any write_descriptor_set
-
-    void reset() {
-        write_descriptor_sets.clear;
-        image_infos.clear;
-        buffer_infos.clear;
-        texel_buffer_views.clear;
-    }
 }
 
+/// reset all internal data, no date to be returned
+void reset( ref Meta_Descriptor_Update meta ) {
+    meta.write_descriptor_sets.clear;
+    meta.image_infos.clear;
+    meta.buffer_infos.clear;
+    meta.texel_buffer_views.clear;
+}
 
 
 /// add a VkWriteDescriptorSet to the Meta_Descriptor_Update
@@ -974,11 +975,15 @@ struct Meta_Descriptor {
     // to override the same from mixed in Vulkan_State_Pointer of the meta_descriptor_update
     this( ref Vulkan vk )               { meta_descriptor_layout.vk_ptr = meta_descriptor_update.vk_ptr = &vk; }
     auto ref opCall( ref Vulkan vk )    { meta_descriptor_layout.vk_ptr = meta_descriptor_update.vk_ptr = &vk; return this; }
+}
 
-    auto reset() {
-        meta_descriptor_update.reset;
-        return meta_descriptor_layout.reset;
-    }
+
+/// reset all internal data and return wrapped Vulkan objects
+/// VkDescriptorPool, VkDescriptorSet and VkDescriptorSetLayout
+/// of the internal Meta_Descriptor_Layout
+auto reset( ref Meta_Descriptor meta ) {
+    meta.meta_descriptor_update.reset;
+    return meta.meta_descriptor_layout.reset;
 }
 
 
