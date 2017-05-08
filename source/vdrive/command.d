@@ -100,5 +100,11 @@ auto queueSubmitInfo(
 }
 
 
+auto commandBufferBeginInfo( VkCommandBufferUsageFlags command_buffer_usage_flags = 0 ) {
+    VkCommandBufferBeginInfo result = { flags : command_buffer_usage_flags };
+    return result;
+}
+
+
 
 
