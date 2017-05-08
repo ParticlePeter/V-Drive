@@ -597,10 +597,17 @@ struct Meta_Image {
 
     mixin                   Memory_Member;
 
+    // get internal image view and reset it to VK_NULL_HANDLE
+    // such that a new, different view can be created
     auto resetView() {
         auto result = image_view;
         image_view = VK_NULL_HANDLE;
         return result;
+    }
+
+    // subrescourceRange shortcut
+    auto subresourceRange() {
+        return image_view_create_info.subresourceRange;
     }
 
     // bulk destroy the resources belonging to this meta struct
