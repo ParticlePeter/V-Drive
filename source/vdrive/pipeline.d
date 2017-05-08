@@ -10,6 +10,10 @@ import vdrive.geometry;
 import erupted;
 
 
+////////////////////////////////////////////
+// Meta_Graphics and Meta_Compute related //
+////////////////////////////////////////////
+
 
 /// Wraps the essential Vulkan objects created with the editing procedure
 /// of Meta_Graphics and Meta_Compute, all other internal structures are obsolete
@@ -33,6 +37,76 @@ void destroy( ref Vulkan vk, ref Core_Pipeline core ) {
 
 
 
+/// private template to constraint template arg to Meta_Graphics or Meta_Compute
+private template isPipeline( T ) {
+        enum isPipeline = is( T == Meta_Graphics ) || is( T == Meta_Compute );
+}
+
+/// add VkDescriptorSetLayout to either Meta_Graphics or Meta_Pipeline, use alias addDescriptorSetLayout instead
+auto ref addDescriptorSetLayoutImpl( META )( ref META meta, VkDescriptorSetLayout descriptor_set_layout ) if( isPipeline!META ) {
+    meta.descriptor_set_layouts.append = descriptor_set_layout;
+    return meta;
+}
+
+/// add VkPushConstantRange to either Meta_Graphics or Meta_Pipeline, use alias addPushConstantRangeImpl instead
+auto ref addPushConstantRangeImpl_1( META )( ref META meta, VkPushConstantRange push_constant_range ) if( isPipeline!META ) {
+    meta.push_constant_ranges.append = push_constant_range;
+    return meta;
+}
+
+/// add VkPushConstantRange to either Meta_Graphics or Meta_Pipeline, use alias addPushConstantRangeImpl instead
+auto ref addPushConstantRangeImpl_2( META )( ref META meta, VkShaderStageFlags stage_flags, size_t offset, size_t size ) if( isPipeline!META ) {
+    return meta.addPushConstantRange( VkPushConstantRange( stage_flags, offset.toUint, size.toUint ));
+}
+
+
+/// overload to simplify VkPipelineLayout construction
+VkPipelineLayout createPipelineLayout( Vulkan vk, VkDescriptorSetLayout[] descriptor_set_layouts, VkPushConstantRange[] push_constant_ranges = [] ) {
+    VkPipelineLayoutCreateInfo pipeline_layout_create_info = {
+        setLayoutCount                  : descriptor_set_layouts.length.toUint,
+        pSetLayouts                     : descriptor_set_layouts.ptr,
+        pushConstantRangeCount          : push_constant_ranges.length.toUint,
+        pPushConstantRanges             : push_constant_ranges.ptr,
+    };
+
+    VkPipelineLayout pipeline_layout;
+    vk.device.vkCreatePipelineLayout( &pipeline_layout_create_info, vk.allocator, &pipeline_layout ).vkAssert;
+    return pipeline_layout;
+}
+
+/// overload to simplify VkPipelineLayout construction
+VkPipelineLayout createPipelineLayout( Vulkan vk, VkDescriptorSetLayout descriptor_set_layout, VkPushConstantRange push_constant_range ) {
+    VkDescriptorSetLayout[1]    descriptor_set_layouts  = [ descriptor_set_layout ];
+    VkPushConstantRange[1]      push_constant_ranges    = [ push_constant_range ];
+    return createPipelineLayout( vk, descriptor_set_layouts, push_constant_ranges );
+}
+
+/// overload to simplify VkPipelineLayout construction
+VkPipelineLayout createPipelineLayout( Vulkan vk, VkDescriptorSetLayout descriptor_set_layout, VkPushConstantRange[] push_constant_ranges = [] ) {
+    VkDescriptorSetLayout[1]    descriptor_set_layouts  = [ descriptor_set_layout ];
+    return createPipelineLayout( vk, descriptor_set_layouts, push_constant_ranges );
+}
+
+/// overload to simplify VkPipelineLayout construction
+VkPipelineLayout createPipelineLayout( Vulkan vk, VkPushConstantRange push_constant_range ) {
+    VkPushConstantRange[1]      push_constant_ranges    = [ push_constant_range ];
+    return createPipelineLayout( vk, [], push_constant_ranges );
+}
+
+/// overload to simplify VkPipelineLayout construction
+VkPipelineLayout createPipelineLayout( Vulkan vk, VkPushConstantRange[] push_constant_ranges ) {
+    return createPipelineLayout( vk, [], push_constant_ranges );
+}
+
+
+
+///////////////////////////
+// Meta_Graphics related //
+///////////////////////////
+
+/// meta struct to configure a graphics VkPipeline and allocate a
+/// dynamic arrays exist to add several related config structs
+/// must be initialized with a Vulkan state struct
 struct Meta_Graphics {
     mixin                                       Vulkan_State_Pointer;
 
@@ -69,39 +143,30 @@ struct Meta_Graphics {
     VkRenderPass                                render_pass;
     uint32_t                                    subpass;
     VkPipeline                                  base_pipeline_handle = VK_NULL_HANDLE;
-    //int32_t                                   base_pipeline_index  = -1;
-
-    /// reset all internal data and return wrapped Vulkan objects
-    /// VkPipeline and VkPipelineLayout
-    auto reset() {
-        Core_Pipeline result = { pipeline, pipeline_layout };
-        //shader_stages.clear;
-        //vertex_input_binding_descriptions.clear;
-        //vertex_input_attribute_descriptions.clear;
-        //viewports.clear;
-        //scissors.clear;
-        //color_blend_states.clear;
-        //dynamic_states.clear;
-        //descriptor_set_layouts.clear;
-        //push_constant_ranges.clear;
-        return result;
-    }
+    //int32_t                                   base_pipeline_index  = -1;  // Todo(pp): this is only meaningfull for multi-pipeline construction. Implement!
 
     void destroyResources() {
-        vk.device.vkDestroyPipeline( pipeline, vk.allocator );
-        vk.device.vkDestroyPipelineLayout( pipeline_layout, vk.allocator );
+        vdrive.state.destroy( vk, pipeline );          // no nice syntax, vdrive.state.destroy overloads
+        vdrive.state.destroy( vk, pipeline_layout );   // get confused with this one in the module scope
     }
 }
 
 
-auto ref destroyShaderModules( ref Meta_Graphics meta ) {
-    foreach( ref shader_stage; meta.shader_stages )
-        //vk.device.vkDestroyShaderModule( shader_stage._module, vk.allocator );
-        vdrive.state.destroy( meta, shader_stage._module );
+/// reset all internal data and return wrapped Vulkan objects
+/// VkPipeline and VkPipelineLayout
+auto reset( ref Meta_Graphics meta ) {
+    Core_Pipeline result = { meta.pipeline, meta.pipeline_layout };
     meta.shader_stages.clear;
-    return meta;
+    meta.vertex_input_binding_descriptions.clear;
+    meta.vertex_input_attribute_descriptions.clear;
+    meta.viewports.clear;
+    meta.scissors.clear;
+    meta.color_blend_states.clear;
+    meta.dynamic_states.clear;
+    meta.descriptor_set_layouts.clear;
+    meta.push_constant_ranges.clear;
+    return result;
 }
-
 
 
 ///////////////////////////
@@ -128,6 +193,13 @@ auto ref addShaderStageCreateInfo( ref Meta_Graphics meta, VkPipelineShaderStage
     return meta;
 }
 
+/// destroy shader modules, can happen immediatelly after PSO construction, if modules are not shared
+auto ref destroyShaderModules( ref Meta_Graphics meta ) {
+    foreach( ref shader_stage; meta.shader_stages )
+        vdrive.state.destroy( meta, shader_stage._module );
+    meta.shader_stages.clear;
+    return meta;
+}
 
 
 ////////////////////////////////////////////////////////
@@ -415,31 +487,22 @@ auto ref addDynamicState( ref Meta_Graphics meta, VkDynamicState dynamic_state )
 /////////////////////
 // pipeline layout //
 /////////////////////
-auto ref addDescriptorSetLayout( ref Meta_Graphics meta, VkDescriptorSetLayout descriptor_set_layout ) {
-    meta.descriptor_set_layouts.append = descriptor_set_layout;
-    return meta;
-}
-
-auto ref addPushConstantRange( ref Meta_Graphics meta, VkPushConstantRange push_constant_range ) {
-    meta.push_constant_ranges.append = push_constant_range;
-    return meta;
-}
-
-auto ref addPushConstantRange( ref Meta_Graphics meta, VkShaderStageFlags stage_flags, size_t offset, size_t size ) {
-    return meta.addPushConstantRange( VkPushConstantRange( stage_flags, offset.toUint, size.toUint ));
-}
+alias addDescriptorSetLayout = addDescriptorSetLayoutImpl!Meta_Graphics;
+alias addPushConstantRange   = addPushConstantRangeImpl_1!Meta_Graphics;
+alias addPushConstantRange   = addPushConstantRangeImpl_2!Meta_Graphics;
 
 
 
-//////////////////////////////////////////////////////////
-// render pass, subpass, base pipeline and optimization //
-//////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////
+// render pass, subpass, base pipeline, optimization and flags in general //
+////////////////////////////////////////////////////////////////////////////
 auto ref renderPass( ref Meta_Graphics meta, VkRenderPass render_pass, size_t subpass = 0 ) {
     meta.render_pass = render_pass;
     meta.subpass = subpass.toUint;
     return meta;
 }
 
+/// set base pipeline handle for derivated pipelines
 auto ref basePipeline( ref Meta_Graphics meta, VkPipeline base_pipeline_handle ) {
     meta.base_pipeline_handle = base_pipeline_handle;
     return meta;
@@ -452,14 +515,21 @@ auto ref basePipeline( ref Meta_Graphics meta, int32_t base_pipeline_index ) {
 }
 */
 
+/// disable pipeline optimization
 auto ref disableOptimization( ref Meta_Graphics meta ) {
     meta.pipeline_create_flags |= VK_PIPELINE_CREATE_DISABLE_OPTIMIZATION_BIT;
     return meta;
 }
 
+/// allow that this piplein can have derivative pipleines
 auto ref allowDerivatives( ref Meta_Graphics meta ) {
     meta.pipeline_create_flags |= VK_PIPELINE_CREATE_ALLOW_DERIVATIVES_BIT;
     return meta;
+}
+
+/// general variant for setting flags
+auto ref pipelineCeateFlags( ref Meta_Graphics meta, VkPipelineCreateFlags flags ) {
+    meta.pipeline_create_flags = flags;
 }
 
 
@@ -501,17 +571,10 @@ auto ref construct( ref Meta_Graphics meta, VkPipelineLayout pipeline_layout = V
         pDynamicStates                  : meta.dynamic_states.ptr,
     };
 
-    if( pipeline_layout ) {
+    if( pipeline_layout )
         meta.pipeline_layout = pipeline_layout;
-    } else {
-        VkPipelineLayoutCreateInfo pipeline_layout_create_info = {
-            setLayoutCount                  : meta.descriptor_set_layouts.length.toUint,
-            pSetLayouts                     : meta.descriptor_set_layouts.ptr,
-            pushConstantRangeCount          : meta.push_constant_ranges.length.toUint,
-            pPushConstantRanges             : meta.push_constant_ranges.ptr,
-        };
-        meta.device.vkCreatePipelineLayout( &pipeline_layout_create_info, meta.allocator, &meta.pipeline_layout ).vkAssert;
-    }
+    else
+        meta.pipeline_layout = meta.createPipelineLayout( meta.descriptor_set_layouts.data, meta.push_constant_ranges.data );
 
     // create the pipeline object
     VkGraphicsPipelineCreateInfo pipeline_create_info = {
@@ -543,61 +606,117 @@ auto ref construct( ref Meta_Graphics meta, VkPipelineLayout pipeline_layout = V
 
 
 
+//////////////////////////
+// Meta_Compute related //
+//////////////////////////
 
 
-struct Meta_Graphics_Ressources {
-    mixin               Vulkan_State_Pointer;
-    VkPipeline          pipeline;
-    VkPipelineLayout    pipeline_layout;
-}
-
-
+/// meta struct to configure a graphics VkPipeline and allocate a
+/// dynamic arrays exist to add VkDescriptorSetLayout and VkPushConstantRange
+/// must be initialized with a Vulkan state struct
 struct Meta_Compute {
     mixin                                       Vulkan_State_Pointer;
 
     VkPipeline                                  pipeline;
-    VkPipelineCreateFlags                       pipeline_create_flags;
-    VkPipelineShaderStageCreateInfo             shader_stage;
+    VkComputePipelineCreateInfo                 pipeline_create_info;
 
-    //VkPipelineLayoutCreateInfo                pipeline_layout_create_info
-    VkPipelineLayout                            pipeline_layout;
     Array!VkDescriptorSetLayout                 descriptor_set_layouts;
     Array!VkPushConstantRange                   push_constant_ranges;
 
-    VkPipeline                                  base_pipeline = VK_NULL_HANDLE;
-    int32_t                                     base_pipeline_index;
+    VkPipelineLayout                            pipeline_layout() { return pipeline_create_info.layout; }
 
     void destroyResources() {
-        vk.device.vkDestroyPipeline( pipeline, vk.allocator );
-        vk.device.vkDestroyPipelineLayout( pipeline_layout, vk.allocator );
-        vk.device.vkDestroyShaderModule( shader_stage._module, vk.allocator );
+        vdrive.state.destroy( vk, pipeline );                               // no nice syntax, vdrive.state.destroy overloads
+        vdrive.state.destroy( vk, pipeline_create_info.layout );    // get confused with this one in the module scope
     }
 }
 
 
-
-VkPipelineLayout createPipelineLayout( Vulkan vk, VkDescriptorSetLayout[] descriptor_set_layouts, VkPushConstantRange[] push_constant_ranges = [] ) {
-    VkPipelineLayoutCreateInfo pipeline_layout_create_info = {
-        setLayoutCount                  : descriptor_set_layouts.length.toUint,
-        pSetLayouts                     : descriptor_set_layouts.ptr,
-        pushConstantRangeCount          : push_constant_ranges.length.toUint,
-        pPushConstantRanges             : push_constant_ranges.ptr,
-    };
-
-    VkPipelineLayout pipeline_layout;
-    vk.device.vkCreatePipelineLayout( &pipeline_layout_create_info, vk.allocator, &pipeline_layout ).vkAssert;
-    return pipeline_layout;
+/// reset all internal data and return wrapped Vulkan objects
+/// VkPipeline and VkPipelineLayout
+auto reset( ref Meta_Compute meta ) {
+    Core_Pipeline result = { meta.pipeline, meta.pipeline_create_info.layout };
+    meta.descriptor_set_layouts.clear;
+    meta.push_constant_ranges.clear;
+    return result;
 }
 
 
-VkPipelineLayout createPipelineLayout( Vulkan vk, VkDescriptorSetLayout descriptor_set_layout, VkPushConstantRange push_constant_range ) {
-    VkDescriptorSetLayout[1]    descriptor_set_layouts  = [ descriptor_set_layout ];
-    VkPushConstantRange[1]      push_constant_ranges    = [ push_constant_range ];
-    return createPipelineLayout( vk, descriptor_set_layouts, push_constant_ranges );
+//////////////////////////////
+// shader stage create info //
+//////////////////////////////
+auto ref shaderStageCreateInfo( ref Meta_Compute meta, VkPipelineShaderStageCreateInfo shader_stage_create_info ) {
+    meta.pipeline_create_info.stage = shader_stage_create_info;
+    return meta;
+}
+
+/// destroy shader module, can happen immediatelly after PSO construction
+auto ref destroyShaderModule( ref Meta_Compute meta ) {
+    vdrive.state.destroy( meta, meta.pipeline_create_info.stage._module );
+    return meta;
 }
 
 
-VkPipelineLayout createPipelineLayout( Vulkan vk, VkDescriptorSetLayout descriptor_set_layout ) {
-    VkDescriptorSetLayout[1]    descriptor_set_layouts  = [ descriptor_set_layout ];
-    return createPipelineLayout( vk, descriptor_set_layouts );
+/////////////////////
+// pipeline layout //
+/////////////////////
+alias addDescriptorSetLayout = addDescriptorSetLayoutImpl!Meta_Compute;
+alias addPushConstantRange   = addPushConstantRangeImpl_1!Meta_Compute;
+alias addPushConstantRange   = addPushConstantRangeImpl_2!Meta_Compute;
+
+
+
+////////////////////////////////////////////////////////////////////////////
+// render pass, subpass, base pipeline, optimization and flags in general //
+////////////////////////////////////////////////////////////////////////////
+
+/// set base pipeline handle for derivated pipelines
+auto ref basePipeline( ref Meta_Compute meta, VkPipeline base_pipeline_handle ) {
+    meta.pipeline_create_info.basePipelineHandle = base_pipeline_handle;
+    meta.pipeline_create_info.flags |= VK_PIPELINE_CREATE_DERIVATIVE_BIT;
+    return meta;
 }
+
+/* not using multi pipeline creation yet
+auto ref basePipeline( ref Meta_Compute meta, int32_t base_pipeline_index ) {
+    meta.pipeline_create_info.basePipelineIndex = base_pipeline_index;
+    return meta;
+}
+*/
+
+/// disable pipeline optimization
+auto ref disableOptimization( ref Meta_Compute meta ) {
+    meta.pipeline_create_info.flags |= VK_PIPELINE_CREATE_DISABLE_OPTIMIZATION_BIT;
+    return meta;
+}
+
+/// allow that this piplein can have derivative pipleines
+auto ref allowDerivatives( ref Meta_Compute meta ) {
+    meta.pipeline_create_info.flags |= VK_PIPELINE_CREATE_ALLOW_DERIVATIVES_BIT;
+    return meta;
+}
+
+/// general variant for setting flags
+auto ref pipelineCeateFlags( ref Meta_Compute meta, VkPipelineCreateFlags flags ) {
+    meta.pipeline_create_info.flags = flags;
+}
+
+
+
+/////////////////////////////////////////
+// construct the pipeline state object //
+/////////////////////////////////////////
+auto ref construct( ref Meta_Compute meta, VkPipelineLayout pipeline_layout = VK_NULL_HANDLE ) {
+    // assert that meta struct is initialized with a valid vulkan state pointer
+    assert( meta.isValid );
+
+    if( pipeline_layout )
+        meta.pipeline_create_info.layout = pipeline_layout;
+    else
+        meta.pipeline_create_info.layout = meta.createPipelineLayout( meta.descriptor_set_layouts.data, meta.push_constant_ranges.data );
+
+    meta.device.vkCreateComputePipelines( VK_NULL_HANDLE, 1, &meta.pipeline_create_info, meta.allocator, &meta.pipeline ).vkAssert;
+    return meta;
+}
+
+
