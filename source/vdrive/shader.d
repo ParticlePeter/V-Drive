@@ -18,7 +18,7 @@ import core.stdc.stdio : printf;
 /// Params:
 ///     vk = reference to a VulkanState struct
 ///     path = the path to glsl or spir-v file
-/// Returns: VkShaderModule 
+/// Returns: VkShaderModule
 auto createShaderModule( ref Vulkan vk, string path ) {
 
     import std.path : extension;
@@ -37,7 +37,7 @@ auto createShaderModule( ref Vulkan vk, string path ) {
         memcpy( &array.data[ $ - spv.length ], spv.ptr, spv.length );
 
         string spir_path = array.data.idup;             // create string from the char array
-        
+
         import std.file : exists;
         bool up_to_date = array.data.exists;            // check if the file exists
 
@@ -82,17 +82,17 @@ auto createShaderModule( ref Vulkan vk, string path ) {
 ///     shader_stage = enum to specify the shader stage
 ///     shader_module = the VkShaderModule to be converted
 ///     shader_entry_point = optionally set a different name for your "main" entry point,
-///                         this is also required if the passed in shader_module has 
+///                         this is also required if the passed in shader_module has
 ///                         multiple entry points ( e.g. shader stages )
-///     specialization_info = optionally set a VkSpecializationInfo for the shader module 
-/// Returns: VkPipelineShaderStageCreateInfo 
+///     specialization_info = optionally set a VkSpecializationInfo for the shader module
+/// Returns: VkPipelineShaderStageCreateInfo
 auto createPipelineShaderStage(
     ref Vulkan vk,
     VkShaderStageFlagBits shader_stage,
     VkShaderModule shader_module,
-    const( char )* shader_entry_point = "main",
-    const( VkSpecializationInfo )* specialization_info = null ) {
-
+    const( VkSpecializationInfo )* specialization_info = null,
+    const( char )* shader_entry_point = "main"
+    ) {
     VkPipelineShaderStageCreateInfo shader_stage_create_info = {
         stage               : shader_stage,
         _module             : shader_module,
@@ -106,25 +106,25 @@ auto createPipelineShaderStage(
 
 /// create a VkPipelineShaderStageCreateInfo acceptable for a pipeline state opbject (PSO)
 /// takes a path to a vulkan acceptable glsl text file or spir-v binary file conveniently
-/// instead of a VkShaderModule. Detection of spir-v is based on .spv extension 
+/// instead of a VkShaderModule. Detection of spir-v is based on .spv extension
 /// Params:
 ///     vk = reference to a VulkanState struct
 ///     shader_stage = enum to specify the shader stage
-///     shader_path = path to glsl text or spir-v binary  
+///     shader_path = path to glsl text or spir-v binary
 ///     shader_entry_point = optionally set a different name for your "main" entry point,
-///                         this is also required if the passed in shader_module has 
+///                         this is also required if the passed in shader_module has
 ///                         multiple entry points ( e.g. shader stages )
-///     specialization_info = optionally set a VkSpecializationInfo for the shader module 
+///     specialization_info = optionally set a VkSpecializationInfo for the shader module
 /// Returns: VkPipelineShaderStageCreateInfo
 auto createPipelineShaderStage(
     ref Vulkan vk,
     VkShaderStageFlagBits shader_stage,
     string shader_path,
-    const( char )* shader_entry_point = "main",
-    const( VkSpecializationInfo )* specialization_info = null ) {
-
+    const( VkSpecializationInfo )* specialization_info = null,
+    const( char )* shader_entry_point = "main"
+    ) {
     return createPipelineShaderStage(
-        vk, shader_stage, vk.createShaderModule( shader_path ), shader_entry_point, specialization_info
+        vk, shader_stage, vk.createShaderModule( shader_path ), specialization_info, shader_entry_point
     );
 }
 
