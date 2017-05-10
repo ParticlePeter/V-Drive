@@ -600,7 +600,14 @@ auto ref construct( ref Meta_Graphics meta, VkPipelineLayout pipeline_layout = V
     if( meta.base_pipeline_handle  != VK_NULL_HANDLE /*|| meta.base_pipeline_index != -1*/ )
         pipeline_create_info.flags |= VK_PIPELINE_CREATE_DERIVATIVE_BIT;
 
-    meta.device.vkCreateGraphicsPipelines( VK_NULL_HANDLE, 1, &pipeline_create_info, meta.allocator, &meta.pipeline ).vkAssert;
+    meta.device.vkCreateGraphicsPipelines(
+        VK_NULL_HANDLE,         // pipelineCache
+        1,                      // createInfoCount
+        &pipeline_create_info,  // pCreateInfos
+        meta.allocator,         // pAllocator
+        &meta.pipeline          // pPipelines
+        ).vkAssert;
+
     return meta;
 }
 
@@ -666,9 +673,9 @@ alias addPushConstantRange   = addPushConstantRangeImpl_2!Meta_Compute;
 
 
 
-////////////////////////////////////////////////////////////////////////////
-// render pass, subpass, base pipeline, optimization and flags in general //
-////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////
+// base pipeline, optimization and flags in general //
+//////////////////////////////////////////////////////
 
 /// set base pipeline handle for derivated pipelines
 auto ref basePipeline( ref Meta_Compute meta, VkPipeline base_pipeline_handle ) {
@@ -715,7 +722,14 @@ auto ref construct( ref Meta_Compute meta, VkPipelineLayout pipeline_layout = VK
     else
         meta.pipeline_create_info.layout = meta.createPipelineLayout( meta.descriptor_set_layouts.data, meta.push_constant_ranges.data );
 
-    meta.device.vkCreateComputePipelines( VK_NULL_HANDLE, 1, &meta.pipeline_create_info, meta.allocator, &meta.pipeline ).vkAssert;
+    meta.device.vkCreateComputePipelines(
+        VK_NULL_HANDLE,             // pipelineCache
+        1,                          // createInfoCount
+        &meta.pipeline_create_info, // pCreateInfos
+        meta.allocator,             // pAllocator
+        &meta.pipeline              // pPipelines
+        ).vkAssert;
+
     return meta;
 }
 
