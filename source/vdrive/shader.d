@@ -50,7 +50,7 @@ auto createShaderModule( ref Vulkan vk, string path ) {
             up_to_date = glsl_mod_time < spir_mod_time;         // set the up_to_date value if glsl is newer than spir-v
         }
 
-        if( !up_to_date ) {
+        if( !up_to_date ) { // not using else, as up_to_date might have changed in the if clause above
             import std.process : execute;               // use process execute to call glslangValidator
             string[6] compile_glsl_args = [ "glslangValidator", "-V", "-w", "-o", spir_path, path ];
             auto compile_glsl = compile_glsl_args.execute;      // store in status struct
