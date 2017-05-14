@@ -912,7 +912,7 @@ auto ref addTexelBufferViews(
 }
 
 
-/// set the VkDescriptorSet which is supposed to be updated into VkWriteDescriptorSet struct
+/// set the VkDescriptorSet which is supposed to be updated in VkWriteDescriptorSet struct
 /// additionally in the case of using dynamic resource arrays the memory of the arrays
 /// might have been reallocated when descriptor infos or buffer views were added
 /// this means that the VkWriteDescriptorSet might point to wrong memory location
