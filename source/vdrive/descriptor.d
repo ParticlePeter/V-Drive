@@ -930,11 +930,11 @@ auto ref attachSet( ref Meta_Descriptor_Update meta, VkDescriptorSet descriptor_
         // only one of the following can be not null and must be patched with a possibly reallocated pointer
         if( write_set.pImageInfo !is null ) write_set.pImageInfo = & meta.image_infos[ piac.index ];
         else if( write_set.pBufferInfo !is null ) write_set.pBufferInfo = & meta.buffer_infos[ piac.index ];
-        else write_set.pTexelBufferView = & meta.texel_buffer_views[ piac.index ];
+        else if( write_set.pTexelBufferView !is null ) write_set.pTexelBufferView = & meta.texel_buffer_views[ piac.index ];
 
         write_set.descriptorCount = piac.count; // set the proper descriptorCount to its original value
     }
-    return meta.update;
+    return meta;
 }
 
 
@@ -1313,7 +1313,7 @@ auto ref construct(
     string                      func = __FUNCTION__
     ) {
     meta.meta_descriptor_layout.allocateSet( descriptor_pool_create_flags, file, line, func );
-    meta.meta_descriptor_update.attachSet( meta.descriptor_set );
+    meta.meta_descriptor_update.attachSet( meta.descriptor_set ).update;
     return meta;
 }
 
@@ -1336,7 +1336,7 @@ auto ref construct(
     meta.meta_descriptor_layout
         .createSetLayout( set_layout_create_flags, file, line, func )
         .allocateSet( descriptor_pool_create_flags, file, line, func );
-    meta.meta_descriptor_update.attachSet( meta.descriptor_set );
+    meta.meta_descriptor_update.attachSet( meta.descriptor_set ).update;
     return meta;
 }
 
@@ -1360,7 +1360,7 @@ auto ref construct(
     meta.meta_descriptor_layout
         .createSetLayout( set_layout_create_flags, file, line, func )
         .allocateSet( descriptor_pool, file, line, func );
-    meta.meta_descriptor_update.attachSet( meta.descriptor_set );
+    meta.meta_descriptor_update.attachSet( meta.descriptor_set ).update;
     return meta;
 }
 
