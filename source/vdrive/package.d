@@ -4,6 +4,7 @@ public import vdrive.util;
 public import vdrive.state;
 public import vdrive.memory;
 public import vdrive.shader;
+public import vdrive.command;
 public import vdrive.surface;
 public import vdrive.geometry;
 public import vdrive.pipeline;
