@@ -106,5 +106,10 @@ auto commandBufferBeginInfo( VkCommandBufferUsageFlags command_buffer_usage_flag
 }
 
 
+void cmdDispatch( ref VkCommandBuffer cmd_buffer, uint32_t[3] group_count ) {
+    cmd_buffer.vkCmdDispatch( group_count[0], group_count[1], group_count[2] );
+}
+
+
 
 
