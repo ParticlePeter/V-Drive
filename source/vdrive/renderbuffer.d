@@ -365,16 +365,22 @@ struct Meta_FB( uint32_t framebuffer_count = 1, size_t clear_value_count = uint3
     alias fb_count = framebuffer_count;
     alias cv_count = clear_value_count;
 
-    static if( fb_count == uint32_t.max )   Array!VkFramebuffer         framebuffers;
-    else {                                  VkFramebuffer[ fb_count ]   framebuffers;
-                                            uint32_t                    framebuffers_length;
+    static if( fb_count == uint32_t.max ) {
+        Array!VkFramebuffer         framebuffers;
+        uint32_t                    frame_buffers_length() { return framebuffers.length.toUint; }
+    } else {
+        VkFramebuffer[ fb_count ]   framebuffers;
+        uint32_t                    framebuffers_length;
     }
 
     VkRect2D render_area;
 
-    static if( cv_count == uint32_t.max )   Array!VkClearValue          clear_values;
-    else {                                  VkClearValue[ cv_count ]    clear_values;
-                                            uint32_t                    clear_values_length;
+    static if( cv_count == uint32_t.max ) {
+        Array!VkClearValue          clear_values;
+        uint32_t                    clear_values_length() { return clear_values.length.toUint; }
+    } else {
+        VkClearValue[ cv_count ]    clear_values;
+        uint32_t                    clear_values_length;
     }
 
     auto ref opCall( ref Vulkan vk ) {
