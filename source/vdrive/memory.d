@@ -209,7 +209,7 @@ auto ref memoryTypeIndex( ref Meta_Memory meta, uint32_t minimum_index ) {
 }
 
 
-auto ref addRange( META )( ref Meta_Memory meta, ref META meta_resource ) if( hasMemReqs!META ) {
+auto ref addRange( META )( ref Meta_Memory meta, ref META meta_resource, VkDeviceSize* memory_size = null ) if( hasMemReqs!META ) {
     // confirm that VkMemoryPropertyFlags have been specified with memoryType;
     vkAssert( meta.memory_property_flags > 0, "Call memoryType( VkMemoryPropertyFlags ) before adding a range" );
 
@@ -218,16 +218,21 @@ auto ref addRange( META )( ref Meta_Memory meta, ref META meta_resource ) if( ha
     auto resource_type_index = meta_resource.memoryTypeIndex( meta.memory_property_flags );
     if( meta.memory_type_index < resource_type_index ) meta.memory_type_index = resource_type_index;
 
-    // register the require memory size range
-    meta_resource.device_memory_offset = meta_resource.alignedOffset( meta.device_memory_size );
-    meta.device_memory_size = meta_resource.device_memory_offset + meta_resource.requiredMemorySize;
+    // register the require memory size range, either internally in the meta struct
+    // or in the optionally passed in pointer to an external memory_size
+    if( memory_size is null ) {
+        meta_resource.device_memory_offset = meta_resource.alignedOffset( meta.device_memory_size );
+        meta.device_memory_size = meta_resource.device_memory_offset + meta_resource.requiredMemorySize;
+    } else {
+        *memory_size = meta_resource.alignedOffset( *memory_size ) + meta_resource.requiredMemorySize;
+    }
 
     return meta;
 }
 
 
-auto ref addRanges( META )( ref Meta_Memory meta, META[] meta_resource ) if( hasMemReqs!META ) {
-    foreach( ref resource; meta_resources ) meta.addRange( resource );
+auto ref addRanges( META )( ref Meta_Memory meta, META[] meta_resource, VkDeviceSize* memory_size = null ) if( hasMemReqs!META ) {
+    foreach( ref resource; meta_resources ) meta.addRange( resource, memory_size );
     return meta;
 }
 
