@@ -247,15 +247,27 @@ auto ref allocate( ref Meta_Memory meta ) {
 }
 
 
-auto ref bind( META )( ref Meta_Memory meta, ref META meta_resource ) if( hasMemReqs!META ) {
+auto ref bind( META )(
+    ref Meta_Memory meta,
+    ref META        meta_resource,
+    string          file = __FILE__,
+    size_t          line = __LINE__,
+    string          func = __FUNCTION__,
+     ) if( hasMemReqs!META ) {
     vkAssert( meta.device_memory != VK_NULL_HANDLE, "Must allocate() before bind()ing a buffer or image" );        // meta struct must be initialized with a valid vulkan state pointer
-    meta_resource.bindMemory( meta.device_memory, meta_resource.device_memory_offset );
+    meta_resource.bindMemory( meta.device_memory, meta_resource.device_memory_offset, file, line, func );
     return meta;
 }
 
 
-auto ref bind( META )( ref Meta_Memory meta, META[] meta_resource ) if( hasMemReqs!META ) {
-    foreach( ref resource; meta_resources ) meta.bind( resource );
+auto ref bind( META )(
+    ref Meta_Memory meta,
+    ref META[]      meta_resource,
+    string          file = __FILE__,
+    size_t          line = __LINE__,
+    string          func = __FUNCTION__,
+     ) if( hasMemReqs!META ) {
+    foreach( ref resource; meta_resources ) meta.bind( resource, file, line, func );
     return meta;
 }
 
