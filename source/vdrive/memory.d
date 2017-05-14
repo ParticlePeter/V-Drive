@@ -153,9 +153,9 @@ struct Meta_Memory {
     mixin                   Vulkan_State_Pointer;
     private:
     VkDeviceMemory          device_memory;
-    VkDeviceSize            device_memory_size = 0;
-    VkMemoryPropertyFlags   memory_property_flags = 0;
-    uint32_t                memory_type_index;
+    VkDeviceSize            device_memory_size      = 0;
+    VkMemoryPropertyFlags   memory_property_flags   = 0;
+    uint32_t                memory_type_index       = 0;
 
     public:
     auto memory()           { return device_memory; }
@@ -166,6 +166,9 @@ struct Meta_Memory {
     // bulk destroy the resources belonging to this meta struct
     void destroyResources() {
         vk.destroy( device_memory );
+        device_memory_size      = 0;
+        memory_property_flags   = 0;
+        memory_type_index       = 0;
     }
 }
 
@@ -183,7 +186,6 @@ auto ref initMemory(
 }
 
 alias create = initMemory;
-
 
 
 auto createMemory( ref Vulkan vk, uint32_t memory_type_index, VkDeviceSize allocation_size ) {
@@ -345,6 +347,12 @@ mixin template Memory_Member() {
     VkDeviceMemory          device_memory;
     VkDeviceSize            device_memory_offset;
     bool                    owns_device_memory = false;
+    void resetMemoryMember()    {
+        memory_requirements     = VkMemoryRequirements();
+        device_memory           = VK_NULL_HANDLE;
+        device_memory_offset    = 0;
+        owns_device_memory      = false;
+    }
     public:
     auto memory()           { return device_memory; }
     auto memSize()          { return memory_requirements.size; }
@@ -553,6 +561,7 @@ struct Meta_Buffer {
         vk.destroy( buffer );
         if( owns_device_memory )
             vk.destroy( device_memory );
+        resetMemoryMember;
     }
     debug string name;
 }
@@ -622,6 +631,7 @@ struct Meta_Image {
             vk.destroy( image_view );
         if( owns_device_memory )
             vk.destroy( device_memory );
+        resetMemoryMember;
     }
     debug string name;
 }
