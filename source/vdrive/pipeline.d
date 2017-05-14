@@ -61,7 +61,14 @@ auto ref addPushConstantRangeImpl_2( META )( ref META meta, VkShaderStageFlags s
 
 
 /// overload to simplify VkPipelineLayout construction
-VkPipelineLayout createPipelineLayout( Vulkan vk, VkDescriptorSetLayout[] descriptor_set_layouts, VkPushConstantRange[] push_constant_ranges = [] ) {
+VkPipelineLayout createPipelineLayout(
+    Vulkan                  vk,
+    VkDescriptorSetLayout[] descriptor_set_layouts,
+    VkPushConstantRange[]   push_constant_ranges = [],
+    string                  file    = __FILE__,
+    size_t                  line    = __LINE__,
+    string                  func    = __FUNCTION__
+    ) {
     VkPipelineLayoutCreateInfo pipeline_layout_create_info = {
         setLayoutCount                  : descriptor_set_layouts.length.toUint,
         pSetLayouts                     : descriptor_set_layouts.ptr,
@@ -70,32 +77,58 @@ VkPipelineLayout createPipelineLayout( Vulkan vk, VkDescriptorSetLayout[] descri
     };
 
     VkPipelineLayout pipeline_layout;
-    vk.device.vkCreatePipelineLayout( &pipeline_layout_create_info, vk.allocator, &pipeline_layout ).vkAssert;
+    vk.device.vkCreatePipelineLayout( &pipeline_layout_create_info, vk.allocator, &pipeline_layout ).vkAssert( "Pipeline Layout", file, line, func );
     return pipeline_layout;
 }
 
 /// overload to simplify VkPipelineLayout construction
-VkPipelineLayout createPipelineLayout( Vulkan vk, VkDescriptorSetLayout descriptor_set_layout, VkPushConstantRange push_constant_range ) {
+VkPipelineLayout createPipelineLayout(
+    Vulkan                  vk,
+    VkDescriptorSetLayout   descriptor_set_layout,
+    VkPushConstantRange     push_constant_range,
+    string                  file    = __FILE__,
+    size_t                  line    = __LINE__,
+    string                  func    = __FUNCTION__
+    ) {
     VkDescriptorSetLayout[1]    descriptor_set_layouts  = [ descriptor_set_layout ];
     VkPushConstantRange[1]      push_constant_ranges    = [ push_constant_range ];
-    return createPipelineLayout( vk, descriptor_set_layouts, push_constant_ranges );
+    return createPipelineLayout( vk, descriptor_set_layouts, push_constant_ranges, file, line, func );
 }
 
 /// overload to simplify VkPipelineLayout construction
-VkPipelineLayout createPipelineLayout( Vulkan vk, VkDescriptorSetLayout descriptor_set_layout, VkPushConstantRange[] push_constant_ranges = [] ) {
+VkPipelineLayout createPipelineLayout(
+    Vulkan                  vk,
+    VkDescriptorSetLayout   descriptor_set_layout,
+    VkPushConstantRange[]   push_constant_ranges = [],
+    string                  file    = __FILE__,
+    size_t                  line    = __LINE__,
+    string                  func    = __FUNCTION__
+    ) {
     VkDescriptorSetLayout[1]    descriptor_set_layouts  = [ descriptor_set_layout ];
-    return createPipelineLayout( vk, descriptor_set_layouts, push_constant_ranges );
+    return createPipelineLayout( vk, descriptor_set_layouts, push_constant_ranges, file, line, func );
 }
 
 /// overload to simplify VkPipelineLayout construction
-VkPipelineLayout createPipelineLayout( Vulkan vk, VkPushConstantRange push_constant_range ) {
+VkPipelineLayout createPipelineLayout(
+    Vulkan                  vk,
+    VkPushConstantRange     push_constant_range,
+    string                  file    = __FILE__,
+    size_t                  line    = __LINE__,
+    string                  func    = __FUNCTION__
+    ) {
     VkPushConstantRange[1]      push_constant_ranges    = [ push_constant_range ];
-    return createPipelineLayout( vk, [], push_constant_ranges );
+    return createPipelineLayout( vk, [], push_constant_ranges, file, line, func );
 }
 
 /// overload to simplify VkPipelineLayout construction
-VkPipelineLayout createPipelineLayout( Vulkan vk, VkPushConstantRange[] push_constant_ranges ) {
-    return createPipelineLayout( vk, [], push_constant_ranges );
+VkPipelineLayout createPipelineLayout(
+    Vulkan                  vk,
+    VkPushConstantRange[]   push_constant_ranges = [],
+    string                  file    = __FILE__,
+    size_t                  line    = __LINE__,
+    string                  func    = __FUNCTION__
+    ) {
+    return createPipelineLayout( vk, [], push_constant_ranges, file, line, func );
 }
 
 
@@ -537,9 +570,15 @@ auto ref pipelineCeateFlags( ref Meta_Graphics meta, VkPipelineCreateFlags flags
 /////////////////////////////////////////
 // construct the pipeline state object //
 /////////////////////////////////////////
-auto ref construct( ref Meta_Graphics meta, VkPipelineLayout pipeline_layout = VK_NULL_HANDLE ) {
+auto ref construct(
+    ref Meta_Graphics   meta,
+    VkPipelineLayout    pipeline_layout = VK_NULL_HANDLE,
+    string              file    = __FILE__,
+    size_t              line    = __LINE__,
+    string              func    = __FUNCTION__
+    ) {
     // assert that meta struct is initialized with a valid vulkan state pointer
-    assert( meta.isValid );
+    assert( meta.isValid, file, line, func );
 
     VkPipelineVertexInputStateCreateInfo vertex_input_state_create_info = {
         vertexBindingDescriptionCount   : meta.vertex_input_binding_descriptions.length.toUint,
@@ -574,7 +613,7 @@ auto ref construct( ref Meta_Graphics meta, VkPipelineLayout pipeline_layout = V
     if( pipeline_layout )
         meta.pipeline_layout = pipeline_layout;
     else
-        meta.pipeline_layout = meta.createPipelineLayout( meta.descriptor_set_layouts.data, meta.push_constant_ranges.data );
+        meta.pipeline_layout = meta.createPipelineLayout( meta.descriptor_set_layouts.data, meta.push_constant_ranges.data, file, line, func );
 
     // create the pipeline object
     VkGraphicsPipelineCreateInfo pipeline_create_info = {
@@ -606,7 +645,7 @@ auto ref construct( ref Meta_Graphics meta, VkPipelineLayout pipeline_layout = V
         &pipeline_create_info,  // pCreateInfos
         meta.allocator,         // pAllocator
         &meta.pipeline          // pPipelines
-        ).vkAssert;
+        ).vkAssert( "Graphics Pipeline", file, line, func );
 
     return meta;
 }
@@ -680,7 +719,8 @@ alias addPushConstantRange   = addPushConstantRangeImpl_2!Meta_Compute;
 /// set base pipeline handle for derivated pipelines
 auto ref basePipeline( ref Meta_Compute meta, VkPipeline base_pipeline_handle ) {
     meta.pipeline_create_info.basePipelineHandle = base_pipeline_handle;
-    meta.pipeline_create_info.flags |= VK_PIPELINE_CREATE_DERIVATIVE_BIT;
+    if( base_pipeline_handle != VK_NULL_HANDLE )    // we might not know if the passed in pipeline was created already
+        meta.pipeline_create_info.flags |= VK_PIPELINE_CREATE_DERIVATIVE_BIT;
     return meta;
 }
 
@@ -713,9 +753,15 @@ auto ref pipelineCeateFlags( ref Meta_Compute meta, VkPipelineCreateFlags flags 
 /////////////////////////////////////////
 // construct the pipeline state object //
 /////////////////////////////////////////
-auto ref construct( ref Meta_Compute meta, VkPipelineLayout pipeline_layout = VK_NULL_HANDLE ) {
+auto ref construct(
+    ref Meta_Compute    meta,
+    VkPipelineLayout    pipeline_layout = VK_NULL_HANDLE,
+    string              file    = __FILE__,
+    size_t              line    = __LINE__,
+    string              func    = __FUNCTION__
+    ) {
     // assert that meta struct is initialized with a valid vulkan state pointer
-    assert( meta.isValid );
+    assert( meta.isValid, file, line, func );
 
     if( pipeline_layout )
         meta.pipeline_create_info.layout = pipeline_layout;
@@ -728,7 +774,7 @@ auto ref construct( ref Meta_Compute meta, VkPipelineLayout pipeline_layout = VK
         &meta.pipeline_create_info, // pCreateInfos
         meta.allocator,             // pAllocator
         &meta.pipeline              // pPipelines
-        ).vkAssert;
+        ).vkAssert( "Compute Pipeline", file, line, func );
 
     return meta;
 }
