@@ -638,14 +638,14 @@ void reset( ref Meta_Descriptor_Update meta ) {
 /// Params:
 ///     meta = reference to a Meta_Descriptor_Update struct
 ///     binding = index of the corresponding layout binding
-///     dst_array_element = starting index of the array element which should be updated
 ///     descriptor_type  = the type of the corresponding layout binding and hence descriptor(s)
+///     dst_array_element = optional starting index of the array element which should be updated, defaults to 0
 /// Returns: the passed in Meta_Structure for function chaining
 auto ref addBindingUpdate(
     ref Meta_Descriptor_Update  meta,
     uint32_t                    binding,
-    uint32_t                    dst_array_element,
-    VkDescriptorType            descriptor_type
+    VkDescriptorType            descriptor_type,
+    uint32_t                    dst_array_element = 0,
     ) {
     VkWriteDescriptorSet write_set = {
     //  dstSet              : meta.descriptor_set,
@@ -1117,7 +1117,7 @@ private auto ref addDescriptorType(
     // and only if the last command was to add a layout binding
     if( meta.add_write_descriptor ) {
         meta.add_write_descriptor = false;
-        meta.meta_descriptor_update.addBindingUpdate( layout_binding.binding, 0, layout_binding.descriptorType );
+        meta.meta_descriptor_update.addBindingUpdate( layout_binding.binding, layout_binding.descriptorType );
     }
 
     ++meta.descriptor_types_count[ cast( size_t )layout_binding.descriptorType ];
