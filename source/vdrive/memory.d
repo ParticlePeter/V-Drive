@@ -156,6 +156,7 @@ struct Meta_Memory {
     VkDeviceSize            device_memory_size      = 0;
     VkMemoryPropertyFlags   memory_property_flags   = 0;
     uint32_t                memory_type_index       = 0;
+    version( DEBUG_NAME )   string name;
 
     public:
     auto memory()           { return device_memory; }
@@ -565,8 +566,8 @@ struct Meta_Buffer {
     VkBuffer                buffer;
     VkBufferCreateInfo      buffer_create_info;
     VkDeviceSize            bufferSize() { return buffer_create_info.size; }
-
     mixin                   Memory_Member;
+    version( DEBUG_NAME )   string name;
 
     // bulk destroy the resources belonging to this meta struct
     void destroyResources() {
@@ -575,7 +576,7 @@ struct Meta_Buffer {
             vk.destroy( device_memory );
         resetMemoryMember;
     }
-    debug string name;
+    
 }
 
 
@@ -620,8 +621,9 @@ struct Meta_Image {
     VkImageCreateInfo       image_create_info;
     VkImageView             image_view = VK_NULL_HANDLE;
     VkImageViewCreateInfo   image_view_create_info;
-
+    VkSampler               sampler;
     mixin                   Memory_Member;
+    version( DEBUG_NAME )   string name;
 
     // get internal image view and reset it to VK_NULL_HANDLE
     // such that a new, different view can be created
@@ -642,15 +644,13 @@ struct Meta_Image {
     }
 
     // bulk destroy the resources belonging to this meta struct
-    void destroyResources() {
+    void destroyResources( bool destroy_sampler = true ) {
         vk.destroy( image );
-        if( image_view != VK_NULL_HANDLE )
-            vk.destroy( image_view );
-        if( owns_device_memory )
-            vk.destroy( device_memory );
+        if( owns_device_memory )                            vk.destroy( device_memory );
+        if( image_view != VK_NULL_HANDLE )                  vk.destroy( image_view );
+        if( destroy_sampler && sampler != VK_NULL_HANDLE )  vk.destroy( sampler );
         resetMemoryMember;
     }
-    debug string name;
 }
 
 
@@ -725,6 +725,8 @@ auto ref initImage(
 
     return meta.create( image_create_info, file, line, func );
 }
+
+
 /// init a VkImage, general create image function, gets a VkImageCreateInfo as argument
 /// store vulkan data in argument Meta_Image container, return container for chaining
 auto ref initImage(
