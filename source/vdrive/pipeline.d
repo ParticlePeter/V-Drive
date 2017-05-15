@@ -578,7 +578,7 @@ auto ref construct(
     string              func    = __FUNCTION__
     ) {
     // assert that meta struct is initialized with a valid vulkan state pointer
-    assert( meta.isValid, file, line, func );
+    meta.isValid.vkAssert( "Meta Struct not initialized", file, line, func );
 
     VkPipelineVertexInputStateCreateInfo vertex_input_state_create_info = {
         vertexBindingDescriptionCount   : meta.vertex_input_binding_descriptions.length.toUint,
@@ -761,7 +761,7 @@ auto ref construct(
     string              func    = __FUNCTION__
     ) {
     // assert that meta struct is initialized with a valid vulkan state pointer
-    assert( meta.isValid, file, line, func );
+    meta.isValid.vkAssert( "Meta Struct not initialized", file, line, func );
 
     if( pipeline_layout )
         meta.pipeline_create_info.layout = pipeline_layout;
