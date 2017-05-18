@@ -780,6 +780,7 @@ auto ref initFramebuffer(
     VkRenderPass            render_pass,
     VkExtent2D              framebuffer_extent,
     VkImageView[]           image_views,
+    bool                    destroy_old_clear_values = true,
     string                  file = __FILE__,
     size_t                  line = __LINE__,
     string                  func = __FUNCTION__
@@ -788,7 +789,7 @@ auto ref initFramebuffer(
     vkAssert( meta.isValid, "Meta_Struct is not initialized with a vulkan state pointer!", file, line, func );
 
     // if we have some old resources we delete them first
-    if( !meta.empty ) meta.destroyResources;
+    if( !meta.empty ) meta.destroyResources( destroy_old_clear_values );
 
     // the framebuffer_extent is not(!) the render_area, but rather a specification of how big the framebuffer is
     // the render area specifies a render able window into this framebuffer
@@ -815,7 +816,7 @@ auto ref initFramebuffer(
 }
 
 
-/// initialize the VkFramebuffer and store them in the meta structure
+/// initialize the VkFramebuffer and store it in the meta structure
 /// Params:
 ///     meta                = reference to a Meta_Framebuffer or Meta_Framebuffers
 ///     meta_renderpass     = the render_pass member is required for VkFramebufferCreateInfo to specify COMPATIBLE renderpasses,
@@ -823,8 +824,17 @@ auto ref initFramebuffer(
 ///     framebuffer_extent  = the extent of the render area
 ///     image_views         = these will be attached to each of the VkFramebuffer(s) attachments 0 .. first_image_views.length
 /// Returns: the passed in Meta_Structure for function chaining
-auto ref initFramebuffer( ref Meta_Framebuffer meta, ref Meta_Renderpass meta_renderpass, VkExtent2D framebuffer_extent, VkImageView[] image_views ) {
-    meta.initFramebuffer( meta_renderpass.begin_info.renderPass, framebuffer_extent, image_views );
+auto ref initFramebuffer(
+    ref Meta_Framebuffer    meta,
+    Meta_Renderpass         meta_renderpass,
+    VkExtent2D              framebuffer_extent,
+    VkImageView[]           image_views,
+    bool                    destroy_old_clear_values = true,
+    string                  file = __FILE__,
+    size_t                  line = __LINE__,
+    string                  func = __FUNCTION__
+    ) {
+    meta.initFramebuffer( meta_renderpass.begin_info.renderPass, framebuffer_extent, image_views, destroy_old_clear_values, file, line, func );
     meta_renderpass.attachFramebuffer( meta );
     return meta;
 }
@@ -832,15 +842,33 @@ auto ref initFramebuffer( ref Meta_Framebuffer meta, ref Meta_Renderpass meta_re
 alias create = initFramebuffer;
 
 
-auto createFramebuffer( ref Vulkan vk, VkRenderPass render_pass, VkExtent2D framebuffer_extent, VkImageView[] image_views ) {
+auto createFramebuffer(
+    ref Vulkan              vk,
+    VkRenderPass            render_pass,
+    VkExtent2D              framebuffer_extent,
+    VkImageView[]           image_views,
+    bool                    destroy_old_clear_values = true,
+    string                  file = __FILE__,
+    size_t                  line = __LINE__,
+    string                  func = __FUNCTION__
+    ) {
     Meta_Framebuffer meta = vk;
-    return meta.initFramebuffer( render_pass, framebuffer_extent, image_views );
+    return meta.initFramebuffer( render_pass, framebuffer_extent, image_views, destroy_old_clear_values, file, line, func );
 }
 
 
-auto createFramebuffer( ref Vulkan vk, ref Meta_Renderpass meta_renderpass, VkExtent2D framebuffer_extent, VkImageView[] image_views ) {
+auto createFramebuffer(
+    ref Vulkan              vk,
+    Meta_Renderpass         meta_renderpass,
+    VkExtent2D              framebuffer_extent,
+    VkImageView[]           image_views,
+    bool                    destroy_old_clear_values = true,
+    string                  file = __FILE__,
+    size_t                  line = __LINE__,
+    string                  func = __FUNCTION__
+    ) {
     Meta_Framebuffer meta = vk;
-    return meta.initFramebuffer( meta_renderpass, framebuffer_extent, image_views );
+    return meta.initFramebuffer( meta_renderpass, framebuffer_extent, image_views, destroy_old_clear_values, file, line, func );
 }
 
 
@@ -860,6 +888,7 @@ auto ref initFramebuffers(
     VkImageView[]           first_image_views,
     VkImageView[]           dynamic_image_views,
     VkImageView[]           last_image_views = [],
+    bool                    destroy_old_clear_values = true,
     string                  file = __FILE__,
     size_t                  line = __LINE__,
     string                  func = __FUNCTION__
@@ -868,7 +897,7 @@ auto ref initFramebuffers(
     vkAssert( meta.isValid, "Meta_Struct is not initialized with a vulkan state pointer!", file, line, func );
 
     // if we have some old resources we delete them first
-    if( !meta.empty ) meta.destroyResources;
+    if( !meta.empty ) meta.destroyResources( destroy_old_clear_values );
 
     // the framebuffer_extent is not(!) the render_area, but rather a specification of how big the framebuffer is
     // the render area specifies a render able window into this framebuffer
@@ -914,19 +943,22 @@ auto ref initFramebuffers(
 ///     first_image_views   = these will be attached to each of the VkFramebuffer(s) attachments 0 .. first_image_views.length
 ///     dynamic_image_views = the count of these specifies the count if VkFramebuffers(s), dynamic_imag_views[i] will be attached to framebuffer[i] attachment[first_image_views.length] 
 /// Returns: the passed in Meta_Structure for function chaining
-auto ref initFramebuffers( 
+auto ref initFramebuffers(
     ref Meta_Framebuffers   meta,
     ref Meta_Renderpass     meta_renderpass,
     VkExtent2D              framebuffer_extent,
     VkImageView[]           first_image_views,
     VkImageView[]           dynamic_image_views,
-    VkImageView[]           last_image_views = []
+    VkImageView[]           last_image_views = [],
+    bool                    destroy_old_clear_values = true,
+    string                  file = __FILE__,
+    size_t                  line = __LINE__,
+    string                  func = __FUNCTION__
     ) {
     meta.initFramebuffers(
-        meta_renderpass.begin_info.renderPass,
-        framebuffer_extent,
-        first_image_views,
-        dynamic_image_views );
+        meta_renderpass.begin_info.renderPass, framebuffer_extent,
+        first_image_views, dynamic_image_views, last_image_views,
+        destroy_old_clear_values, file, line, func );
     meta_renderpass.attachFramebuffer( meta, 0 );
     return meta;
 }
@@ -941,10 +973,17 @@ auto createFramebuffers(
     VkExtent2D      framebuffer_extent,
     VkImageView[]   first_image_views,
     VkImageView[]   dynamic_image_views,
-    VkImageView[]   last_image_views = []
+    VkImageView[]   last_image_views = [],
+    bool            destroy_old_clear_values = true,
+    string          file = __FILE__,
+    size_t          line = __LINE__,
+    string          func = __FUNCTION__
     ) {
     Meta_Framebuffers meta = vk;
-    return meta.create( render_pass, framebuffer_extent, first_image_views, dynamic_image_views, last_image_views );
+    return meta.initFramebuffers(
+        render_pass, framebuffer_extent,
+        first_image_views, dynamic_image_views, last_image_views,
+        destroy_old_clear_values, file, line, func );
 }
 
 
@@ -954,8 +993,15 @@ auto createFramebuffers(
     VkExtent2D              framebuffer_extent,
     VkImageView[]           first_image_views,
     VkImageView[]           dynamic_image_views,
-    VkImageView[]           last_image_views = []
+    VkImageView[]           last_image_views = [],
+    bool                    destroy_old_clear_values = true,
+    string                  file = __FILE__,
+    size_t                  line = __LINE__,
+    string                  func = __FUNCTION__
     ) {
     Meta_Framebuffers  meta = vk;
-    return meta.create( meta_renderpass, framebuffer_extent, first_image_views, dynamic_image_views );
+    return meta.initFramebuffers(
+        meta_renderpass, framebuffer_extent,
+        first_image_views, dynamic_image_views, last_image_views,
+        destroy_old_clear_values, file, line, func );
 }
