@@ -412,15 +412,19 @@ struct Meta_FB( uint32_t framebuffer_count = 1, size_t clear_value_count = uint3
         else                                    return framebuffers_length > 0;
     }
 
-    void destroyResources() {
+    void destroyResources( bool destroy_clear_values = true ) {
         foreach( fb; framebuffers )  vk.destroy( fb );
         static if( fb_count == uint32_t.max )   framebuffers.clear;
         else                                    framebuffers_length = 0;
 
         // Required if this struct should be reused for proper render_area reinitialization
         render_area = VkRect2D( VkOffset2D( 0, 0 ), VkExtent2D( 0, 0 ));
-        static if( cv_count == uint32_t.max )   clear_values.clear;
-        else                                    clear_values_length = 0;
+
+        // optionally destroy clear values, default is destroy them
+        if( destroy_clear_values ) {
+            static if( cv_count == uint32_t.max )   clear_values.clear;
+            else                                    clear_values_length = 0;
+        }
     }
 }
 
