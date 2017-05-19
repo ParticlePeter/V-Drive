@@ -133,4 +133,58 @@ unittest {
     writeln( cast( ubyte[] )pointer_buffer.data() );
 
 }
+
+
+
+nothrow @nogc:
+
+//struct Static_Array( size : N, T, N = uint ) if( __traits( isIntegral, size )) {
+struct Static_Array( uint size, T ) {
+    alias N = uint;
+    alias data this;
+    T[ size ] data;
+    private N count = 0;
+
+    // set desired length, which must not be gretaer then the array size
+    void length( N l, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__  ) {
+        import vdrive.util.util : vkAssert;
+        vkAssert( l <= size, "Array out of bounds!", file, line, func );
+        count = l;
+    }
+
+    const N length()    { return count; }
+    const N opDollar()  { return count; }
+    const bool empty()  { return count == 0; }
+    N capacity()        { return size; } 
+     
+    //@property T* ptr()                      { return data.ptr; }
+
+    ref inout( T ) opIndex( size_t i, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__  ) inout {
+    //ref T opIndex( size_t i, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+        import vdrive.util.util : vkAssert;
+        vkAssert( i < size, "Array out of bounds!", file, line, func );
+        //if( i >= count ) count = cast( uint )( i + 1 );
+        return data[ i ];
+    }
+
+    inout @property ref inout( T ) front()  { return data[ 0 ]; }
+    inout @property ref inout( T ) back()   { return data[ count - 1 ]; }
+
+    void append( S )( S stuff, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) if( is( S : T )) {
+        import vdrive.util.util : vkAssert;
+        vkAssert( count < size, "Memory not sufficient to append additional data!", file, line, func );
+        data[ count ] = stuff; 
+        ++count;
+    }
+
+    void clear() { count = 0; }
+}
+
+alias SArray = Static_Array;
+
+
+auto sizedArray( uint max_length, T )( uint length ) {
+    SArray!( max_length, T ) array;
+    array.length = length;
+    return array;
 }
