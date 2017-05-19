@@ -128,3 +128,89 @@ auto createPipelineShaderStage(
     );
 }
 
+
+import vdrive.util;
+union  MapEntry32 {
+    uint32_t u = 0;
+    int32_t  i;
+    float    f;
+    this( uint32_t u ) { this.u = u; }
+    this( int32_t  i ) { this.i = i; }
+    this( float    f ) { this.f = f; }
+
+    static MapEntry32 max() { return MapEntry32( uint32_t.max ); }
+}
+
+struct Meta_SC( uint32_t specialization_count ) {
+    enum isMetaSC = true;
+
+    alias sc_count = specialization_count;
+
+    VkSpecializationInfo specialization_info;
+
+    static if( sc_count == uint32_t.max ) {
+        Array!VkSpecializationMapEntry  specialization_map_entries;
+        Array!MapEntry32                specialization_data;
+    } else {
+        SArray!( sc_count, VkSpecializationMapEntry ) specialization_map_entries;
+        SArray!( sc_count, MapEntry32 )               specialization_data;
+    } 
+
+
+    void reset() {
+       specialization_map_entries.clear;
+       specialization_data.clear; 
+    }
+}
+
+alias Meta_Specialization = Meta_SC!( uint32_t.max );
+
+auto ref addMapEntry( META_SC )(
+    ref META_SC     meta,
+    MapEntry32      data = MapEntry32.max,
+    uint32_t        constantID = uint32_t.max
+    ) if( __traits( hasMember, META_SC, "isMetaSC" )) {
+
+    if( constantID == uint32_t.max )
+        constantID = meta.specialization_map_entries.length
+            ? meta.specialization_map_entries[ $-1 ].constantID + 1 : 0;
+    return meta.addMapEntry(
+        VkSpecializationMapEntry(
+            constantID,
+            ( meta.specialization_data.length * MapEntry32.sizeof ).toUint,
+            MapEntry32.sizeof ),
+        data );
+}
+
+auto ref addMapEntry( META_SC )(
+    ref META_SC                 meta,
+    VkSpecializationMapEntry    specialization_map_entry,
+    MapEntry32                  data = MapEntry32.max
+    ) if( __traits( hasMember, META_SC, "isMetaSC" )) {
+
+    meta.specialization_map_entries.append( specialization_map_entry );
+    if( data.u < uint32_t.max ) meta.specialization_data.append( data );
+    return meta;
+}
+
+auto ref construct( META_SC )(
+    ref META_SC     meta,
+    void[]          specialization_constants = []
+    ) if( __traits( hasMember, META_SC, "isMetaSC" )) {
+
+    uint32_t data_size  = ( specialization_constants == []
+        ? meta.specialization_data.length * MapEntry32.sizeof
+        : specialization_constants.length ).toUint;
+
+    const( void )* p_data = specialization_constants == []
+        ? meta.specialization_data.ptr
+        : specialization_constants.ptr;
+
+
+    with( meta.specialization_info ) {
+        mapEntryCount   = meta.specialization_map_entries.length.toUint;
+        pMapEntries     = meta.specialization_map_entries.ptr;
+        dataSize        = data_size;
+        pData           = p_data;
+    }
+}
