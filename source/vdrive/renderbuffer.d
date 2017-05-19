@@ -356,8 +356,6 @@ auto ref construct( ref Meta_Renderpass meta ) {
 // Meta_Framebuffer //
 //////////////////////
 
-
-
 struct Meta_FB( uint32_t framebuffer_count = 1, size_t clear_value_count = uint32_t.max ) {
     mixin       Vulkan_State_Pointer;
 
@@ -365,23 +363,13 @@ struct Meta_FB( uint32_t framebuffer_count = 1, size_t clear_value_count = uint3
     alias fb_count = framebuffer_count;
     alias cv_count = clear_value_count;
 
-    static if( fb_count == uint32_t.max ) {
-        Array!VkFramebuffer         framebuffers;
-        uint32_t                    frame_buffers_length() { return framebuffers.length.toUint; }
-    } else {
-        VkFramebuffer[ fb_count ]   framebuffers;
-        uint32_t                    framebuffers_length;
-    }
+    static if( fb_count == uint32_t.max )    Array!VkFramebuffer    framebuffers;
+    else                        SArray!( fb_count, VkFramebuffer )  framebuffers;
 
     VkRect2D render_area;
 
-    static if( cv_count == uint32_t.max ) {
-        Array!VkClearValue          clear_values;
-        uint32_t                    clear_values_length() { return clear_values.length.toUint; }
-    } else {
-        VkClearValue[ cv_count ]    clear_values;
-        uint32_t                    clear_values_length;
-    }
+    static if( cv_count == uint32_t.max )    Array!VkClearValue     clear_values;
+    else                        SArray!( fb_count, VkClearValue )   clear_values;
 
     auto ref opCall( ref Vulkan vk ) {
         this.vk( vk );
@@ -398,24 +386,14 @@ struct Meta_FB( uint32_t framebuffer_count = 1, size_t clear_value_count = uint3
         return framebuffers[ index ];
     }
 
-    auto ptr() {
-        return framebuffers.ptr;
-    }
-
-    auto length() {
-        static if( fb_count == uint32_t.max )   return framebuffers.length.toUint;
-        else                                    return framebuffers_length;
-    }
-
-    bool empty() {
-        static if( fb_count == uint32_t.max )   return framebuffers.empty;
-        else                                    return framebuffers_length > 0;
-    }
+    auto ptr()      { return framebuffers.ptr; }
+    auto length()   { return framebuffers.length.toUint; }
+    bool empty()    { return framebuffers.empty; }
 
     void destroyResources( bool destroy_clear_values = true ) {
         foreach( fb; framebuffers )  vk.destroy( fb );
         static if( fb_count == uint32_t.max )   framebuffers.clear;
-        else                                    framebuffers_length = 0;
+        else                                    framebuffers.clear;
 
         // Required if this struct should be reused for proper render_area reinitialization
         render_area = VkRect2D( VkOffset2D( 0, 0 ), VkExtent2D( 0, 0 ));
@@ -423,7 +401,7 @@ struct Meta_FB( uint32_t framebuffer_count = 1, size_t clear_value_count = uint3
         // optionally destroy clear values, default is destroy them
         if( destroy_clear_values ) {
             static if( cv_count == uint32_t.max )   clear_values.clear;
-            else                                    clear_values_length = 0;
+            else                                    clear_values.clear;
         }
     }
 }
@@ -433,8 +411,14 @@ alias Meta_Framebuffers = Meta_FB!( uint32_t.max, uint32_t.max );
 
 
 /// template to determine if a type is a Meta_Framebuffer or Meta_Framebuffers
-template IS_FB( META_FB ) {  enum IS_FB = ( is( META_FB == Meta_Framebuffer ) || is( META_FB == Meta_Framebuffers ));  }
+//template isMultiBuffer( META_FB ) {  enum isMultiBuffer = ( is( META_FB == Meta_Framebuffer ) || is( META_FB == Meta_Framebuffers ));  }
 
+/// If T is a vector, this evaluates to true, otherwise false
+private template isSingleBuffer( T )  {  enum isSingleBuffer = is( typeof( isSingleBufferImpl( T.init ))); }
+private void isSingleBufferImpl( uint cv_count )( Meta_FB!( 1, cv_count ) meta ) {}
+
+private template isMultiBuffer( T )  {  enum isMultiBuffer = is( typeof( isMultiBufferImpl( T.init ))); }
+private void isMultiBufferImpl( uint fb_count, uint cv_count )( Meta_FB!( fb_count, cv_count ) meta ) {}
 
 /// Set attachment specific (framebuffer attachment index) r, g, b, a clear value
 /// The type of all values must be the same and either float, int32_t or uint32_t
@@ -456,7 +440,7 @@ auto ref setClearValue( META_FB, T )(
     string      file = __FILE__,
     size_t      line = __LINE__,
     string      func = __FUNCTION__
-    ) if( IS_FB!META_FB && ( is( T == float ) || is( T == int32_t ) || is( T == uint32_t ))) {
+    ) if( isMultiBuffer!META_FB && ( is( T == float ) || is( T == int32_t ) || is( T == uint32_t ))) {
     T[4] rgba = [ r, g, b, a ];
     return setClearValue( meta, index, rgba, file, line, func );
 }
@@ -476,7 +460,7 @@ auto ref setClearValue( META_FB, T )(
     string      file = __FILE__,
     size_t      line = __LINE__,
     string      func = __FUNCTION__
-    ) if( IS_FB!META_FB && ( is( T == float ) || is( T == int32_t ) || is( T == uint32_t ))) {
+    ) if( isMultiBuffer!META_FB && ( is( T == float ) || is( T == int32_t ) || is( T == uint32_t ))) {
     VkClearValue clear_value;
             static if( is( T == float ))    clear_value.color.float32   = rgba;
     else    static if( is( T == int32_t ))  clear_value.color.int32     = rgba;
@@ -501,7 +485,7 @@ auto ref setClearValue( META_FB, U )(
     string      file = __FILE__,
     size_t      line = __LINE__,
     string      func = __FUNCTION__
-    ) if( IS_FB!META_FB && is( U : uint32_t )) {
+    ) if( isMultiBuffer!META_FB && is( U : uint32_t )) {
     VkClearValue clear_value = { depthStencil : VkClearDepthStencilValue( depth, stencil ) };
     return setClearValue( meta, index, clear_value, file, line, func );
 }
@@ -521,29 +505,29 @@ auto ref setClearValue( META_FB )(
     string          file = __FILE__,
     size_t          line = __LINE__,
     string          func = __FUNCTION__
-    ) if( IS_FB!META_FB ) {
+    ) if( isMultiBuffer!META_FB ) {
 
     // if using dynamic arrays
-    static if( META_FB.cv_count == uint32_t.max ) {
+//    static if( META_FB.cv_count == uint32_t.max ) {
         if( index == uint32_t.max )                     // signal to append clear_value instead of setting to a specific index ...
             index = meta.clear_values.length.toUint;    // ... hence set the index to the length of the current array length
         if( meta.clear_values.length <= index ) {       // if index is greater then the array ...
             meta.clear_values.length  = index + 1;      // ... resize the array
         }
         meta.clear_values[ index ] = clear_value;
-    }
-
+//    }
+/*
     // if using static arrays
     else {
         if( index == uint32_t.max )                 // signal to append clear_value instead of setting to a specific index ...
             index = clear_values_length;            // ... hence set the index to the length of the current array length
-        vkAssert( index < META_FB.cv_count,        // assert that the current index fits into the static array bounds
+        vkAssert( index < META_FB.cv_count,         // assert that the current index fits into the static array bounds
             "Meta_Framebuffer with static clear value array param index must be greater than the static array length", 
             file, line, func );
         clear_values_length = index + 1;            // set the occupied length of the static clear_value array
         meta.clear_values[ index ] = clear_value;
     }
-    
+*/
     return meta;
 }
 
@@ -566,7 +550,7 @@ auto ref addClearValue( META_FB, T )(
     string      file = __FILE__,
     size_t      line = __LINE__,
     string      func = __FUNCTION__
-    ) if( IS_FB!META_FB && ( is( T == float ) || is( T == int32_t ) || is( T == uint32_t ))) {
+    ) if( isMultiBuffer!META_FB && ( is( T == float ) || is( T == int32_t ) || is( T == uint32_t ))) {
     return setClearValue( meta, uint32_t.max, r, g, b, a, file, line, func );
 }
 
@@ -583,7 +567,7 @@ auto ref addClearValue( META_FB, T )(
     string      file = __FILE__,
     size_t      line = __LINE__,
     string      func = __FUNCTION__
-    ) if( IS_FB!META_FB && ( is( T == float ) || is( T == int32_t ) || is( T == uint32_t ))) {
+    ) if( isMultiBuffer!META_FB && ( is( T == float ) || is( T == int32_t ) || is( T == uint32_t ))) {
     return setClearValue( meta, uint32_t.max, rgba, file, line, func );
 }
 
@@ -602,7 +586,7 @@ auto ref addClearValue( META_FB, U )(
     string      file = __FILE__,
     size_t      line = __LINE__,
     string      func = __FUNCTION__
-    ) if( IS_FB!META_FB && is( U : uint32_t )) {
+    ) if( isMultiBuffer!META_FB && is( U : uint32_t )) {
     return setClearValue( meta, uint32_t.max, depth, stencil, file, line, func );
 }
 
@@ -619,7 +603,7 @@ auto ref addClearValue( META_FB )(
     string          file = __FILE__,
     size_t          line = __LINE__,
     string          func = __FUNCTION__
-    ) if( IS_FB!META_FB ) {
+    ) if( isMultiBuffer!META_FB ) {
     return setClearValue( meta, uint32_t.max, clear_value, file, line, func );
 }
 
@@ -631,7 +615,7 @@ auto ref addClearValue( META_FB )(
 ///     meta    = reference to a Meta_Framebuffer or Meta_Framebuffers
 ///     offset  = the offset of the render area
 /// Returns: the passed in Meta_Structure for function chaining 
-auto ref renderAreaOffset( META_FB )( ref META_FB meta, VkOffset2D offset ) if( IS_FB!META_FB ) {
+auto ref renderAreaOffset( META_FB )( ref META_FB meta, VkOffset2D offset ) if( isMultiBuffer!META_FB ) {
     meta.render_area.offset = offset;
     return meta;
 }
@@ -645,7 +629,7 @@ auto ref renderAreaOffset( META_FB )( ref META_FB meta, VkOffset2D offset ) if( 
 ///     x       = the offset of the render area in x
 ///     y       = the offset of the render area in y
 /// Returns: the passed in Meta_Structure for function chaining 
-auto ref renderAreaOffset( META_FB )( ref META_FB meta, int32_t x, int32_t y ) if( IS_FB!META_FB ) {
+auto ref renderAreaOffset( META_FB )( ref META_FB meta, int32_t x, int32_t y ) if( isMultiBuffer!META_FB ) {
     return meta.renderAreaOffset( VkOffset2D( x, y ));
 }
 
@@ -657,7 +641,7 @@ auto ref renderAreaOffset( META_FB )( ref META_FB meta, int32_t x, int32_t y ) i
 ///     meta    = reference to a Meta_Framebuffer or Meta_Framebuffers
 ///     extent  = the extent of the render area
 /// Returns: the passed in Meta_Structure for function chaining
-auto ref renderAreaExtent( META_FB )( ref META_FB meta, VkExtent2D extent ) if( IS_FB!META_FB ) {
+auto ref renderAreaExtent( META_FB )( ref META_FB meta, VkExtent2D extent ) if( isMultiBuffer!META_FB ) {
     meta.render_area.extent = extent;
     return meta;
 }
@@ -671,7 +655,7 @@ auto ref renderAreaExtent( META_FB )( ref META_FB meta, VkExtent2D extent ) if( 
 ///     width   = the width of the render area
 ///     height  = the height of the render area
 /// Returns: the passed in Meta_Structure for function chaining
-auto ref renderAreaExtent( META_FB )( ref META_FB meta, uint32_t width, uint32_t height ) if( IS_FB!META_FB ) {
+auto ref renderAreaExtent( META_FB )( ref META_FB meta, uint32_t width, uint32_t height ) if( isMultiBuffer!META_FB ) {
     return meta.renderAreaExtent( VkExtent2D( width, height ));
 }
 
@@ -683,7 +667,7 @@ auto ref renderAreaExtent( META_FB )( ref META_FB meta, uint32_t width, uint32_t
 ///     meta    = reference to a Meta_Framebuffer or Meta_Framebuffers
 ///     area    = the render area
 /// Returns: the passed in Meta_Structure for function chaining
-auto ref renderArea( META_FB )( ref META_FB meta, VkRect2D area ) if( IS_FB!META_FB ) {
+auto ref renderArea( META_FB )( ref META_FB meta, VkRect2D area ) if( isMultiBuffer!META_FB ) {
     meta.render_area = area;
     return meta;
 }
@@ -697,7 +681,7 @@ auto ref renderArea( META_FB )( ref META_FB meta, VkRect2D area ) if( IS_FB!META
 ///     offset  = the offset of the render area
 ///     extent  = the extent of the render area
 /// Returns: the passed in Meta_Structure for function chaining
-auto ref renderAreaExtent( META_FB )( ref META_FB meta, VkOffset2D offset, VkExtent2D extent ) if( IS_FB!META_FB ) {
+auto ref renderAreaExtent( META_FB )( ref META_FB meta, VkOffset2D offset, VkExtent2D extent ) if( isMultiBuffer!META_FB ) {
     return meta.renderArea( VkRect( offset, extent ));
 }
 
@@ -712,7 +696,7 @@ auto ref renderAreaExtent( META_FB )( ref META_FB meta, VkOffset2D offset, VkExt
 ///     width   = the width of the render area
 ///     height  = the height of the render area
 /// Returns: the passed in Meta_Structure for function chaining
-auto ref renderAreaExtent( META_FB )( ref META_FB meta, int32_t x, int32_t y, uint32_t width, uint32_t height ) if( IS_FB!META_FB ) {
+auto ref renderAreaExtent( META_FB )( ref META_FB meta, int32_t x, int32_t y, uint32_t width, uint32_t height ) if( isMultiBuffer!META_FB ) {
     return meta.renderArea( VkRect( VkOffset2D( x, y ), VkExtent( width, height )));
 }
 
@@ -723,7 +707,7 @@ auto ref renderAreaExtent( META_FB )( ref META_FB meta, int32_t x, int32_t y, ui
 /////////////////////////////////////////////////
 
 
-
+/*
 /// set members of a Meta_Renderpass.VkRenderPassBeginInfo with the corresponding members of a Meta_Framebuffer structure
 /// this should be called once if the framebuffer related members of the VkRenderPassBeginInfo are not changing later on
 /// or before vkCmdBeginRenderPass to switch framebuffer, render area (hint, see renderAreaOffset/Extent) and clear values
@@ -731,7 +715,10 @@ auto ref renderAreaExtent( META_FB )( ref META_FB meta, int32_t x, int32_t y, ui
 ///     meta_renderpass = reference to a Meta_Renderpass structure holding the VkRenderPassBeginInfo
 ///     meta_framebuffer = the Meta_Framebuffer structure whose framebuffer and resources will be attached
 /// Returns: the passed in Meta_Structure for function chaining
-auto ref attachFramebuffer( ref Meta_Renderpass meta_renderpass, ref Meta_Framebuffer meta_framebuffer ) {
+auto ref attachFramebuffer( META_FB )(
+    ref Meta_Renderpass meta_renderpass,
+    ref META_FB         meta_framebuffer
+    ) if( isSingleBuffer!META_FB ) {
     with( meta_renderpass.begin_info ) {
         framebuffer     = meta_framebuffer( 0 );
         renderArea      = meta_framebuffer.render_area;
@@ -739,7 +726,7 @@ auto ref attachFramebuffer( ref Meta_Renderpass meta_renderpass, ref Meta_Frameb
         clearValueCount = meta_framebuffer.clear_values.length.toUint;
     } return meta_renderpass;
 }
-
+*/
 /// set members of a Meta_Renderpass.VkRenderPassBeginInfo with the corresponding members of a Meta_Framebuffers structure
 /// this should be called once if the framebuffer related members of the VkRenderPassBeginInfo are not changing later on
 /// or before vkCmdBeginRenderPass to switch framebuffer, render area (hint, see renderAreaOffset/Extent) and clear values
@@ -748,7 +735,11 @@ auto ref attachFramebuffer( ref Meta_Renderpass meta_renderpass, ref Meta_Frameb
 ///     meta_framebuffers = reference to the Meta_Framebuffer structure whose framebuffer and resources will be attached
 ///     framebuffer_length = the index to select a framebuffer from the member framebuffer array
 /// Returns: the passed in Meta_Structure for function chaining
-auto ref attachFramebuffer( ref Meta_Renderpass meta_renderpass, ref Meta_Framebuffers meta_framebuffers, uint32_t framebuffer_index ) {
+auto ref attachFramebuffer( META_FB )(
+    ref Meta_Renderpass meta_renderpass,
+    ref META_FB         meta_framebuffers,
+    uint32_t            framebuffer_index = 0
+    ) if( isMultiBuffer!META_FB ) {
     with( meta_renderpass.begin_info ) {
         framebuffer     = meta_framebuffers( framebuffer_index );
         renderArea      = meta_framebuffers.render_area;
@@ -775,8 +766,8 @@ auto ref attachFramebuffer( ref Meta_Renderpass meta_renderpass, VkFramebuffer f
 ///     framebuffer_extent  = the extent of the framebuffer, this is not(!) the render area
 ///     image_views         = these will be attached to each of the VkFramebuffer(s) attachments 0 .. first_image_views.length
 /// Returns: the passed in Meta_Structure for function chaining
-auto ref initFramebuffer(
-    ref Meta_Framebuffer    meta,
+auto ref initFramebuffer( META_FB )(
+    ref META_FB             meta,
     VkRenderPass            render_pass,
     VkExtent2D              framebuffer_extent,
     VkImageView[]           image_views,
@@ -784,7 +775,7 @@ auto ref initFramebuffer(
     string                  file = __FILE__,
     size_t                  line = __LINE__,
     string                  func = __FUNCTION__
-    ) {
+    ) if( isSingleBuffer!META_FB ) {
     // assert that meta struct is initialized with a valid vulkan state pointer
     vkAssert( meta.isValid, "Meta_Struct is not initialized with a vulkan state pointer!", file, line, func );
 
@@ -824,8 +815,8 @@ auto ref initFramebuffer(
 ///     framebuffer_extent  = the extent of the render area
 ///     image_views         = these will be attached to each of the VkFramebuffer(s) attachments 0 .. first_image_views.length
 /// Returns: the passed in Meta_Structure for function chaining
-auto ref initFramebuffer(
-    ref Meta_Framebuffer    meta,
+auto ref initFramebuffer( META_FB )(
+    ref META_FB             meta,
     Meta_Renderpass         meta_renderpass,
     VkExtent2D              framebuffer_extent,
     VkImageView[]           image_views,
@@ -833,7 +824,7 @@ auto ref initFramebuffer(
     string                  file = __FILE__,
     size_t                  line = __LINE__,
     string                  func = __FUNCTION__
-    ) {
+    ) if( isSingleBuffer!META_FB ) {
     meta.initFramebuffer( meta_renderpass.begin_info.renderPass, framebuffer_extent, image_views, destroy_old_clear_values, file, line, func );
     meta_renderpass.attachFramebuffer( meta );
     return meta;
@@ -881,8 +872,8 @@ auto createFramebuffer(
 ///     dynamic_image_views = the count of these specifies the count if VkFramebuffers(s), dynamic_imag_views[i] will be attached to framebuffer[i] attachment[first_image_views.length] 
 ///     last_image views    = these will be attached to each of the VkFramebuffer(s) attachments first_image_views.length + 1 .. last_image_view_length + 1 
 /// Returns: the passed in Meta_Structure for function chaining
-auto ref initFramebuffers(
-    ref Meta_Framebuffers   meta,
+auto ref initFramebuffers( META_FB, uint32_t max_image_view_count = uint32_t.max )(
+    ref META_FB             meta,
     VkRenderPass            render_pass,
     VkExtent2D              framebuffer_extent,
     VkImageView[]           first_image_views,
@@ -892,7 +883,7 @@ auto ref initFramebuffers(
     string                  file = __FILE__,
     size_t                  line = __LINE__,
     string                  func = __FUNCTION__
-    ) {
+    ) if( isMultiBuffer!META_FB ) {
     // assert that meta struct is initialized with a valid vulkan state pointer
     vkAssert( meta.isValid, "Meta_Struct is not initialized with a vulkan state pointer!", file, line, func );
 
@@ -908,9 +899,12 @@ auto ref initFramebuffers(
 
     // copy the first image views, add another image for the dynamic image views and then the last image views
     // the dynamic image view will be filled with one of the dynamic_image_viewes in the framebuffer create loop
-    auto image_views = sizedArray!VkImageView( first_image_views.length + 1 + last_image_views.length );
-    foreach( i, image_view; first_image_views )     image_views[ i ] = image_view;
-    foreach( i, image_view; last_image_views )      image_views[ first_image_views.length + 1 + i ] = image_view;
+    uint image_view_count = ( first_image_views.length + 1 + last_image_views.length ).toUint;
+    static if( max_image_view_count == uint32_t.max )   auto image_views = sizedArray!VkImageView(   image_view_count );
+    else                        auto image_views = sizedArray!( max_image_view_count, VkImageView )( image_view_count );
+
+    foreach( i, image_view; first_image_views ) image_views[ i ] = image_view;
+    foreach( i, image_view; last_image_views )  image_views[ first_image_views.length + 1 + i ] = image_view;
 
     VkFramebufferCreateInfo framebuffer_create_info = {
         renderPass      : render_pass,                      // this defines render pass COMPATIBILITY   
@@ -922,11 +916,12 @@ auto ref initFramebuffers(
     };
 
     // create a framebuffer per dynamic_image_view (e.g. for each swapchain image view)
-    meta.framebuffers.length = dynamic_image_views.length;
-    foreach( i, ref fb; meta.framebuffers.data ) {
+    meta.framebuffers.length = dynamic_image_views.length.toUint;
+    //foreach( i, ref fb; meta.framebuffers.data ) {
+    foreach( i; 0 .. meta.framebuffers.length ) {
         image_views[ first_image_views.length ] = dynamic_image_views[ i ];
         meta.device
-            .vkCreateFramebuffer( &framebuffer_create_info, meta.allocator, &fb )
+            .vkCreateFramebuffer( &framebuffer_create_info, meta.allocator, & meta.framebuffers[ i ] )
             .vkAssert( file, line, func );
     }
 
@@ -943,8 +938,8 @@ auto ref initFramebuffers(
 ///     first_image_views   = these will be attached to each of the VkFramebuffer(s) attachments 0 .. first_image_views.length
 ///     dynamic_image_views = the count of these specifies the count if VkFramebuffers(s), dynamic_imag_views[i] will be attached to framebuffer[i] attachment[first_image_views.length] 
 /// Returns: the passed in Meta_Structure for function chaining
-auto ref initFramebuffers(
-    ref Meta_Framebuffers   meta,
+auto ref initFramebuffers( META_FB, uint32_t max_image_view_count = uint32_t.max )(
+    ref META_FB             meta,
     ref Meta_Renderpass     meta_renderpass,
     VkExtent2D              framebuffer_extent,
     VkImageView[]           first_image_views,
@@ -954,8 +949,8 @@ auto ref initFramebuffers(
     string                  file = __FILE__,
     size_t                  line = __LINE__,
     string                  func = __FUNCTION__
-    ) {
-    meta.initFramebuffers(
+    ) if( isMultiBuffer!META_FB ) {
+    meta.initFramebuffers!( META_FB, max_image_view_count )(
         meta_renderpass.begin_info.renderPass, framebuffer_extent,
         first_image_views, dynamic_image_views, last_image_views,
         destroy_old_clear_values, file, line, func );
