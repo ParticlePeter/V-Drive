@@ -363,14 +363,10 @@ struct Meta_FB( uint32_t framebuffer_count = 1, size_t clear_value_count = uint3
     alias fb_count = framebuffer_count;
     alias cv_count = clear_value_count;
 
-    static if( fb_count == uint32_t.max )    Array!VkFramebuffer    framebuffers;
-    else                        SArray!( fb_count, VkFramebuffer )  framebuffers;
-
-    VkRect2D render_area;
-
-    static if( cv_count == uint32_t.max )    Array!VkClearValue     clear_values;
-    else                        SArray!( fb_count, VkClearValue )   clear_values;
-
+    VkRect2D                                                                render_area;
+    D_OR_S_ARRAY!( fb_count, VkFramebuffer )                                framebuffers;
+    static if( cv_count > 0 )   D_OR_S_ARRAY!( cv_count, VkClearValue )     clear_values;
+    
     auto ref opCall( ref Vulkan vk ) {
         this.vk( vk );
         return this;
@@ -391,27 +387,20 @@ struct Meta_FB( uint32_t framebuffer_count = 1, size_t clear_value_count = uint3
     bool empty()    { return framebuffers.empty; }
 
     void destroyResources( bool destroy_clear_values = true ) {
-        foreach( fb; framebuffers )  vk.destroy( fb );
-        static if( fb_count == uint32_t.max )   framebuffers.clear;
-        else                                    framebuffers.clear;
-
         // Required if this struct should be reused for proper render_area reinitialization
         render_area = VkRect2D( VkOffset2D( 0, 0 ), VkExtent2D( 0, 0 ));
 
+        // destroy framebuffers
+        foreach( fb; framebuffers )  vk.destroy( fb );
+        framebuffers.clear;
+
         // optionally destroy clear values, default is destroy them
-        if( destroy_clear_values ) {
-            static if( cv_count == uint32_t.max )   clear_values.clear;
-            else                                    clear_values.clear;
-        }
+        static if( cv_count > 0 ) if( destroy_clear_values ) clear_values.clear;
     }
 }
 
 alias Meta_Framebuffer  = Meta_FB!( 1, uint32_t.max );
 alias Meta_Framebuffers = Meta_FB!( uint32_t.max, uint32_t.max );
-
-
-/// template to determine if a type is a Meta_Framebuffer or Meta_Framebuffers
-//template isMultiBuffer( META_FB ) {  enum isMultiBuffer = ( is( META_FB == Meta_Framebuffer ) || is( META_FB == Meta_Framebuffers ));  }
 
 /// If T is a vector, this evaluates to true, otherwise false
 private template isSingleBuffer( T )  {  enum isSingleBuffer = is( typeof( isSingleBufferImpl( T.init ))); }
@@ -419,6 +408,7 @@ private void isSingleBufferImpl( uint cv_count )( Meta_FB!( 1, cv_count ) meta )
 
 private template isMultiBuffer( T )  {  enum isMultiBuffer = is( typeof( isMultiBufferImpl( T.init ))); }
 private void isMultiBufferImpl( uint fb_count, uint cv_count )( Meta_FB!( fb_count, cv_count ) meta ) {}
+
 
 /// Set attachment specific (framebuffer attachment index) r, g, b, a clear value
 /// The type of all values must be the same and either float, int32_t or uint32_t

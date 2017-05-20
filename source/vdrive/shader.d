@@ -141,21 +141,13 @@ union  MapEntry32 {
     static MapEntry32 max() { return MapEntry32( uint32_t.max ); }
 }
 
+
 struct Meta_SC( uint32_t specialization_count ) {
-    enum isMetaSC = true;
-
     alias sc_count = specialization_count;
-
     VkSpecializationInfo specialization_info;
 
-    static if( sc_count == uint32_t.max ) {
-        Array!VkSpecializationMapEntry  specialization_map_entries;
-        Array!MapEntry32                specialization_data;
-    } else {
-        SArray!( sc_count, VkSpecializationMapEntry ) specialization_map_entries;
-        SArray!( sc_count, MapEntry32 )               specialization_data;
-    } 
-
+    D_OR_S_ARRAY!( sc_count, VkSpecializationMapEntry ) specialization_map_entries;
+    D_OR_S_ARRAY!( sc_count, MapEntry32 )               specialization_data;
 
     void reset() {
        specialization_map_entries.clear;
@@ -163,13 +155,18 @@ struct Meta_SC( uint32_t specialization_count ) {
     }
 }
 
+
 alias Meta_Specialization = Meta_SC!( uint32_t.max );
+
+private template isMetaSC( T )  {  enum isMetaSC = is( typeof( isMetaSCImpl( T.init ))); }
+private void isMetaSCImpl( uint sc_count )( Meta_SC!( sc_count ) meta ) {}
+
 
 auto ref addMapEntry( META_SC )(
     ref META_SC     meta,
     MapEntry32      data = MapEntry32.max,
     uint32_t        constantID = uint32_t.max
-    ) if( __traits( hasMember, META_SC, "isMetaSC" )) {
+    ) if(  isMetaSC!META_SC ) {
 
     if( constantID == uint32_t.max )
         constantID = meta.specialization_map_entries.length
@@ -182,21 +179,23 @@ auto ref addMapEntry( META_SC )(
         data );
 }
 
+
 auto ref addMapEntry( META_SC )(
     ref META_SC                 meta,
     VkSpecializationMapEntry    specialization_map_entry,
     MapEntry32                  data = MapEntry32.max
-    ) if( __traits( hasMember, META_SC, "isMetaSC" )) {
+    ) if( isMetaSC!META_SC ) {
 
     meta.specialization_map_entries.append( specialization_map_entry );
     if( data.u < uint32_t.max ) meta.specialization_data.append( data );
     return meta;
 }
 
+
 auto ref construct( META_SC )(
     ref META_SC     meta,
     void[]          specialization_constants = []
-    ) if( __traits( hasMember, META_SC, "isMetaSC" )) {
+    ) if(  isMetaSC!META_SC ) {
 
     uint32_t data_size  = ( specialization_constants == []
         ? meta.specialization_data.length * MapEntry32.sizeof
@@ -205,7 +204,6 @@ auto ref construct( META_SC )(
     const( void )* p_data = specialization_constants == []
         ? meta.specialization_data.ptr
         : specialization_constants.ptr;
-
 
     with( meta.specialization_info ) {
         mapEntryCount   = meta.specialization_map_entries.length.toUint;

@@ -188,3 +188,9 @@ auto sizedArray( uint max_length, T )( uint length ) {
     array.length = length;
     return array;
 }
+
+
+template D_OR_S_ARRAY( uint count, T ) {
+    static if( count == uint.max ) alias D_OR_S_ARRAY = Array!T;
+    else                 alias D_OR_S_ARRAY = SArray!( count, T );
+}
