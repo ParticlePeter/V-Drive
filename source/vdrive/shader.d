@@ -162,6 +162,8 @@ private template isMetaSC( T )  {  enum isMetaSC = is( typeof( isMetaSCImpl( T.i
 private void isMetaSCImpl( uint sc_count )( Meta_SC!( sc_count ) meta ) {}
 
 
+// add a simple 4 specialization constant map entry of type uint32_t, int32_t or float
+// VkSpecializationMapEntry offset is deduced from constants added so far and size is 4 bytes
 auto ref addMapEntry( META_SC )(
     ref META_SC     meta,
     MapEntry32      data = MapEntry32.max,
@@ -171,6 +173,7 @@ auto ref addMapEntry( META_SC )(
     if( constantID == uint32_t.max )
         constantID = meta.specialization_map_entries.length
             ? meta.specialization_map_entries[ $-1 ].constantID + 1 : 0;
+
     return meta.addMapEntry(
         VkSpecializationMapEntry(
             constantID,
@@ -179,19 +182,23 @@ auto ref addMapEntry( META_SC )(
         data );
 }
 
-
+// add custom VkSpecializationMapEntry describing more advanced layot in terms of offset and size
+// data for the constants can than be passed into construct function
+// a simple map entry can still be supplied, but then it should be supplied with each call
+// to this particular meta struct, and no data be specified with construct function
 auto ref addMapEntry( META_SC )(
     ref META_SC                 meta,
     VkSpecializationMapEntry    specialization_map_entry,
-    MapEntry32                  data = MapEntry32.max
+    MapEntry32                  map_entry = MapEntry32.max
     ) if( isMetaSC!META_SC ) {
 
     meta.specialization_map_entries.append( specialization_map_entry );
-    if( data.u < uint32_t.max ) meta.specialization_data.append( data );
+    if( map_entry.u < uint32_t.max ) meta.specialization_data.append( map_entry );
     return meta;
 }
 
-
+// construct the specialization constants with either internal data
+// or optionally with external data passed in as void[] array
 auto ref construct( META_SC )(
     ref META_SC     meta,
     void[]          specialization_constants = []
