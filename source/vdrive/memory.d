@@ -515,6 +515,8 @@ auto ref unmapMemory( META )( ref META meta ) if( hasMemReqs!META || is( META ==
 }
 
 
+/// create a mapped memory range with given size and offset for the (backing) memory object
+/// the offset into the buffer or image backing VkMemory will be added to the passed in offset
 auto createMappedMemoryRange( META )(
     ref META            meta,
     VkDeviceSize        size    = 0,
@@ -523,7 +525,11 @@ auto createMappedMemoryRange( META )(
     size_t              line    = __LINE__,
     string              func    = __FUNCTION__
     ) if( hasMemReqs!META || is( META == Meta_Memory )) {
-    return meta.createMappedMemoryRange( meta.device_memory, size, offset, file, line, func );
+    // if we want to create a mapped memory range for the memory of an underlying buffer or image,
+    // we need to account for the buffer or image offset into its VkDeviceMemory
+    static if( is( META == Meta_Memory ))   VkDeviceSize combined_offset = offset;
+    else                                    VkDeviceSize combined_offset = offset + meta.device_memory_offset;
+    return meta.createMappedMemoryRange( meta.device_memory, size, combined_offset, file, line, func );
 }
 
 
