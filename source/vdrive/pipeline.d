@@ -132,6 +132,30 @@ VkPipelineLayout createPipelineLayout(
 }
 
 
+/// convenience function to create a pipeline ccache with one call
+VkPipelineCache createPipelineCache(
+    ref Vulkan  vk,
+    void[]      initial_data = [],
+    string      file    = __FILE__,
+    size_t      line    = __LINE__,
+    string      func    = __FUNCTION__
+    ) {
+    VkPipelineCacheCreateInfo pipeline_cache_ci = {
+        initialDataSize : initial_data.length.toUint,
+        pInitialData    : initial_data.ptr
+    };
+
+    VkPipelineCache pipeline_cache;
+    vk.device.vkCreatePipelineCache(
+        &pipeline_cache_ci,
+        vk.allocator,
+        &pipeline_cache
+        ).vkAssert( "Pipeline Cache", file, line, func );
+
+    return pipeline_cache;
+}
+
+
 
 ///////////////////////////
 // Meta_Graphics related //
