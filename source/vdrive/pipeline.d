@@ -62,7 +62,7 @@ auto ref addPushConstantRangeImpl_2( META )( ref META meta, VkShaderStageFlags s
 
 /// overload to simplify VkPipelineLayout construction
 VkPipelineLayout createPipelineLayout(
-    Vulkan                  vk,
+    ref Vulkan              vk,
     VkDescriptorSetLayout[] descriptor_set_layouts,
     VkPushConstantRange[]   push_constant_ranges = [],
     string                  file    = __FILE__,
@@ -83,7 +83,7 @@ VkPipelineLayout createPipelineLayout(
 
 /// overload to simplify VkPipelineLayout construction
 VkPipelineLayout createPipelineLayout(
-    Vulkan                  vk,
+    ref Vulkan              vk,
     VkDescriptorSetLayout   descriptor_set_layout,
     VkPushConstantRange     push_constant_range,
     string                  file    = __FILE__,
@@ -97,7 +97,7 @@ VkPipelineLayout createPipelineLayout(
 
 /// overload to simplify VkPipelineLayout construction
 VkPipelineLayout createPipelineLayout(
-    Vulkan                  vk,
+    ref Vulkan              vk,
     VkDescriptorSetLayout   descriptor_set_layout,
     VkPushConstantRange[]   push_constant_ranges = [],
     string                  file    = __FILE__,
@@ -110,7 +110,7 @@ VkPipelineLayout createPipelineLayout(
 
 /// overload to simplify VkPipelineLayout construction
 VkPipelineLayout createPipelineLayout(
-    Vulkan                  vk,
+    ref Vulkan              vk,
     VkPushConstantRange     push_constant_range,
     string                  file    = __FILE__,
     size_t                  line    = __LINE__,
@@ -122,7 +122,7 @@ VkPipelineLayout createPipelineLayout(
 
 /// overload to simplify VkPipelineLayout construction
 VkPipelineLayout createPipelineLayout(
-    Vulkan                  vk,
+    ref Vulkan              vk,
     VkPushConstantRange[]   push_constant_ranges = [],
     string                  file    = __FILE__,
     size_t                  line    = __LINE__,
@@ -806,7 +806,7 @@ auto ref construct(
         meta.pipeline_create_info.layout = meta.createPipelineLayout( meta.descriptor_set_layouts.data, meta.push_constant_ranges.data );
 
     meta.device.vkCreateComputePipelines(
-        VK_NULL_HANDLE,             // pipelineCache
+        pipeline_cache,             // pipelineCache
         1,                          // createInfoCount
         &meta.pipeline_create_info, // pCreateInfos
         meta.allocator,             // pAllocator
