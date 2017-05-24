@@ -596,6 +596,7 @@ auto ref pipelineCeateFlags( ref Meta_Graphics meta, VkPipelineCreateFlags flags
 /////////////////////////////////////////
 auto ref construct(
     ref Meta_Graphics   meta,
+    VkPipelineCache     pipeline_cache  = VK_NULL_HANDLE,
     VkPipelineLayout    pipeline_layout = VK_NULL_HANDLE,
     string              file    = __FILE__,
     size_t              line    = __LINE__,
@@ -664,7 +665,7 @@ auto ref construct(
         pipeline_create_info.flags |= VK_PIPELINE_CREATE_DERIVATIVE_BIT;
 
     meta.device.vkCreateGraphicsPipelines(
-        VK_NULL_HANDLE,         // pipelineCache
+        pipeline_cache,         // pipelineCache
         1,                      // createInfoCount
         &pipeline_create_info,  // pCreateInfos
         meta.allocator,         // pAllocator
@@ -672,6 +673,17 @@ auto ref construct(
         ).vkAssert( "Graphics Pipeline", file, line, func );
 
     return meta;
+}
+
+
+auto ref construct(
+    ref Meta_Graphics   meta,
+    VkPipelineLayout    pipeline_layout,
+    string              file    = __FILE__,
+    size_t              line    = __LINE__,
+    string              func    = __FUNCTION__
+    ) {
+    return meta.construct( VK_NULL_HANDLE, pipeline_layout, file, line, func );
 }
 
 
@@ -779,6 +791,7 @@ auto ref pipelineCeateFlags( ref Meta_Compute meta, VkPipelineCreateFlags flags 
 /////////////////////////////////////////
 auto ref construct(
     ref Meta_Compute    meta,
+    VkPipelineCache     pipeline_cache  = VK_NULL_HANDLE,
     VkPipelineLayout    pipeline_layout = VK_NULL_HANDLE,
     string              file    = __FILE__,
     size_t              line    = __LINE__,
@@ -804,3 +817,13 @@ auto ref construct(
 }
 
 
+
+auto ref construct(
+    ref Meta_Compute    meta,
+    VkPipelineLayout    pipeline_layout,
+    string              file    = __FILE__,
+    size_t              line    = __LINE__,
+    string              func    = __FUNCTION__
+    ) {
+    return meta.construct( VK_NULL_HANDLE, pipeline_layout, file, line, func );
+}
