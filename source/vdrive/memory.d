@@ -497,16 +497,8 @@ auto mapMemory( META )(
     mapped_memory[ 0 .. data.length ] = data[];
 
     // required for the mapped memory flush
-    //VkMappedMemoryRange mapped_memory_range = {
-    //    memory  : meta.device_memory,
-    //    offset  : combined_offset,
-    //    size    : data.length,
-    //};
-
     VkMappedMemoryRange mapped_memory_range =
         meta.createMappedMemoryRange( meta.device_memory, data.length, combined_offset, file, line, func );
-
-
 
     // flush the mapped memory range so that its visible to the device memory space
     meta.device
