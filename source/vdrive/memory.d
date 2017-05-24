@@ -634,12 +634,12 @@ struct Meta_Image {
     }
 
     // image_create_info extent shortcut
-    auto extent() {
+    auto const ref extent() {
         return image_create_info.extent;
     }
 
     // image_view_create_info subrescourceRange shortcut
-    auto subresourceRange() {
+    auto const ref subresourceRange() {
         return image_view_create_info.subresourceRange;
     }
 
