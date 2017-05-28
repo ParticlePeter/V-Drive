@@ -53,7 +53,7 @@ void vkAssert(
     if( vkResult != VK_SUCCESS ) {
         import core.stdc.stdio : printf;
         printf( "\n! ERROR !\n==============\n" );
-        printf( "\tVkResult : %s\n", vkResult.toCharPtr );
+        printf( "    VkResult : %s\n", vkResult.toCharPtr );
         printHelper( message, file, line, func, msg_end );
     }
     assert( vkResult == VK_SUCCESS );
@@ -73,15 +73,15 @@ private void printHelper(
     buffer[ file.length ] = '\0';
 
     import core.stdc.stdio : printf;
-    printf( "\tFile     : %s\n", buffer.ptr );
-    printf( "\tLine     : %d\n", line );
+    printf( "    File     : %s\n", buffer.ptr );
+    printf( "    Line     : %d\n", line );
 
     memcpy( buffer.ptr, func.ptr, func.length );
     buffer[ func.length ] = '\0';
 
-    printf( "\tFunc     : %s\n", buffer.ptr );
+    printf( "    Func     : %s\n", buffer.ptr );
     if( message ) {
-        printf(  "\tMessage  : %s", message );
+        printf(  "    Message  : %s", message );
         if( msg_end ) printf( "%s", msg_end );
         printf(  "\n" );
     }
