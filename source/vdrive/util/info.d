@@ -305,8 +305,8 @@ auto extensionVersion( T )( T extension, VkPhysicalDevice gpu, const( char )* la
 			printf( "%s version: %u\n", layer, result );
 		} else {
 			// Todo(pp): why is this here evaluated in the case of  T : const( char )* ?????
-			//auto layer_strz = layer.toStringz;
-			//printf( "%s version: %u\n", layer_strz.ptr, result );
+			//auto layer_z = layer.toStringz;
+			//printf( "%s version: %u\n", layer_z.ptr, result );
 		}
 	}
 
@@ -322,8 +322,8 @@ if( is( T == string ) || is( T : const( char )* ) || is( T : char[] )) {
 		static if( is( T : const( char )* ))	{
 			printf( "%s available: %u\n", extension, result );
 		} else {
-			auto layer_strz = extension.toStringz;
-			printf( "%s available: %u\n", layer_strz.ptr, result );
+			auto extension_z = extension.toStringz;
+			printf( "%s available: %u\n", extension_z.ptr, result );
 		}
 	}
 	return result;
@@ -414,8 +414,8 @@ if( is( T == string ) || is( T : const( char )* ) || is( T : char[] )) {
 		static if( is( T : const( char )* ))	{
 			printf( "%s version: %u\n", layer, result );
 		} else {
-			auto layer_strz = layer.toStringz;
-			printf( "%s version: %u\n", layer_strz.ptr, result );
+			auto layer_z = layer.toStringz;
+			printf( "%s version: %u\n", layer_z.ptr, result );
 		}
 	}
 
@@ -431,8 +431,8 @@ if( is( T == string ) || is( T : const( char )* ) || is( T : char[] )) {
 		static if( is( T : const( char )* ))	{
 			printf( "%s available: %u\n", layer, result );
 		} else {
-			auto layer_strz = layer.toStringz;
-			printf( "%s available: %u\n", layer_strz.ptr, result );
+			auto layer_z = layer.toStringz;
+			printf( "%s available: %u\n", layer_z.ptr, result );
 		}
 	}
 	return result;
@@ -475,11 +475,12 @@ auto listProperties( VkPhysicalDevice gpu, GPU_Info gpu_info = GPU_Info.none ) {
 
 	if( gpu_info & GPU_Info.properties ) {
 		auto ver = gpu_properties.apiVersion;
+		auto device_type_z = gpu_properties.deviceType.toStringz;
 		printf( "\tAPI Version     : %d.%d.%d\n", ver.vkMajor, ver.vkMinor, ver.vkPatch );
 		printf( "\tDriver Version  : %d\n", gpu_properties.driverVersion );
 		printf( "\tVendor ID       : %d\n", gpu_properties.vendorID );
 		printf( "\tDevice ID       : %d\n", gpu_properties.deviceID );
-		printf( "\tGPU type        : %s\n", gpu_properties.deviceType.toStringz.ptr );
+		printf( "\tGPU type        : %s\n", device_type_z.ptr );
 		println;
 	}
 
