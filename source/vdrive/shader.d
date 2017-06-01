@@ -152,6 +152,56 @@ auto createPipelineShaderStage(
 }
 
 
+/// create a VkPipelineShaderStageCreateInfo acceptable for a pipeline state opbject (PSO)
+/// takes a path to a vulkan acceptable glsl text file or spir-v binary file conveniently
+/// instead of a VkShaderModule. Detection of spir-v is based on .spv extension
+/// the shader stage is deduced from passed in file extension
+/// file extension must be one of the default shader stage extensions expected by glsLangvalidator
+/// Params:
+///     vk = reference to a VulkanState struct
+///     shader_path = path to glsl text or spir-v binary
+///     shader_entry_point = optionally set a different name for your "main" entry point,
+///                         this is also required if the passed in shader_module has
+///                         multiple entry points ( e.g. shader stages )
+///     specialization_info = optionally set a VkSpecializationInfo for the shader module
+/// Returns: VkPipelineShaderStageCreateInfo
+auto createPipelineShaderStage(
+    ref Vulkan                      vk,
+    string                          shader_path,
+    const( VkSpecializationInfo )*  specialization_info = null,
+    const( char )*                  shader_entry_point = "main",
+    string                          file = __FILE__,
+    size_t                          line = __LINE__,
+    string                          func = __FUNCTION__
+    ) {
+    import std.path : extension;
+    string ext = shader_path.extension;        // get extension of path argument
+    vkAssert( ext != ".spv",
+        "This overload of createPiplineShaderStage cannot be used with binary Spir-V, as the shader stage cannot be deduced",
+        file, line, func );
+
+    // deduce the pipeline shader stage from file extension
+    VkShaderStageFlagBits shader_stage = VK_SHADER_STAGE_ALL;
+    switch( ext ) {
+        case ".vert" : shader_stage = VK_SHADER_STAGE_VERTEX_BIT; break;
+        case ".tesc" : shader_stage = VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT; break;
+        case ".tese" : shader_stage = VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT; break;
+        case ".geom" : shader_stage = VK_SHADER_STAGE_GEOMETRY_BIT; break;
+        case ".frag" : shader_stage = VK_SHADER_STAGE_FRAGMENT_BIT; break;
+        case ".comp" : shader_stage = VK_SHADER_STAGE_COMPUTE_BIT; break;
+        default :
+        char[128] buffer;
+        buffer[ 0 .. ext.length ] = ext;                                            // the following message is exactly 80 characters long including new line at start and \0 at end
+        buffer[ ext.length .. ext.length + 80 ] = "
+               Accepted Extensions  : .vert, .tesc, .tese, .geom, .frag, .comp\0";  // new line character is automatically added at the beginning of this message
+        vkAssert( false, "Unknown Extension    : ", file, line, func, buffer.ptr );
+    }
+    return createPipelineShaderStage(
+        vk, shader_stage, vk.createShaderModule( shader_path, file, line, func ), specialization_info, shader_entry_point
+    );
+}
+
+
 import vdrive.util;
 union  MapEntry32 {
     uint32_t u = 0;
