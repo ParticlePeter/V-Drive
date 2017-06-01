@@ -39,10 +39,10 @@ auto createShaderModule(
 
         // append new extension .spv
         string spv = ".spv";                                    // string with extension for memcpy
-        path_z.length = path_z.length + spv.length;				// resize the path_z array with the length of the new extension
+        path_z.length = path_z.length + spv.length - 1;         // resize the path_z array with the length of the new extension
         path_z[ $-1 ] = '\0';                                   // set the last value to a terminating character
         import core.stdc.string : memcpy;                       // import and use memcopy to copy into the char array
-        memcpy( &path_z.data[ $ - spv.length - 1 ], spv.ptr, spv.length );
+        memcpy( &path_z.data[ $ - spv.length ], spv.ptr, spv.length );
 
         string spir_path = path_z.data.idup;                    // create string from the char array
 
