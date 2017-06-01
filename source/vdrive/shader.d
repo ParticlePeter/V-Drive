@@ -135,14 +135,17 @@ auto createPipelineShaderStage(
 ///     specialization_info = optionally set a VkSpecializationInfo for the shader module
 /// Returns: VkPipelineShaderStageCreateInfo
 auto createPipelineShaderStage(
-    ref Vulkan vk,
-    VkShaderStageFlagBits shader_stage,
-    string shader_path,
-    const( VkSpecializationInfo )* specialization_info = null,
-    const( char )* shader_entry_point = "main"
+    ref Vulkan                      vk,
+    VkShaderStageFlagBits           shader_stage,
+    string                          shader_path,
+    const( VkSpecializationInfo )*  specialization_info = null,
+    const( char )*                  shader_entry_point = "main"
+    string                          file = __FILE__,
+    size_t                          line = __LINE__,
+    string                          func = __FUNCTION__
     ) {
     return createPipelineShaderStage(
-        vk, shader_stage, vk.createShaderModule( shader_path ), specialization_info, shader_entry_point
+        vk, shader_stage, vk.createShaderModule( shader_path, file, line, func ), specialization_info, shader_entry_point
     );
 }
 
