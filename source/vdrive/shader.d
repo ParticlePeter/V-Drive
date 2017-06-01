@@ -139,7 +139,7 @@ auto createPipelineShaderStage(
     VkShaderStageFlagBits           shader_stage,
     string                          shader_path,
     const( VkSpecializationInfo )*  specialization_info = null,
-    const( char )*                  shader_entry_point = "main"
+    const( char )*                  shader_entry_point = "main",
     string                          file = __FILE__,
     size_t                          line = __LINE__,
     string                          func = __FUNCTION__
