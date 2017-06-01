@@ -19,66 +19,68 @@ import core.stdc.stdio : printf;
 /// and check if this file exists. If it does it will be used
 /// Params:
 ///     vk = reference to a VulkanState struct
-///     path = the path to glsl or spir-v file
+///     shader_path = the path to glsl or spir-v file
 /// Returns: VkShaderModule
 auto createShaderModule(
     ref Vulkan  vk,
-    string      path,
+    string      shader_path,
     string      file = __FILE__,
     size_t      line = __LINE__,
     string      func = __FUNCTION__
     ) {
     import std.file : exists;
     import std.path : extension;
-    string ext = path.extension;
+    string ext = shader_path.extension;         // get extension of path argument, must compile non .spv extension files
+    auto shader_path_z = shader_path.toStringz; // convert to std.container.array!char, this adds '\0' as last value and must be compensated in index calculations
+
     if( ext != ".spv" ) {
 
-        // convert to std.container.array!char
-        auto path_z = path.toStringz;                           // this adds '\0' as last value and must be compensated in index calculations
-        path_z[ $ - ext.length - 1 ] = '_';                     // substitute the . of .ext with _ to _ext
+        shader_path_z[ $ - ext.length - 1 ] = '_';                  // substitute the . of .ext with _ to _ext
 
         // append new extension .spv
-        string spv = ".spv";                                    // string with extension for memcpy
-        path_z.length = path_z.length + spv.length - 1;         // resize the path_z array with the length of the new extension
-        path_z[ $-1 ] = '\0';                                   // set the last value to a terminating character
-        import core.stdc.string : memcpy;                       // import and use memcopy to copy into the char array
-        memcpy( &path_z.data[ $ - spv.length ], spv.ptr, spv.length );
-
-        string spir_path = path_z.data.idup;                    // create string from the char array
+        string spv = ".spv";                                        // string with extension for memcpy, spv.length = 4
+        shader_path_z.length = shader_path_z.length + spv.length;   // resize the shader_path_z array with the length of the new extension
+        shader_path_z[ $-1 ] = '\0';                                // set the last value to a terminating character, required for propper vkAssert
+        import core.stdc.string : memcpy;                           // import and use memcopy to copy into the char array
+        memcpy( &shader_path_z.data[ $ - 5 ], spv.ptr, 4 );         // copy the .spv extension at [ $ - spv.length - "\0".length ] = [ $ - 4 - 1 ] 
+        string spir_path = shader_path_z.data[ 0 .. $-1 ].idup;     // create string from the char array
 
         // assert that either the original or the newly composed path exist
-        bool path_exists = path.exists;                         // check if the original file exists
-        bool spir_up_to_date = spir_path.exists;                // check if the spir file exists, if not we will compile it
-        vkAssert( path_exists || spir_up_to_date,
+        bool glsl_path_exists = shader_path.exists;                 // check if the original file, which must be a glsl file, exists
+        bool spir_up_to_date = spir_path.exists;                    // check if the spir file exists, if not we will compile it
+        vkAssert( glsl_path_exists || spir_up_to_date,
             "Neither path to glsl code nor path to corresponding spv exist: ",
-            file, line, func, path_z.ptr );
+            file, line, func, shader_path_z.ptr );
 
-        if( path_exists && spir_up_to_date ) {                  // if both files exists, check if the spir-v is up to date with the glsl source
-            import std.file : getTimes;                         // need to get the modification times of the files
-            import std.datetime : SysTime;                      // stored in comparable SysTimes
-            SysTime access_time, glsl_mod_time, spir_mod_time;  // access times are irrelevant
-            spir_path.getTimes( access_time, spir_mod_time );   // get spir-v file times (.spv)
-            path.getTimes( access_time, glsl_mod_time );        // get glsl file times
-            spir_up_to_date = glsl_mod_time < spir_mod_time;    // set the spir_up_to_date value if glsl is newer than spir-v
+        if( glsl_path_exists && spir_up_to_date ) {                 // if both files exists, check if the spir-v is up to date with the glsl source
+            import std.file : getTimes;                             // need to get the modification times of the files
+            import std.datetime : SysTime;                          // stored in comparable SysTimes
+            SysTime access_time, glsl_mod_time, spir_mod_time;      // access times are irrelevant
+            spir_path.getTimes( access_time, spir_mod_time );       // get spir-v file times (.spv)
+            shader_path.getTimes( access_time, glsl_mod_time );     // get glsl file times
+            spir_up_to_date = glsl_mod_time < spir_mod_time;        // set the spir_up_to_date value if glsl is newer than spir-v
         }
 
         if( !spir_up_to_date ) { // not using 'else', as spir_up_to_date might have changed in the if clause above
-            import std.process : execute;                       // use process execute to call glslangValidator
-            string[6] compile_glsl_args = [ "glslangValidator", "-V", "-w", "-o", spir_path, path ];
-            auto compile_glsl = compile_glsl_args.execute;      // store in status struct
-            printf( compile_glsl.output.ptr );                  // print output
+            import std.process : execute;                           // use process execute to call glslangValidator
+            string[6] compile_glsl_args = [ "glslangValidator", "-V", "-w", "-o", spir_path, shader_path ];
+            auto compile_glsl = compile_glsl_args.execute;          // store in status struct
+            vkAssert( compile_glsl.status == 0,                     // assert that compilation went right, othervise include compilation error into assert message
+                "SPIR-V is not generated for failed compile or link : ",
+                file, line, func, compile_glsl.output.ptr
+            );
+            printf( compile_glsl.output.ptr );                      // print output to signal that a shader has been (re)compiled
         }
-        path = spir_path;                                       // create string from the composed char array
+        shader_path = spir_path;                                    // overwrite the string path parameter with the composed char array back into
     }
 
     // assert that the passed in or freshly compiled spir-v file exist
-    auto path_z = path.toStringz;
-    vkAssert( path.exists,
+    vkAssert( shader_path.exists,
         "Path to Spir-V does not exist: ",
-        file, line, func, path_z.ptr );
+        file, line, func, shader_path_z.ptr );
 
     import std.stdio : File;
-    auto shader_file = File( path );
+    auto shader_file = File( shader_path );
     auto read_buffer = sizedArray!char( cast( size_t )shader_file.size );
     auto code = shader_file.rawRead( read_buffer.data );
 
