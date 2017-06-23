@@ -69,7 +69,8 @@ auto createShaderModule(
                 "SPIR-V is not generated for failed compile or link : ",
                 file, line, func, compile_glsl.output.ptr
             );
-            printf( compile_glsl.output.ptr );                      // print output to signal that a shader has been (re)compiled
+            auto output_z = compile_glsl.output.toStringz;
+            printf( "Compiled: %s", output_z.ptr );                 // print output to signal that a shader has been (re)compiled
         }
         shader_path = spir_path;                                    // overwrite the string path parameter with the composed char array back into
     }
