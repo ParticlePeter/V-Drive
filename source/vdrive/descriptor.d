@@ -428,7 +428,7 @@ auto ref addLayoutBinding(
 auto ref addLayoutBindingImmutable(
     ref Meta_Descriptor_Layout meta,
     uint32_t            binding,
-    uint32_t            descriptor_count,
+//    uint32_t            descriptor_count,   // Todo(pp): this param is redundant, we must add immutable samplers anyway, which defines the count 
     VkDescriptorType    descriptor_type,
     VkShaderStageFlags  shader_stage_flags,
     string              file = __FILE__,
@@ -440,7 +440,9 @@ auto ref addLayoutBindingImmutable(
         file, line, func );
 
     // first call the normal addLayoutBinding()
-    meta.addLayoutBinding( binding, descriptor_count, descriptor_type, shader_stage_flags, file, line, func );
+    // we would prefere a binding count of 0 as we will update this value with adding samplers
+    // but the value must be greater 0 by design, we will set the descriptor count of the appropriate struct to 0 later
+    meta.addLayoutBinding( binding, 1, descriptor_type, shader_stage_flags, file, line, func );
 
     // than mark the added VkDescriptorSetLayoutBinding accepting only immutable samplers
     // we do this by setting the pImmutableSamplers field to an arbitrary address, not null
@@ -448,6 +450,7 @@ auto ref addLayoutBindingImmutable(
     // Meta_Descriptor_Layout.immutable_samplers to that field (anyway)
     auto layout_binding = & meta.descriptor_set_layout_bindings[ $-1 ];     // grab the address of recently added layout binding
     layout_binding.pImmutableSamplers = cast( VkSampler* )layout_binding;   // cast and attach it to its own pImmutableSamplers field
+    layout_binding.descriptorCount = 0;
     return meta;
 }
 
@@ -459,10 +462,10 @@ auto ref addLayoutBindingImmutable(
 /// Returns: the passed in Meta_Structure for function chaining
 auto ref addSampler(
     ref Meta_Descriptor_Layout  meta,
-    VkSampler   sampler,
-    string      file = __FILE__,
-    size_t      line = __LINE__,
-    string      func = __FUNCTION__
+    VkSampler                   sampler,
+    string                      file = __FILE__,
+    size_t                      line = __LINE__,
+    string                      func = __FUNCTION__
     ) {
     // enforce that a layout binding has been added so far
     vkAssert( !meta.descriptor_set_layout_bindings.empty,
@@ -470,8 +473,13 @@ auto ref addSampler(
         file, line, func );
 
     meta.immutable_samplers.append( sampler );
+    //auto layout_binding = & meta.descriptor_set_layout_bindings[ $-1 ];     // get the recent layout binding
+    //Pack_Index_And_Count piac = layout_binding.descriptorCount;             // preserve index and count
+    //++piac.count;                                                           // increase the descriptor count
+    //layout_binding.descriptorCount = piac.descriptor_count;                 // assigning back to the original member
 
-    // shortcut to the last  meta.descriptor_set_layout_bindings
+
+    // shortcut to the last meta.descriptor_set_layout_bindings
     auto layout_binding = & meta.descriptor_set_layout_bindings[ $-1 ];
 
     // Todo(pp): thoroughly test addLayoutBindingImmutable()
@@ -484,6 +492,7 @@ auto ref addSampler(
     // helper to store different values in the lower and upper 16 bits
     // the actual descriptorCount is stored in the lower 16 bits, see bellow
     Pack_Index_And_Count piac = layout_binding.descriptorCount;         // preserve index and count
+    ++piac.count;
 
     if( layout_binding.pImmutableSamplers == cast( VkSampler* )layout_binding ) {
 
@@ -556,7 +565,7 @@ auto ref allocateSet(
     VkDescriptorPoolSize[ VK_DESCRIPTOR_TYPE_RANGE_SIZE ] descriptor_pool_sizes;
 
     // use this to edit data at descriptor_pool_sizes[ pool_size_index ]
-    // with this approach we are merging used meta.descriptor_types_count ( non zero values in at index descriptor_type )
+    // with this approach we are merging used meta.descriptor_types_count ( non zero values at index descriptor_type )
     size_t pool_size_index;
 
     // the iter index descriptor_type corresponds to a certain VkDescriptorType enum
@@ -565,6 +574,8 @@ auto ref allocateSet(
             descriptor_pool_sizes[ pool_size_index ].type = cast( VkDescriptorType )descriptor_type;
             descriptor_pool_sizes[ pool_size_index ].descriptorCount = descriptor_count;
             ++pool_size_index;
+            //printf( "%d : %s\n", descriptor_count, toCharPtr( cast( VkDescriptorType )descriptor_type ));
+
         }
     }
 
@@ -1050,6 +1061,7 @@ auto ref addLayoutBindingImmutable(
     size_t              line = __LINE__,
     string              func = __FUNCTION__
     ) {
+    // Todo(pp): fix comments bellow, they are not valid for Immutable version as we do not have a descriptor_count param
     // descriptor_count in this case is a starting value which will increase when using
     // Meta_Descriptor to create and update the descriptor set
     // note however, that in this case these descriptor_count descriptors will not be updated when
@@ -1058,11 +1070,12 @@ auto ref addLayoutBindingImmutable(
     // descriptor_count = 0 cannot be passed to the Meta_Descriptor_Layout.addLayoutBinding function
     // hence the descriptor_count is incremented by one for the call and decremented from
     // the added layout binding afterwards
-    meta.add_write_descriptor = true;
+    meta.add_write_descriptor = true;       // Todo(pp): this should be required only for VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER but not for VK_DESCRIPTOR_TYPE_SAMPLER
     meta.meta_descriptor_layout     //descriptor_count must not be 0, set it to 1 and add the layout binding
-        .addLayoutBindingImmutable( binding, 1, descriptor_type, shader_stage_flags, file, line, func )
-        .descriptor_set_layout_bindings[ $-1 ]      // access the added layout binding (last)
-        .descriptorCount--;     // decrement its descriptorCount - crazy that all this works!
+        .addLayoutBindingImmutable( binding, descriptor_type, shader_stage_flags, file, line, func );
+//        .addLayoutBindingImmutable( binding, 1, descriptor_type, shader_stage_flags, file, line, func )
+//        .descriptor_set_layout_bindings[ $-1 ]      // access the added layout binding (last)
+//        .descriptorCount--;     // decrement its descriptorCount - crazy that all this works!
 
     // we also must decrement the descriptor types count of the current descriptor_type
     // as it was increased by one too trick the meta_descriptor_layout.addLayoutBinding overload
@@ -1070,23 +1083,6 @@ auto ref addLayoutBindingImmutable(
     return meta;
 }
 
-/*
-/// add an immutable VkSampler to the last VkDescriptorSetLayoutBinding
-/// Params:
-///     meta = reference to a Meta_Descriptor struct
-///     sampler = to immutably bound to the last added layout binding
-/// Returns: the passed in Meta_Structure for function chaining
-auto ref addImmutableSampler(
-    ref Meta_Descriptor meta,
-    VkSampler           sampler,
-    string              file = __FILE__,
-    size_t              line = __LINE__,
-    string              func = __FUNCTION__
-    ) {
-    meta.meta_descriptor_layout.addSampler( sampler, file, line, func );
-    return meta;
-}
-*/
 
 /// private template function, forwards to addDescriptorTypeUpdate, to add either
 /// VkDescriptorImageInfo, VkDescriptorBufferInfo or VkDescriptorBufferInfo
@@ -1156,10 +1152,10 @@ auto ref addSampler(
         // as it was already specified with Meta_Descriptor_Layout.addLayoutBinding(Immutable)
         // hence we need to incremet it here as we are dynamically editing the descriptor_count
         meta.meta_descriptor_layout.addSampler( sampler, file, line, func );    // add the sampler to the recent layout binding
-        auto layout_binding = & meta.descriptor_set_layout_bindings[ $-1 ];     // get the recent layout binding
-        Pack_Index_And_Count piac = layout_binding.descriptorCount;             // preserve index and count
-        ++piac.count;                                                           // increase the descriptor count
-        layout_binding.descriptorCount = piac.descriptor_count;                 // assigning back to the original member
+//        auto layout_binding = & meta.descriptor_set_layout_bindings[ $-1 ];     // get the recent layout binding
+//        Pack_Index_And_Count piac = layout_binding.descriptorCount;             // preserve index and count
+//        ++piac.count;                                                           // increase the descriptor count
+//        layout_binding.descriptorCount = piac.descriptor_count;                 // assigning back to the original member
     }
 
     return meta;
