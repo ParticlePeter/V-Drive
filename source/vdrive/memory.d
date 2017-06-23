@@ -740,7 +740,7 @@ auto ref initImage(
         meta.destroy( meta.image );                         // destroy it first
 
     meta.image_create_info = image_create_info;
-    meta.device.vkCreateImage( &meta.image_create_info, meta.allocator, &meta.image ).vkAssert;
+    meta.device.vkCreateImage( &meta.image_create_info, meta.allocator, &meta.image ).vkAssert( file, line, func );
     meta.device.vkGetImageMemoryRequirements( meta.image, &meta.memory_requirements );
     return meta;
 }
