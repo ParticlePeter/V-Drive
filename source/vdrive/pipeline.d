@@ -331,6 +331,18 @@ auto ref addViewportAndScissors( ref Meta_Graphics meta, VkRect2D rect, float mi
 /////////////////////////
 // rasterization state //
 /////////////////////////
+
+/// the mixin bellow generates following setter functions:
+/// auto ref depthClampEnable(           Meta_Graphics meta, VkBool32            depth_clamp_enable          );
+/// auto ref rasterizerDiscardEnable(    Meta_Graphics meta, VkBool32            rasterizer_discard_enable   );
+/// auto ref polygonMode(                Meta_Graphics meta, VkPolygonMode       polygon_mode                );
+/// auto ref cullMode(                   Meta_Graphics meta, VkCullModeFlags     cull_mode                   );
+/// auto ref frontFace(                  Meta_Graphics meta, VkFrontFace         front_face                  );
+/// auto ref depthBiasEnable(            Meta_Graphics meta, VkBool32            depth_bias_enable           );
+/// auto ref depthBiasConstantFactor(    Meta_Graphics meta, float               depth_bias_constant_factor  );
+/// auto ref depthBiasClamp(             Meta_Graphics meta, float               depth_bias_clamp            );
+/// auto ref depthBiasSlopeFactor(       Meta_Graphics meta, float               depth_bias_slope_factor     );
+/// auto ref lineWidth(                  Meta_Graphics meta, float               line_width                  );
 mixin( Forward_To_Inner_Struct!( Meta_Graphics, VkPipelineRasterizationStateCreateInfo, "meta.rasterization_state" ));
 
 auto ref depthBias(
@@ -351,6 +363,14 @@ auto ref depthBias(
 ///////////////////////
 // multisample state //
 ///////////////////////
+
+/// the mixin bellow generates following setter functions:
+/// auto ref rasterizationSamples(      Meta_Graphics meta, VkSampleCountFlagBits   rasterization_samples       );
+/// auto ref sampleShadingEnable(       Meta_Graphics meta, VkBool32                sample_shading_enable       );
+/// auto ref minSampleShading(          Meta_Graphics meta, float                   min_sample_shading          );
+/// auto ref pSampleMask(               Meta_Graphics meta, const( VkSampleMask )*  p_sample_mask               );
+/// auto ref alphaToCoverageEnable(     Meta_Graphics meta, VkBool32                alpha_to_coverage_enable    );
+/// auto ref alphaToOneEnable(          Meta_Graphics meta, VkBool32                alpha_to_one_enable         );
 mixin( Forward_To_Inner_Struct!( Meta_Graphics, VkPipelineMultisampleStateCreateInfo, "meta.multisample_state" ));
 
 auto ref multisampleShading(
@@ -370,6 +390,15 @@ auto ref multisampleAlpha( ref Meta_Graphics meta, VkBool32 to_coverage, VkBool3
 /////////////////
 // depth state //
 /////////////////
+
+/// the mixin bellow generates following setter functions:
+/// auto ref depthTestEnable(       Meta_Graphics meta, VkBool32           depth_test_enable         );
+/// auto ref depthWriteEnable(      Meta_Graphics meta, VkBool32           depth_write_enable        );
+/// auto ref depthCompareOp(        Meta_Graphics meta, VkCompareOp        depth_compare_op          );
+/// auto ref depthBoundsTestEnable( Meta_Graphics meta, VkBool32           depth_bounds_test_enable  );
+/// auto ref stencilTestEnable(     Meta_Graphics meta, VkBool32           stencil_test_enable       );
+/// auto ref minDepthBounds(        Meta_Graphics meta, float              min_depth_bounds          );
+/// auto ref maxDepthBounds(        Meta_Graphics meta, float              max_depth_bounds          );
 mixin( Forward_To_Inner_Struct!( Meta_Graphics, VkPipelineDepthStencilStateCreateInfo, "meta.depth_stencil_state", "front", "back" ));
 
 auto ref depthState(
@@ -455,6 +484,11 @@ auto ref stencilStateBack(
 ////////////////////////
 // color blend states //
 ////////////////////////
+
+/// the mixin bellow generates following setter functions:
+/// auto ref logicOpEnable(     Meta_Graphics meta, VkBool32       logic_op_enable  );
+/// auto ref logicOp(           Meta_Graphics meta, VkLogicOp      logic_op         );
+/// auto ref blendConstants(    Meta_Graphics meta, float[4]       blend_constants  );
 mixin( Forward_To_Inner_Struct!( Meta_Graphics, VkPipelineColorBlendStateCreateInfo, "meta.color_blend_state", "attachmentCount", "pAttachments" ));
 
 auto ref colorBlendLogicOp( ref Meta_Graphics meta, VkLogicOp logic_op, VkBool32 enable = VK_TRUE ) {
