@@ -461,11 +461,13 @@ auto listPhysicalDevices( VkInstance instance, bool printInfo = true ) {
 }
 
 // returns gpu properties and can also print the properties, limits and sparse properties  
-enum GPU_Info { none = 0, properties, limits, sparse_properties = 4 };
+enum GPU_Info { none = 0, name, properties, limits = 4, sparse_properties = 8 };
 auto listProperties( VkPhysicalDevice gpu, GPU_Info gpu_info = GPU_Info.none ) {
 
 	VkPhysicalDeviceProperties gpu_properties;
 	vkGetPhysicalDeviceProperties( gpu, &gpu_properties );
+
+	if( gpu_info == GPU_Info.none ) return gpu_properties;
 
 	printf( "%s\n", gpu_properties.deviceName.ptr );
 	import core.stdc.string : strlen;
