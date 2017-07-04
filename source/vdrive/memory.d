@@ -40,9 +40,12 @@ auto memoryTypeIndex(
 auto memoryHeapIndex(
     VkPhysicalDeviceMemoryProperties    memory_properties,
     VkMemoryHeapFlags                   memory_heap_flags,
-    uint32_t                            first_memory_heap_index = 0
+    uint32_t                            first_memory_heap_index = 0,
+    string                              file = __FILE__,
+    size_t                              line = __LINE__,
+    string                              func = __FUNCTION__
     ) {
-    vkAssert( first_memory_heap_index < memory_properties.memoryHeapCount );
+    vkAssert( first_memory_heap_index < memory_properties.memoryHeapCount, "First Memory Heap Index out of bounds", file, line, func );
     foreach( i; first_memory_heap_index .. memory_properties.memoryHeapCount ) {
         if(( memory_properties.memoryHeaps[i].flags & memory_heap_flags ) == memory_heap_flags ) {
             return i.toUint;
@@ -61,14 +64,24 @@ auto hasMemoryHeapType(
 
 auto memoryHeapSize(
     VkPhysicalDeviceMemoryProperties    memory_properties,
-    uint32_t                            memory_heap_index
+    uint32_t                            memory_heap_index,
+    string                              file = __FILE__,
+    size_t                              line = __LINE__,
+    string                              func = __FUNCTION__
     ) {
-    vkAssert( memory_heap_index < memory_properties.memoryHeapCount );
+    vkAssert( memory_heap_index < memory_properties.memoryHeapCount, "Memory Heap Index out of bounds", file, line, func );
     return memory_properties.memoryHeaps[ memory_heap_index ].size;
 }
 
 
-auto allocateMemory( ref Vulkan vk, VkDeviceSize allocation_size, uint32_t memory_type_index ) {
+auto allocateMemory(
+    ref Vulkan      vk,
+    VkDeviceSize    allocation_size,
+    uint32_t        memory_type_index,
+    string          file = __FILE__,
+    size_t          line = __LINE__,
+    string          func = __FUNCTION__
+    ) {
     // construct a memory allocation info from arguments
     VkMemoryAllocateInfo memory_allocate_info = {
         allocationSize  : allocation_size,
@@ -77,7 +90,7 @@ auto allocateMemory( ref Vulkan vk, VkDeviceSize allocation_size, uint32_t memor
 
     // allocate device memory
     VkDeviceMemory device_memory;
-    vkAllocateMemory( vk.device, &memory_allocate_info, vk.allocator, &device_memory ).vkAssert;
+    vkAllocateMemory( vk.device, &memory_allocate_info, vk.allocator, &device_memory ).vkAssert( "Allocate Memory", file, line, func );
 
     return device_memory;
 }
@@ -95,7 +108,7 @@ auto mapMemory(
     ) {
     VkMemoryMapFlags flags;
     void* mapped_memory;
-    vk.device.vkMapMemory( memory, offset, size, flags, &mapped_memory ).vkAssert( file, line, func );
+    vk.device.vkMapMemory( memory, offset, size, flags, &mapped_memory ).vkAssert( "Map Memory", file, line, func );
     return mapped_memory;
 }
 
@@ -130,7 +143,7 @@ void flushMappedMemoryRange(
     size_t                  line    = __LINE__,
     string                  func    = __FUNCTION__
     ) {
-    vk.device.vkFlushMappedMemoryRanges( 1, & mapped_memory_range ).vkAssert( file, line, func );
+    vk.device.vkFlushMappedMemoryRanges( 1, & mapped_memory_range ).vkAssert( "Create Mapped Memory Range", file, line, func );
 }
 
 
@@ -141,7 +154,7 @@ void flushMappedMemoryRanges(
     size_t                  line    = __LINE__,
     string                  func    = __FUNCTION__
     ) {
-    vk.device.vkFlushMappedMemoryRanges( mapped_memory_ranges.length.toUint, mapped_memory_ranges.ptr ).vkAssert( file, line, func );
+    vk.device.vkFlushMappedMemoryRanges( mapped_memory_ranges.length.toUint, mapped_memory_ranges.ptr ).vkAssert( "Flush Mapped Memory Ranges", file, line, func );
 }
 
 
@@ -177,10 +190,13 @@ struct Meta_Memory {
 auto ref initMemory(
     ref Meta_Memory         meta,
     uint32_t                memory_type_index,
-    VkDeviceSize            allocation_size
+    VkDeviceSize            allocation_size,
+    string                  file = __FILE__,
+    size_t                  line = __LINE__,
+    string                  func = __FUNCTION__
     ) {
-    vkAssert( meta.isValid, "Vulkan state not assigned" );     // assert that meta struct is initialized with a valid vulkan state pointer
-    meta.device_memory = allocateMemory( meta, allocation_size, memory_type_index );
+    vkAssert( meta.isValid, "Vulkan state not assigned", file, line, func );     // assert that meta struct is initialized with a valid vulkan state pointer
+    meta.device_memory = allocateMemory( meta, allocation_size, memory_type_index, file, line, func );
     meta.device_memory_size = allocation_size;
     meta.memory_type_index = memory_type_index;
     return meta;
@@ -240,9 +256,14 @@ auto ref addRanges( META )( ref Meta_Memory meta, META[] meta_resource, VkDevice
 }
 
 
-auto ref allocate( ref Meta_Memory meta ) {
-    vkAssert( meta.isValid, "Vulkan state not assigned" );     // meta struct must be initialized with a valid vulkan state pointer
-    vkAssert( meta.device_memory_size > 0, "Must call addRange() at least onece before calling allocate()" );
+auto ref allocate(
+    ref Meta_Memory meta,
+    string          file = __FILE__,
+    size_t          line = __LINE__,
+    string          func = __FUNCTION__
+    ) {
+    vkAssert( meta.isValid, "Vulkan state not assigned", file, line, func );     // meta struct must be initialized with a valid vulkan state pointer
+    vkAssert( meta.device_memory_size > 0, "Must call addRange() at least onece before calling allocate()", file, line, func );
     meta.device_memory = allocateMemory( meta, meta.device_memory_size, meta.memory_type_index );
     return meta;
 }
@@ -419,8 +440,8 @@ auto ref createMemoryImpl( META )(
         meta.destroy( meta.device_memory );                     // we destroy it here
     meta.owns_device_memory = true;
     meta.device_memory = allocateMemory( meta, meta.memory_requirements.size, meta.memoryTypeIndex( memory_property_flags ));
-    static if( is( META == Meta_Buffer ))   meta.device.vkBindBufferMemory( meta.buffer, meta.device_memory, 0 ).vkAssert( null, file, line, func );
-    else                                    meta.device.vkBindImageMemory(  meta.image,  meta.device_memory, 0 ).vkAssert( null, file, line, func );
+    static if( is( META == Meta_Buffer ))   meta.device.vkBindBufferMemory( meta.buffer, meta.device_memory, 0 ).vkAssert( "Bind Buffer Memory", file, line, func );
+    else                                    meta.device.vkBindImageMemory(  meta.image,  meta.device_memory, 0 ).vkAssert( "Bind Image Memory" , file, line, func );
     return meta;
 }
 
@@ -438,8 +459,8 @@ auto ref bindMemoryImpl( META )(
     meta.owns_device_memory = false;
     meta.device_memory = device_memory;
     meta.device_memory_offset = device_memory_offset;
-    static if( is( META == Meta_Buffer ))   meta.device.vkBindBufferMemory( meta.buffer, device_memory, device_memory_offset ).vkAssert( null, file, line, func );
-    else                                    meta.device.vkBindImageMemory(  meta.image,  device_memory, device_memory_offset ).vkAssert( null, file, line, func );
+    static if( is( META == Meta_Buffer ))   meta.device.vkBindBufferMemory( meta.buffer, device_memory, device_memory_offset ).vkAssert( "Bind Buffer Memory", file, line, func );
+    else                                    meta.device.vkBindImageMemory(  meta.image,  device_memory, device_memory_offset ).vkAssert( "Bind Image Memory" , file, line, func );
     return meta;
 }
 
@@ -471,7 +492,7 @@ auto mapMemory( META )(
     void* mapped_memory;
     meta.device
         .vkMapMemory( meta.device_memory, combined_offset, size, 0, &mapped_memory )
-        .vkAssert( file, line, func );
+        .vkAssert( "Map Memory", file, line, func );
     return mapped_memory;
 }
 
@@ -503,7 +524,7 @@ auto mapMemory( META )(
     // flush the mapped memory range so that its visible to the device memory space
     meta.device
         .vkFlushMappedMemoryRanges( 1, &mapped_memory_range )
-        .vkAssert( file, line, func );
+        .vkAssert( "Map Memory", file, line, func );
     return mapped_memory;
 }
 
@@ -581,17 +602,24 @@ struct Meta_Buffer {
 /// initialize a VkBuffer object, this function or createBuffer must be called first, further operations require the buffer
 /// the resulting buffer and its create info are stored in the Meta_Buffer struct
 /// the Meta_Buffer struct is returned for function chaining
-auto ref initBuffer( ref Meta_Buffer meta, VkBufferUsageFlags usage, VkDeviceSize size, VkSharingMode sharing_mode = VK_SHARING_MODE_EXCLUSIVE ) {
-
+auto ref initBuffer(
+    ref Meta_Buffer     meta,
+    VkBufferUsageFlags  usage,
+    VkDeviceSize        size,
+    VkSharingMode       sharing_mode = VK_SHARING_MODE_EXCLUSIVE,
+    string              file = __FILE__,
+    size_t              line = __LINE__,
+    string              func = __FUNCTION__
+    ) {
     // assert that meta struct is initialized with a valid vulkan state pointer
-    assert( meta.isValid );
+    vkAssert( meta.isValid, "Vulkan state not assigned", file, line, func );
 
     // buffer create info from arguments
     meta.buffer_create_info.size        = size; // size in Bytes
     meta.buffer_create_info.usage       = usage;
     meta.buffer_create_info.sharingMode = sharing_mode;
 
-    meta.device.vkCreateBuffer( &meta.buffer_create_info, meta.allocator, &meta.buffer ).vkAssert;
+    meta.device.vkCreateBuffer( &meta.buffer_create_info, meta.allocator, &meta.buffer ).vkAssert( "Init Buffer", file, line, func );
     meta.device.vkGetBufferMemoryRequirements( meta.buffer, &meta.memory_requirements );
 
     return meta;
@@ -740,7 +768,7 @@ auto ref initImage(
         meta.destroy( meta.image );                         // destroy it first
 
     meta.image_create_info = image_create_info;
-    meta.device.vkCreateImage( &meta.image_create_info, meta.allocator, &meta.image ).vkAssert( file, line, func );
+    meta.device.vkCreateImage( &meta.image_create_info, meta.allocator, &meta.image ).vkAssert( "Init Image", file, line, func );
     meta.device.vkGetImageMemoryRequirements( meta.image, &meta.memory_requirements );
     return meta;
 }
@@ -851,7 +879,16 @@ auto ref createView( ref Meta_Image meta, VkImageSubresourceRange subresource_ra
 
 /// create a VkImageView with choosing an image view type, format and VkComponentMapping for the underlying VkImage
 /// store vulkan data in argument Meta_Image container, return container for chaining
-auto ref createView( ref Meta_Image meta, VkImageSubresourceRange subresource_range, VkImageViewType view_type, VkFormat view_format, VkComponentMapping component_mapping ) {
+auto ref createView(
+    ref Meta_Image          meta,
+    VkImageSubresourceRange subresource_range,
+    VkImageViewType         view_type,
+    VkFormat                view_format,
+    VkComponentMapping      component_mapping,
+    string                  file = __FILE__,
+    size_t                  line = __LINE__,
+    string                  func = __FUNCTION__
+    ) {
     if( meta.image_view != VK_NULL_HANDLE )
         meta.destroy( meta.image_view );
     with( meta.image_view_create_info ) {
@@ -861,7 +898,7 @@ auto ref createView( ref Meta_Image meta, VkImageSubresourceRange subresource_ra
         subresourceRange    = subresource_range;
         components          = component_mapping;
     }
-    meta.device.vkCreateImageView( &meta.image_view_create_info, meta.allocator, &meta.image_view ).vkAssert;
+    meta.device.vkCreateImageView( &meta.image_view_create_info, meta.allocator, &meta.image_view ).vkAssert( "Create View", file, line, func );
     return meta;
 }
 
@@ -880,8 +917,8 @@ void recordTransition(
     VkAccessFlags           dst_accsess_mask,
     VkPipelineStageFlags    src_stage_mask = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
     VkPipelineStageFlags    dst_stage_mask = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-    VkDependencyFlags       dependency_flags = 0, ) {
-
+    VkDependencyFlags       dependency_flags = 0,
+    ) {
     VkImageMemoryBarrier layout_transition_barrier = {
         srcAccessMask       : src_accsess_mask,
         dstAccessMask       : dst_accsess_mask,
