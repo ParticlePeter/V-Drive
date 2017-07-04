@@ -126,7 +126,7 @@ const( char )* toCharPtr( VkResult vkResult ) nothrow @nogc {
 
 /// this is a general templated function to enumarate any vulkan property
 /// see usage in module surface or module util.info
-auto listVulkanProperty( ReturnType, alias vkFunc, Args... )( Args args ) {
+auto listVulkanProperty( ReturnType, alias vkFunc, Args... )( string file, size_t line, string func, Args args ) {
     import vdrive.util.array : ptr;
     Array!ReturnType result;
     VkResult vkResult;
@@ -147,13 +147,13 @@ auto listVulkanProperty( ReturnType, alias vkFunc, Args... )( Args args ) {
     */
 
     do {
-        vkFunc( args, &count, null ).vkAssert;
+        vkFunc( args, &count, null ).vkAssert( file, line, func );
         if( count == 0 )  break;
         result.length = count;
         vkResult = vkFunc( args, &count, result.ptr );
     } while( vkResult == VK_INCOMPLETE );
 
-    vkResult.vkAssert; // check if everything went right
+    vkResult.vkAssert( file, line, func ); // check if everything went right
 
     return result;
 }

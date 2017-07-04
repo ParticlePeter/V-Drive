@@ -258,12 +258,18 @@ private void inspect( T )( T info, string before = "" ) {
 ////////////////
 
 /// list all available ( layer per ) instance / device extensions
-auto listExtensions( VkPhysicalDevice gpu, const( char )* layer, bool printInfo = true ) {
-
+auto listExtensions(
+	VkPhysicalDevice	gpu,
+	const( char )*		layer,
+	bool				printInfo = true,
+    string              file = __FILE__,
+    size_t              line = __LINE__,
+    string              func = __FUNCTION__
+    ) {
 	// Enumerate Instance or Device extensions
 	auto extension_properties = gpu == VK_NULL_HANDLE ?
-		listVulkanProperty!( VkExtensionProperties, vkEnumerateInstanceExtensionProperties, const( char )* )( layer ) :
-		listVulkanProperty!( VkExtensionProperties, vkEnumerateDeviceExtensionProperties, VkPhysicalDevice, const( char )* )( gpu, layer );
+		listVulkanProperty!( VkExtensionProperties, vkEnumerateInstanceExtensionProperties, const( char )* )( file, line, func, layer ) :
+		listVulkanProperty!( VkExtensionProperties, vkEnumerateDeviceExtensionProperties, VkPhysicalDevice, const( char )* )( file, line, func, gpu, layer );
 
 	if( printInfo ) {
 		if(	extension_properties.length == 0 )  {
@@ -351,12 +357,18 @@ unittest {
 
 
 /// list all available instance / device layers
-auto listLayers( VkPhysicalDevice gpu, bool printInfo = true  ) {
+auto listLayers(
+	VkPhysicalDevice	gpu,
+	bool				printInfo = true,
+    string              file = __FILE__,
+    size_t              line = __LINE__,
+    string              func = __FUNCTION__
+    ) {
 
 	// Enumerate Instance or Device layers
 	auto layer_properties = gpu == VK_NULL_HANDLE ?
-		listVulkanProperty!( VkLayerProperties, vkEnumerateInstanceLayerProperties )() :
-		listVulkanProperty!( VkLayerProperties, vkEnumerateDeviceLayerProperties, VkPhysicalDevice )( gpu );
+		listVulkanProperty!( VkLayerProperties, vkEnumerateInstanceLayerProperties )( file, line, func ) :
+		listVulkanProperty!( VkLayerProperties, vkEnumerateDeviceLayerProperties, VkPhysicalDevice )( file, line, func, gpu );
 
 	if( printInfo ) {
 		if(	layer_properties.length == 0 )  {
@@ -443,9 +455,14 @@ if( is( T == string ) || is( T : const( char )* ) || is( T : char[] )) {
 /////////////////////
 // Physical Device //
 /////////////////////
-auto listPhysicalDevices( VkInstance instance, bool printInfo = true ) {
-
-	auto gpus = listVulkanProperty!( VkPhysicalDevice, vkEnumeratePhysicalDevices, VkInstance )( instance );
+auto listPhysicalDevices(
+	VkInstance	instance,
+	bool		printInfo = true,
+    string      file = __FILE__,
+    size_t      line = __LINE__,
+    string      func = __FUNCTION__
+    ) {
+	auto gpus = listVulkanProperty!( VkPhysicalDevice, vkEnumeratePhysicalDevices, VkInstance )( file, line, func, instance );
 
 	if( gpus.length == 0 ) {
 		import core.stdc.stdio : fprintf, stderr;
