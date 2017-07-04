@@ -37,8 +37,14 @@ struct Vulkan {
 }
 
 
-void initInstance( T )( ref Vulkan vk, T extensionNames, T layerNames )
-if( is( T == string ) | is( T == string[] ) | is( T == Array!( const( char )* )) | is( T : const( char* )[] )) {
+void initInstance( T )(
+    ref Vulkan          vk,
+    T                   extensionNames,
+    T                   layerNames,
+    string              file = __FILE__,
+    size_t              line = __LINE__,
+    string              func = __FUNCTION__
+    ) if( is( T == string ) | is( T == string[] ) | is( T == Array!( const( char )* )) | is( T : const( char* )[] )) {
 
     // Information about the application
     VkApplicationInfo application_info = {
@@ -81,7 +87,7 @@ if( is( T == string ) | is( T == string[] ) | is( T == Array!( const( char )* ))
     };
 
     // Create the vulkan instance
-    vkCreateInstance( &instance_create_info, null, &vk.instance ).vkAssert;
+    vkCreateInstance( &instance_create_info, vk.allocator, &vk.instance ).vkAssert( "Instance Initialization", file, line, func );
 
     // load all functions from the instance - useful for prototyping
     loadInstanceLevelFunctions( vk.instance );
@@ -94,15 +100,36 @@ if( is( T == string ) | is( T == string[] ) | is( T == Array!( const( char )* ))
 }
 
 
-void initInstance( ref Vulkan vk, string extensionNames = "", string layerNames = "" ) {
-    initInstance!( string )( vk, extensionNames, layerNames );
+void initInstance( 
+    ref Vulkan  vk,
+    string      extensionNames = "",
+    string      layerNames = "",
+    string      file = __FILE__,
+    size_t      line = __LINE__,
+    string      func = __FUNCTION__
+    ) {
+    initInstance!( string )( vk, extensionNames, layerNames, file, line, func );
 }
 
-void initInstance( ref Vulkan vk, string[] extensionNames, string[] layerNames = [] ) {
-    initInstance!( string[] )( vk, extensionNames, layerNames );
+void initInstance(
+    ref Vulkan  vk,
+    string[]    extensionNames,
+    string[]    layerNames = [],
+    string      file = __FILE__,
+    size_t      line = __LINE__,
+    string      func = __FUNCTION__
+    ) {
+    initInstance!( string[] )( vk, extensionNames, layerNames, file, line, func );
 }
 
-void initInstance( ref Vulkan vk, const( char* )[] extensionNames, const( char* )[] layerNames = [] ) {
+void initInstance( 
+    ref Vulkan          vk,
+    const( char* )[]    extensionNames,
+    const( char* )[]    layerNames = [],
+    string              file = __FILE__,
+    size_t              line = __LINE__,
+    string              func = __FUNCTION__
+    ) {
     initInstance!( const( char* )[] )( vk, extensionNames, layerNames );
 }
 
@@ -112,24 +139,25 @@ void destroyInstance( ref Vulkan vk ) {
 
 
 auto initDevice( T )(
-    ref Vulkan vk,
-    Queue_Family[] queue_families,
-    T extensionNames,
-    T layerNames,
-    VkPhysicalDeviceFeatures* gpuFeatures = null )
-if( is( T == string ) | is( T == string[] ) | is( T == Array!( const( char )* )) | is( T : const( char* )[] ) ) {
+    ref Vulkan                  vk,
+    Queue_Family[]              queue_families,
+    T                           extensionNames,
+    T                           layerNames,
+    VkPhysicalDeviceFeatures*   gpuFeatures = null,
+    string                      file = __FILE__,
+    size_t                      line = __LINE__,
+    string                      func = __FUNCTION__
+    ) if( is( T == string ) | is( T == string[] ) | is( T == Array!( const( char )* )) | is( T : const( char* )[] )) {
 
-    // check if Vulkan state has a not VK_NULL_HANDLE
-    if( vk.gpu == VK_NULL_HANDLE )  {
-        printf( "Physical Device is VK_NULL_HANDLE! Set a valid Physical Devise as Vulkan.gpu\n" );
-        return null;
-    }
+    // check if Vulkan state has a gpu set properly
+    vkAssert( vk.gpu != VK_NULL_HANDLE,
+        "Physical Device is VK_NULL_HANDLE! Set a valid Physical Devise as Vulkan.gpu", file, line, func
+    );
 
     // check if any queue family was passed into function
-    if( queue_families.length == 0 )  {
-        printf( "Zero family queues specified! Need at least one family queue!\n" );
-        return null;
-    }
+    vkAssert( queue_families.length > 0,
+        "Zero family queues specified! Need at least one family queue!", file, line, func
+    );
 
 
     // Preprocess arguments if passed as string or string[] at compile time
@@ -173,7 +201,7 @@ if( is( T == string ) | is( T == string[] ) | is( T == Array!( const( char )* ))
     };
 
     // create the device and load all device level Vulkan functions for the device
-    vk.gpu.vkCreateDevice( &device_create_info, null, &vk.device ).vkAssert;
+    vk.gpu.vkCreateDevice( &device_create_info, null, &vk.device ).vkAssert( "Create Device, file, line, func" );
     loadDeviceLevelFunctions( vk.device );
 
     // get and store the memory properties of the current gpu
@@ -184,19 +212,43 @@ if( is( T == string ) | is( T == string[] ) | is( T == Array!( const( char )* ))
 }
 
 
-
-
-auto initDevice( ref Vulkan vk, Queue_Family[] queue_families, string extensionNames = "", string layerNames = "", VkPhysicalDeviceFeatures* gpuFeatures = null ) {
-    return initDevice!( string )( vk, queue_families, extensionNames, layerNames, gpuFeatures );
+auto initDevice(
+    ref Vulkan                  vk,
+    Queue_Family[]              queue_families,
+    string                      extensionNames = "",
+    string                      layerNames = "",
+    VkPhysicalDeviceFeatures*   gpuFeatures = null,
+    string                      file = __FILE__,
+    size_t                      line = __LINE__,
+    string                      func = __FUNCTION__
+    ) {
+    return initDevice!( string )( vk, queue_families, extensionNames, layerNames, gpuFeatures, file, line, func );
 }
 
-
-auto initDevice( ref Vulkan vk, Queue_Family[] queue_families, string[] extensionNames, string[] layerNames = [], VkPhysicalDeviceFeatures* gpuFeatures = null ) {
-    return initDevice!( string[] )( vk, queue_families, extensionNames, layerNames, gpuFeatures );
+auto initDevice(
+    ref Vulkan                  vk,
+    Queue_Family[]              queue_families,
+    string[]                    extensionNames = [],
+    string[]                    layerNames = [],
+    VkPhysicalDeviceFeatures*   gpuFeatures = null,
+    string                      file = __FILE__,
+    size_t                      line = __LINE__,
+    string                      func = __FUNCTION__
+    ) {
+    return initDevice!( string[] )( vk, queue_families, extensionNames, layerNames, gpuFeatures, file, line, func );
 }
 
-auto initDevice( ref Vulkan vk, Queue_Family[] queue_families, const( char* )[] extensionNames, const( char* )[] layerNames = [], VkPhysicalDeviceFeatures* gpuFeatures = null ) {
-    return initDevice!( const( char* )[] )( vk, queue_families, extensionNames, layerNames, gpuFeatures );
+auto initDevice(
+    ref Vulkan                  vk,
+    Queue_Family[]              queue_families,
+    const( char* )[]            extensionNames,
+    const( char* )[]            layerNames,
+    VkPhysicalDeviceFeatures*   gpuFeatures = null,
+    string                      file = __FILE__,
+    size_t                      line = __LINE__,
+    string                      func = __FUNCTION__
+    ) {
+    return initDevice!( const( char* )[] )( vk, queue_families, extensionNames, layerNames, gpuFeatures, file, line, func );
 }
 
 
