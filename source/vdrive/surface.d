@@ -67,9 +67,14 @@ auto ref selectPresentMode( ref Meta_Surface meta, VkPresentModeKHR[] include_mo
 mixin( Forward_To_Inner_Struct!( Meta_Surface, VkSwapchainCreateInfoKHR, "meta.create_info" ));
 
 
-auto ref createSwapchain( ref Meta_Surface meta ) {
+auto ref createSwapchain( 
+    ref Meta_Surface    meta,
+    string              file = __FILE__,
+    size_t              line = __LINE__,
+    string              func = __FUNCTION__
+    ) {
     // assert that meta struct is initialized with a valid vulkan state pointer
-    assert( meta.isValid );
+    vkAssert( meta.isValid, "Vulkan state not assigned", file, line, func );
 
     // request different count of images dependent on selected present mode
     if( meta.minImageCount == 0 ) {
@@ -87,11 +92,7 @@ auto ref createSwapchain( ref Meta_Surface meta ) {
 
     import std.algorithm : clamp;
     meta.minImageCount = meta.minImageCount.clamp( surface_capabilities.minImageCount, surface_capabilities.maxImageCount );
-    if( meta.minImageCount == 0 ) {
-        printf( "Need at least one image in the swap chain, but max count is: %u", surface_capabilities.maxImageCount );
-        VK_ERROR_FEATURE_NOT_PRESENT.vkAssert;
-        return meta;
-    }
+    vkAssert( meta.minImageCount > 0, "No image in the swapchain", file, line, func );
 
     //printf( "\nImage Count: %u\n", image_count );
 
@@ -111,7 +112,7 @@ auto ref createSwapchain( ref Meta_Surface meta ) {
     }
 
     meta.create_info.oldSwapchain = meta.swapchain;         // store this in case we are reecreating the swapchain
-    vkCreateSwapchainKHR( meta.vk.device, &meta.create_info, meta.allocator, &meta.swapchain ).vkAssert;
+    vkCreateSwapchainKHR( meta.vk.device, &meta.create_info, meta.allocator, &meta.swapchain ).vkAssert( "Create Swapcahin", file, line, func );
     if( meta.create_info.oldSwapchain )                     // if the old swapchain was valid
         meta.destroy( meta.create_info.oldSwapchain );      // destroy it now
 
@@ -121,7 +122,14 @@ auto ref createSwapchain( ref Meta_Surface meta ) {
 
 
 
-auto ref createImageViews( ref Meta_Surface meta, VkImageAspectFlags subrecource_aspect_mask = VK_IMAGE_ASPECT_COLOR_BIT, VkImageViewType image_view_type = VK_IMAGE_VIEW_TYPE_2D ) {
+auto ref createImageViews(
+    ref Meta_Surface    meta,
+    VkImageAspectFlags  subrecource_aspect_mask = VK_IMAGE_ASPECT_COLOR_BIT,
+    VkImageViewType     image_view_type = VK_IMAGE_VIEW_TYPE_2D,
+    string              file = __FILE__,
+    size_t              line = __LINE__,
+    string              func = __FUNCTION__
+    ) {
     VkImageSubresourceRange image_subresource_range = {
         aspectMask      : VK_IMAGE_ASPECT_COLOR_BIT,
         baseMipLevel    : 0,
@@ -130,12 +138,19 @@ auto ref createImageViews( ref Meta_Surface meta, VkImageAspectFlags subrecource
         layerCount      : 1,
     };
 
-    meta.createImageViews( image_subresource_range, image_view_type );
+    meta.createImageViews( image_subresource_range, image_view_type, file, line, func );
     return meta;
 }
 
 
-auto ref createImageViews( ref Meta_Surface meta, VkImageSubresourceRange image_subresource_range, VkImageViewType image_view_type = VK_IMAGE_VIEW_TYPE_2D ) {
+auto ref createImageViews(
+    ref Meta_Surface        meta,
+    VkImageSubresourceRange image_subresource_range,
+    VkImageViewType         image_view_type = VK_IMAGE_VIEW_TYPE_2D,
+    string                  file = __FILE__,
+    size_t                  line = __LINE__,
+    string                  func = __FUNCTION__
+    ) {
     VkImageViewCreateInfo image_view_create_info = {
         viewType            : image_view_type,
         format              : meta.imageFormat,
@@ -143,43 +158,69 @@ auto ref createImageViews( ref Meta_Surface meta, VkImageSubresourceRange image_
         subresourceRange    : image_subresource_range,
     };
 
-    meta.createImageViews( image_view_create_info );
+    meta.createImageViews( image_view_create_info, file, line, func );
     return meta;
 }
 
 
-auto ref createImageViews( ref Meta_Surface meta, VkImageViewCreateInfo image_view_create_info ) {
+auto ref createImageViews(
+    ref Meta_Surface        meta,
+    VkImageViewCreateInfo   image_view_create_info,
+    string                  file = __FILE__,
+    size_t                  line = __LINE__,
+    string                  func = __FUNCTION__
+    ) {
     // assert that meta struct is initialized with a valid vulkan state pointer
-    assert( meta.isValid );
+    vkAssert( meta.isValid, "Vulkan state not assigned", file, line, func );
 
     // destroy old image views if they exist
     foreach( ref image_view; meta.present_image_views ) meta.destroy( image_view );
 
     // Create image views of the swapchain images in the passed in argument present_image_views
-    auto present_images = listVulkanProperty!( VkImage, vkGetSwapchainImagesKHR, VkDevice, VkSwapchainKHR )( meta.device, meta.swapchain );
+    auto present_images = 
+        listVulkanProperty!( VkImage, vkGetSwapchainImagesKHR, VkDevice, VkSwapchainKHR )
+            ( file, line, func, meta.device, meta.swapchain );
 
     // allocate storage for image views and create one view per swapchain image in a loop
     meta.present_image_views.length = present_images.length;
     foreach( i; 0 .. present_images.length ) {
         image_view_create_info.image = present_images[i];   // complete VkImageViewCreateInfo with image i:
-        vkCreateImageView( meta.device, &image_view_create_info, meta.allocator, &meta.present_image_views[i] ).vkAssert;
+        vkCreateImageView( meta.device, &image_view_create_info, meta.allocator, &meta.present_image_views[i] ).vkAssert( "Create Image View", file, line, func );
     }
 
     return meta;
 }
 
 
-auto ref construct( ref Meta_Surface meta ) {
-    return meta.createSwapchain.createImageViews;
+auto ref construct(
+    ref Meta_Surface    meta,
+    string              file = __FILE__,
+    size_t              line = __LINE__,
+    string              func = __FUNCTION__
+    ) {
+    return meta
+        .createSwapchain( file, line, func )
+        .createImageViews( VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_VIEW_TYPE_2D, file, line, func );    // must pass same default values to reach file, line, func
 }
 
 
-auto getSwapchainImages( VkDevice device, VkSwapchainKHR swapchain ) {
-    return listVulkanProperty!( VkImage, vkGetSwapchainImagesKHR, VkDevice, VkSwapchainKHR )( device, swapchain );
+auto getSwapchainImages(
+    VkDevice        device,
+    VkSwapchainKHR  swapchain,
+    string          file = __FILE__,
+    size_t          line = __LINE__,
+    string          func = __FUNCTION__
+    ) {
+    return listVulkanProperty!( VkImage, vkGetSwapchainImagesKHR, VkDevice, VkSwapchainKHR )( file, line, func, device, swapchain );
 }
 
-auto getSwapchainImages( Meta_Surface meta ) {
-    return listVulkanProperty!( VkImage, vkGetSwapchainImagesKHR, VkDevice, VkSwapchainKHR )( meta.device, meta.swapchain );
+auto getSwapchainImages(
+    Meta_Surface meta,
+    string       file = __FILE__,
+    size_t       line = __LINE__,
+    string       func = __FUNCTION__
+    ) {
+    return listVulkanProperty!( VkImage, vkGetSwapchainImagesKHR, VkDevice, VkSwapchainKHR )( file, line, func, meta.device, meta.swapchain );
 }
 
 // Todo(pp): this function is only a stub and must be merged with the one above.
@@ -191,7 +232,7 @@ auto getSwapchainImages( Meta_Surface meta ) {
 // see requirements and recipe on array in util.array module
 auto swapchainImageViews( ref Meta_Surface meta, VkImageViewCreateInfo image_view_create_info, void* scratch = null, uint32_t* size_used = null ) {
     // assert that meta struct is initialized with a valid vulkan state pointer
-    assert( meta.isValid );
+    vkAssert( meta.isValid, "Vulkan state not assigned" );
 
     // Create image views of the swapchain images in the passed in argument present_image_views
     auto present_images = listVulkanProperty!( VkImage, vkGetSwapchainImagesKHR, VkDevice, VkSwapchainKHR )( scratch, meta.device, meta.swapchain );
@@ -217,9 +258,17 @@ auto swapchainImageViews( ref Meta_Surface meta, VkImageViewCreateInfo image_vie
 ////////////////////////////
 
 /// list surface formats
-auto listSurfaceFormats( VkPhysicalDevice gpu, VkSurfaceKHR surface, bool printInfo = true ) {
+auto listSurfaceFormats(
+    VkPhysicalDevice    gpu,
+    VkSurfaceKHR        surface,
+    bool                printInfo = true,
+    string              file = __FILE__,
+    size_t              line = __LINE__,
+    string              func = __FUNCTION__
+    ) {
     auto surface_formats = listVulkanProperty!(
-        VkSurfaceFormatKHR, vkGetPhysicalDeviceSurfaceFormatsKHR, VkPhysicalDevice, VkSurfaceKHR )( gpu, surface );
+        VkSurfaceFormatKHR, vkGetPhysicalDeviceSurfaceFormatsKHR, VkPhysicalDevice, VkSurfaceKHR )
+            ( file, line, func, gpu, surface );
 
     if( surface_formats.length == 0 ) {
         printf( "No Surface Formats available!" );
@@ -261,9 +310,17 @@ if( is( Array_T == Array!VkSurfaceFormatKHR ) || is( Array_T : VkSurfaceFormatKH
 
 
 /// list presentation modes
-auto listPresentModes( VkPhysicalDevice gpu, VkSurfaceKHR surface, bool printInfo = true ) {
+auto listPresentModes(
+    VkPhysicalDevice    gpu,
+    VkSurfaceKHR        surface,
+    bool                printInfo = true,
+    string              file = __FILE__,
+    size_t              line = __LINE__,
+    string              func = __FUNCTION__
+    ) {
     auto present_modes = listVulkanProperty!(
-        VkPresentModeKHR, vkGetPhysicalDeviceSurfacePresentModesKHR, VkPhysicalDevice, VkSurfaceKHR )( gpu, surface );
+        VkPresentModeKHR, vkGetPhysicalDeviceSurfacePresentModesKHR, VkPhysicalDevice, VkSurfaceKHR )
+            ( file, line, func, gpu, surface );
 
     if( printInfo ) {
         if( present_modes.length == 0 )  {
