@@ -36,17 +36,17 @@ struct Vulkan {
     VkPhysicalDeviceMemoryProperties    memory_properties;
 }
 
-
 void initInstance( T )(
     ref Vulkan          vk,
     T                   extensionNames,
     T                   layerNames,
+    VkApplicationInfo*  application_info_ptr = null,
     string              file = __FILE__,
     size_t              line = __LINE__,
     string              func = __FUNCTION__
     ) if( is( T == string ) | is( T == string[] ) | is( T == Array!( const( char )* )) | is( T : const( char* )[] )) {
 
-    // Information about the application
+    // Default information about the application, in case none was passed in by the user
     VkApplicationInfo application_info = {
         pEngineName         : "V-Drive",
         engineVersion       : VK_MAKE_VERSION( 0, 1, 0 ),
@@ -54,6 +54,10 @@ void initInstance( T )(
         applicationVersion  : VK_MAKE_VERSION( 0, 1, 0 ),
         apiVersion          : VK_API_VERSION_1_0,
     };
+
+    // if no application info was passed ind we assign the address to the default one
+    if( application_info_ptr is null )
+        application_info_ptr = & application_info;
 
     // Preprocess arguments if passed as string or string[] at compile time
     static if( is( T == string )) {
@@ -79,7 +83,7 @@ void initInstance( T )(
 
     // Specify initialization of the vulkan instance
     VkInstanceCreateInfo instance_create_info = {
-        pApplicationInfo        : &application_info,
+        pApplicationInfo        : application_info_ptr,
         enabledExtensionCount   : cast( uint32_t )ppExtensionNames.length,
         ppEnabledExtensionNames : ppExtensionNames.ptr,
         enabledLayerCount       : cast( uint32_t )ppLayerNames.length,
@@ -101,36 +105,39 @@ void initInstance( T )(
 
 
 void initInstance( 
-    ref Vulkan  vk,
-    string      extensionNames = "",
-    string      layerNames = "",
-    string      file = __FILE__,
-    size_t      line = __LINE__,
-    string      func = __FUNCTION__
+    ref Vulkan          vk,
+    string              extensionNames = "",
+    string              layerNames = "",
+    VkApplicationInfo*  application_info_ptr = null,
+    string              file = __FILE__,
+    size_t              line = __LINE__,
+    string              func = __FUNCTION__
     ) {
-    initInstance!( string )( vk, extensionNames, layerNames, file, line, func );
+    initInstance!( string )( vk, extensionNames, layerNames, application_info_ptr, file, line, func );
 }
 
 void initInstance(
-    ref Vulkan  vk,
-    string[]    extensionNames,
-    string[]    layerNames = [],
-    string      file = __FILE__,
-    size_t      line = __LINE__,
-    string      func = __FUNCTION__
+    ref Vulkan          vk,
+    string[]            extensionNames,
+    string[]            layerNames = [],
+    VkApplicationInfo*  application_info_ptr = null,
+    string              file = __FILE__,
+    size_t              line = __LINE__,
+    string              func = __FUNCTION__
     ) {
-    initInstance!( string[] )( vk, extensionNames, layerNames, file, line, func );
+    initInstance!( string[] )( vk, extensionNames, layerNames, application_info_ptr, file, line, func );
 }
 
 void initInstance( 
     ref Vulkan          vk,
     const( char* )[]    extensionNames,
     const( char* )[]    layerNames = [],
+    VkApplicationInfo*  application_info_ptr = null,
     string              file = __FILE__,
     size_t              line = __LINE__,
     string              func = __FUNCTION__
     ) {
-    initInstance!( const( char* )[] )( vk, extensionNames, layerNames );
+    initInstance!( const( char* )[] )( vk, extensionNames, layerNames, application_info_ptr, file, line, func );
 }
 
 void destroyInstance( ref Vulkan vk ) {
