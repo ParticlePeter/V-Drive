@@ -13,7 +13,18 @@ dependencies        "erupted" version = "~>1.5.1"
 buildRequirements   "allowWarnings"
 
 
-// example hello triangle
+// example pp_00 : print capabilities
+subPackage {
+    name                "vk_caps"
+    description         "Vulkan Capabilities"
+    targetType          "executable"
+    sourcePaths         "source"    "example/pp_00_capabilities"
+    dependency          "erupted"   version = "~>1.5.1"
+    subConfiguration    "erupted"   "with-derelict-loader"
+//    buildOptions        "profile" "profileGC"
+}
+
+// example sw_01 : hello triangle
 subPackage {
     name                "triangle"
     description         "Simple Triangle"
