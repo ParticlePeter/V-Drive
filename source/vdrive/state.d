@@ -38,8 +38,8 @@ struct Vulkan {
 
 void initInstance( T )(
     ref Vulkan          vk,
-    T                   extensionNames,
-    T                   layerNames,
+    T                   extension_names,
+    T                   layer_names,
     VkApplicationInfo*  application_info_ptr = null,
     string              file = __FILE__,
     size_t              line = __LINE__,
@@ -62,23 +62,23 @@ void initInstance( T )(
     // Preprocess arguments if passed as string or string[] at compile time
     static if( is( T == string )) {
         Array!( const( char )* ) ppExtensionNames;
-        ppExtensionNames = extensionNames.toPtrArray;
+        ppExtensionNames = extension_names.toPtrArray;
 
         Array!( const( char )* ) ppLayerNames;
-        if( layerNames.length > 0 )   ppLayerNames = layerNames.toPtrArray;
+        if( layer_names.length > 0 )   ppLayerNames = layer_names.toPtrArray;
 
     } else static if( is( T == string[] )) {
         Array!char extension_concat_buffer;
         Array!( const( char )* ) ppExtensionNames;
-        ppExtensionNames = extensionNames.toPtrArray( extension_concat_buffer );
+        ppExtensionNames = extension_names.toPtrArray( extension_concat_buffer );
 
         Array!char layer_concat_buffer;
         Array!( const( char )* ) ppLayerNames;
-        if( layerNames.length > 0 )   ppLayerNames = layerNames.toPtrArray( layer_concat_buffer );
+        if( layer_names.length > 0 )   ppLayerNames = layer_names.toPtrArray( layer_concat_buffer );
 
     } else {
-        alias ppExtensionNames = extensionNames;
-        alias ppLayerNames = layerNames;
+        alias ppExtensionNames = extension_names;
+        alias ppLayerNames = layer_names;
     }
 
     // Specify initialization of the vulkan instance
@@ -106,38 +106,38 @@ void initInstance( T )(
 
 void initInstance( 
     ref Vulkan          vk,
-    string              extensionNames = "",
-    string              layerNames = "",
+    string              extension_names = "",
+    string              layer_names = "",
     VkApplicationInfo*  application_info_ptr = null,
     string              file = __FILE__,
     size_t              line = __LINE__,
     string              func = __FUNCTION__
     ) {
-    initInstance!( string )( vk, extensionNames, layerNames, application_info_ptr, file, line, func );
+    initInstance!( string )( vk, extension_names, layer_names, application_info_ptr, file, line, func );
 }
 
 void initInstance(
     ref Vulkan          vk,
-    string[]            extensionNames,
-    string[]            layerNames = [],
+    string[]            extension_names,
+    string[]            layer_names = [],
     VkApplicationInfo*  application_info_ptr = null,
     string              file = __FILE__,
     size_t              line = __LINE__,
     string              func = __FUNCTION__
     ) {
-    initInstance!( string[] )( vk, extensionNames, layerNames, application_info_ptr, file, line, func );
+    initInstance!( string[] )( vk, extension_names, layer_names, application_info_ptr, file, line, func );
 }
 
 void initInstance( 
     ref Vulkan          vk,
-    const( char* )[]    extensionNames,
-    const( char* )[]    layerNames = [],
+    const( char* )[]    extension_names,
+    const( char* )[]    layer_names = [],
     VkApplicationInfo*  application_info_ptr = null,
     string              file = __FILE__,
     size_t              line = __LINE__,
     string              func = __FUNCTION__
     ) {
-    initInstance!( const( char* )[] )( vk, extensionNames, layerNames, application_info_ptr, file, line, func );
+    initInstance!( const( char* )[] )( vk, extension_names, layer_names, application_info_ptr, file, line, func );
 }
 
 void destroyInstance( ref Vulkan vk ) {
@@ -148,9 +148,9 @@ void destroyInstance( ref Vulkan vk ) {
 auto initDevice( T )(
     ref Vulkan                  vk,
     Queue_Family[]              queue_families,
-    T                           extensionNames,
-    T                           layerNames,
-    VkPhysicalDeviceFeatures*   gpuFeatures = null,
+    T                           extension_names,
+    T                           layer_names,
+    VkPhysicalDeviceFeatures*   gpu_features = null,
     string                      file = __FILE__,
     size_t                      line = __LINE__,
     string                      func = __FUNCTION__
@@ -170,23 +170,23 @@ auto initDevice( T )(
     // Preprocess arguments if passed as string or string[] at compile time
     static if( is( T == string )) {
         Array!( const( char )* ) ppExtensionNames;
-        ppExtensionNames = extensionNames.toPtrArray;
+        ppExtensionNames = extension_names.toPtrArray;
 
         Array!( const( char )* ) ppLayerNames;
-        if( layerNames.length > 0 )   ppLayerNames = layerNames.toPtrArray;
+        if( layer_names.length > 0 )   ppLayerNames = layer_names.toPtrArray;
 
     } else static if( is( T == string[] )) {
         Array!char extension_concat_buffer;
         Array!( const( char )* ) ppExtensionNames;
-        ppExtensionNames = extensionNames.toPtrArray( extension_concat_buffer );
+        ppExtensionNames = extension_names.toPtrArray( extension_concat_buffer );
 
         Array!char layer_concat_buffer;
         Array!( const( char )* ) ppLayerNames;
-        if( layerNames.length > 0 )   ppLayerNames = layerNames.toPtrArray( layer_concat_buffer );
+        if( layer_names.length > 0 )   ppLayerNames = layer_names.toPtrArray( layer_concat_buffer );
 
     } else {
-        alias ppExtensionNames = extensionNames;
-        alias ppLayerNames = layerNames;
+        alias ppExtensionNames = extension_names;
+        alias ppLayerNames = layer_names;
     }
 
     // arange queue_families into VkdeviceQueueCreateInfos
@@ -204,7 +204,7 @@ auto initDevice( T )(
         ppEnabledExtensionNames : ppExtensionNames.ptr,
         enabledLayerCount       : cast( uint32_t )ppLayerNames.length,
         ppEnabledLayerNames     : ppLayerNames.ptr,
-        pEnabledFeatures        : gpuFeatures,
+        pEnabledFeatures        : gpu_features,
     };
 
     // create the device and load all device level Vulkan functions for the device
@@ -222,40 +222,40 @@ auto initDevice( T )(
 auto initDevice(
     ref Vulkan                  vk,
     Queue_Family[]              queue_families,
-    string                      extensionNames = "",
-    string                      layerNames = "",
-    VkPhysicalDeviceFeatures*   gpuFeatures = null,
+    string                      extension_names = "",
+    string                      layer_names = "",
+    VkPhysicalDeviceFeatures*   gpu_features = null,
     string                      file = __FILE__,
     size_t                      line = __LINE__,
     string                      func = __FUNCTION__
     ) {
-    return initDevice!( string )( vk, queue_families, extensionNames, layerNames, gpuFeatures, file, line, func );
+    return initDevice!( string )( vk, queue_families, extension_names, layer_names, gpu_features, file, line, func );
 }
 
 auto initDevice(
     ref Vulkan                  vk,
     Queue_Family[]              queue_families,
-    string[]                    extensionNames = [],
-    string[]                    layerNames = [],
-    VkPhysicalDeviceFeatures*   gpuFeatures = null,
+    string[]                    extension_names = [],
+    string[]                    layer_names = [],
+    VkPhysicalDeviceFeatures*   gpu_features = null,
     string                      file = __FILE__,
     size_t                      line = __LINE__,
     string                      func = __FUNCTION__
     ) {
-    return initDevice!( string[] )( vk, queue_families, extensionNames, layerNames, gpuFeatures, file, line, func );
+    return initDevice!( string[] )( vk, queue_families, extension_names, layer_names, gpu_features, file, line, func );
 }
 
 auto initDevice(
     ref Vulkan                  vk,
     Queue_Family[]              queue_families,
-    const( char* )[]            extensionNames,
-    const( char* )[]            layerNames,
-    VkPhysicalDeviceFeatures*   gpuFeatures = null,
+    const( char* )[]            extension_names,
+    const( char* )[]            layer_names,
+    VkPhysicalDeviceFeatures*   gpu_features = null,
     string                      file = __FILE__,
     size_t                      line = __LINE__,
     string                      func = __FUNCTION__
     ) {
-    return initDevice!( const( char* )[] )( vk, queue_families, extensionNames, layerNames, gpuFeatures, file, line, func );
+    return initDevice!( const( char* )[] )( vk, queue_families, extension_names, layer_names, gpu_features, file, line, func );
 }
 
 
