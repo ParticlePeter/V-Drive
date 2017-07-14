@@ -1,4 +1,4 @@
-module vdrive.surface;
+module vdrive.swapchain;
 
 import core.stdc.stdio : printf;
 
@@ -14,7 +14,7 @@ import std.stdio;
 /// struct to capture buffer and memory creation as well as binding
 /// the struct can travel through several methods and can be filled with necessary data
 /// first thing after creation of this struct must be the assignment of the address of a valid vulkan state struct
-struct Meta_Surface {
+struct Meta_Swapchain {
     mixin                       Vulkan_State_Pointer;
     VkQueue                     present_queue = VK_NULL_HANDLE;
 //  uint32_t                    present_queue_family_index;         // does not seem to be required so far
@@ -51,24 +51,24 @@ struct Meta_Surface {
 }
 
 
-auto ref selectSurfaceFormat( ref Meta_Surface meta, VkFormat[] include_formats, bool first_available_as_fallback = true ) {
+auto ref selectSurfaceFormat( ref Meta_Swapchain meta, VkFormat[] include_formats, bool first_available_as_fallback = true ) {
     meta.surfaceFormat = meta.gpu.listSurfaceFormats( meta.surface, false ).filter( include_formats );
     return meta;
 }
 
 
-auto ref selectPresentMode( ref Meta_Surface meta, VkPresentModeKHR[] include_modes, bool first_available_as_fallback = true ) {
+auto ref selectPresentMode( ref Meta_Swapchain meta, VkPresentModeKHR[] include_modes, bool first_available_as_fallback = true ) {
     meta.presentMode = meta.gpu.listPresentModes( meta.surface, false ).filter( include_modes );
     return meta;
 }
 
 
-// forward members of Meta_Surface.create_info to setter and getter functions
-mixin( Forward_To_Inner_Struct!( Meta_Surface, VkSwapchainCreateInfoKHR, "meta.create_info" ));
+// forward members of Meta_Swapchain.create_info to setter and getter functions
+mixin( Forward_To_Inner_Struct!( Meta_Swapchain, VkSwapchainCreateInfoKHR, "meta.create_info" ));
 
 
 auto ref createSwapchain( 
-    ref Meta_Surface    meta,
+    ref Meta_Swapchain    meta,
     string              file = __FILE__,
     size_t              line = __LINE__,
     string              func = __FUNCTION__
@@ -123,7 +123,7 @@ auto ref createSwapchain(
 
 
 auto ref createImageViews(
-    ref Meta_Surface    meta,
+    ref Meta_Swapchain    meta,
     VkImageAspectFlags  subrecource_aspect_mask = VK_IMAGE_ASPECT_COLOR_BIT,
     VkImageViewType     image_view_type = VK_IMAGE_VIEW_TYPE_2D,
     string              file = __FILE__,
@@ -144,7 +144,7 @@ auto ref createImageViews(
 
 
 auto ref createImageViews(
-    ref Meta_Surface        meta,
+    ref Meta_Swapchain        meta,
     VkImageSubresourceRange image_subresource_range,
     VkImageViewType         image_view_type = VK_IMAGE_VIEW_TYPE_2D,
     string                  file = __FILE__,
@@ -164,7 +164,7 @@ auto ref createImageViews(
 
 
 auto ref createImageViews(
-    ref Meta_Surface        meta,
+    ref Meta_Swapchain        meta,
     VkImageViewCreateInfo   image_view_create_info,
     string                  file = __FILE__,
     size_t                  line = __LINE__,
@@ -193,7 +193,7 @@ auto ref createImageViews(
 
 
 auto ref construct(
-    ref Meta_Surface    meta,
+    ref Meta_Swapchain    meta,
     string              file = __FILE__,
     size_t              line = __LINE__,
     string              func = __FUNCTION__
@@ -215,7 +215,7 @@ auto getSwapchainImages(
 }
 
 auto getSwapchainImages(
-    Meta_Surface meta,
+    Meta_Swapchain meta,
     string       file = __FILE__,
     size_t       line = __LINE__,
     string       func = __FUNCTION__
@@ -230,7 +230,7 @@ auto getSwapchainImages(
 // moreover, to not over complicate the argument amount the option to use scratch space
 // should be set globally and recorded in the vulkan state struct
 // see requirements and recipe on array in util.array module
-auto swapchainImageViews( ref Meta_Surface meta, VkImageViewCreateInfo image_view_create_info, void* scratch = null, uint32_t* size_used = null ) {
+auto swapchainImageViews( ref Meta_Swapchain meta, VkImageViewCreateInfo image_view_create_info, void* scratch = null, uint32_t* size_used = null ) {
     // assert that meta struct is initialized with a valid vulkan state pointer
     vkAssert( meta.isValid, "Vulkan state not assigned" );
 
