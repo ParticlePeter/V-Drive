@@ -113,6 +113,20 @@ int main() {
     Vulkan vk;
     vk.initInstance;
 
+    // check if any device supporting vulkan is available
+    uint32_t device_count;
+    vk.instance.vkEnumeratePhysicalDevices( & device_count, null ).vkAssert( "Ennumerate Physical Devices" );
+
+    printf( "Found %d physical devices supporting Vulka\n\n", device_count );
+
+    if( device_count == 0 ) {
+        printf( "\nPress enter to exit!!!\n" );
+        char input;
+        import std.stdio : readf;
+        readf( "%s", & input );
+    }
+
+
     // enumerate gpus
     auto gpus = vk.instance.listPhysicalDevices( false );
 
