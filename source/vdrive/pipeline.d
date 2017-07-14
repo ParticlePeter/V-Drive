@@ -2,10 +2,8 @@ module vdrive.pipeline;
 
 import core.stdc.stdio : printf;
 
-import vdrive.util;
+import vdrive.util.array, vdrive.util.util;
 import vdrive.state;
-import vdrive.surface;
-import vdrive.geometry;
 
 import erupted;
 
