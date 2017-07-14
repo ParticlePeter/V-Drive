@@ -22,12 +22,14 @@ struct Meta_Swapchain {
     VkSwapchainCreateInfoKHR    create_info;
     Array!VkImageView           present_image_views;
 
+    // convenience function to get the pointer to the VkSurface of create_info
+    auto surface_ptr()      { return & create_info.surface; }
 
     // convenience to get the swapchain image count
-    auto imageCount() { return present_image_views.length.toUint; }
+    auto imageCount()       { return present_image_views.length.toUint; }
 
     // convenience to get VkSurfaceFormatKHR from VkSwapchainCreateInfoKHR.imageFormat and .imageColorSpace and set vice versa
-    auto surfaceFormat() { return VkSurfaceFormatKHR( create_info.imageFormat, create_info.imageColorSpace ); }
+    auto surfaceFormat()    { return VkSurfaceFormatKHR( create_info.imageFormat, create_info.imageColorSpace ); }
     void surfaceFormat( VkSurfaceFormatKHR surface_format ) {
         create_info.imageFormat = surface_format.format;
         create_info.imageColorSpace = surface_format.colorSpace;
