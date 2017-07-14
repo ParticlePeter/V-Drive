@@ -143,7 +143,7 @@ void flushMappedMemoryRange(
     size_t                  line    = __LINE__,
     string                  func    = __FUNCTION__
     ) {
-    vk.device.vkFlushMappedMemoryRanges( 1, & mapped_memory_range ).vkAssert( "Create Mapped Memory Range", file, line, func );
+    vk.device.vkFlushMappedMemoryRanges( 1, & mapped_memory_range ).vkAssert( "Flush Mapped Memory Range", file, line, func );
 }
 
 
@@ -551,6 +551,27 @@ auto createMappedMemoryRange( META )(
     static if( is( META == Meta_Memory ))   VkDeviceSize combined_offset = offset;
     else                                    VkDeviceSize combined_offset = offset + meta.device_memory_offset;
     return meta.createMappedMemoryRange( meta.device_memory, size, combined_offset, file, line, func );
+}
+
+
+/// flush the memory object, either whole size or with offset and size
+/// memory must have been mapped beforehand
+auto ref flushMappedMemoryRange( META )(
+    ref META            meta,
+    VkDeviceSize        size    = 0,
+    VkDeviceSize        offset  = 0,
+    string              file    = __FILE__,
+    size_t              line    = __LINE__,
+    string              func    = __FUNCTION__
+    ) if( hasMemReqs!META || is( META == Meta_Memory )) {
+    vkAssert( meta.isValid, "Vulkan state not assigned", file, line, func );       // meta struct must be initialized with a valid vulkan state pointer
+    VkMappedMemoryRange mapped_memory_range = {
+        memory  : meta.device_memory,
+        size    : size > 0 ? size : VK_WHOLE_SIZE,
+        offset  : offset,
+    };
+    meta.device.vkFlushMappedMemoryRanges( 1, & mapped_memory_range ).vkAssert( "Flush Mapped Memory Range", file, line, func );
+    return meta;
 }
 
 
