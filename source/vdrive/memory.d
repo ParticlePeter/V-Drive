@@ -1003,6 +1003,13 @@ void recordTransition(
 
 
 
+
+bool is_constructed( Meta_Memory meta ) { return meta.memory != VK_NULL_HANDLE; }
+bool is_constructed( Meta_Buffer meta ) { return meta.buffer != VK_NULL_HANDLE; }
+bool is_constructed( Meta_Image  meta ) { return meta.image  != VK_NULL_HANDLE; }
+
+
+
 // checking format support
 //VkFormatProperties format_properties;
 //vk.gpu.vkGetPhysicalDeviceFormatProperties( VK_FORMAT_B8G8R8A8_UNORM, &format_properties );
