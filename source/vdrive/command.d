@@ -100,13 +100,13 @@ auto queueSubmitInfo(
 }
 
 
-auto commandBufferBeginInfo( VkCommandBufferUsageFlags command_buffer_usage_flags = 0 ) {
+auto createCmdBufferBI( VkCommandBufferUsageFlags command_buffer_usage_flags = 0 ) {
     VkCommandBufferBeginInfo result = { flags : command_buffer_usage_flags };
     return result;
 }
 
 
-void cmdDispatch( ref VkCommandBuffer cmd_buffer, uint32_t[3] group_count ) {
+void vdCmdDispatch( ref VkCommandBuffer cmd_buffer, uint32_t[3] group_count ) {
     cmd_buffer.vkCmdDispatch( group_count[0], group_count[1], group_count[2] );
 }
 
