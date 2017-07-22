@@ -158,6 +158,28 @@ void flushMappedMemoryRanges(
 }
 
 
+void invalidateMappedMemoryRange(
+    ref Vulkan              vk,
+    VkMappedMemoryRange     mapped_memory_range,
+    string                  file    = __FILE__,
+    size_t                  line    = __LINE__,
+    string                  func    = __FUNCTION__
+    ) {
+    vk.device.vkInvalidateMappedMemoryRanges( 1, & mapped_memory_range ).vkAssert( "Flush Mapped Memory Range", file, line, func );
+}
+
+
+void invalidateMappedMemoryRanges(
+    ref Vulkan              vk,
+    VkMappedMemoryRange[]   mapped_memory_ranges,
+    string                  file    = __FILE__,
+    size_t                  line    = __LINE__,
+    string                  func    = __FUNCTION__
+    ) {
+    vk.device.vkInvalidateMappedMemoryRanges( mapped_memory_ranges.length.toUint, mapped_memory_ranges.ptr ).vkAssert( "Flush Mapped Memory Ranges", file, line, func );
+}
+
+
 ///////////////////////////////////////
 // Meta_Memory and related functions //
 ///////////////////////////////////////
@@ -573,6 +595,28 @@ auto ref flushMappedMemoryRange( META )(
     meta.device.vkFlushMappedMemoryRanges( 1, & mapped_memory_range ).vkAssert( "Flush Mapped Memory Range", file, line, func );
     return meta;
 }
+
+
+/// invalidate the memory object, either whole size or with offset and size
+/// memory must have been mapped beforehand
+auto ref invalidateMappedMemoryRange( META )(
+    ref META            meta,
+    VkDeviceSize        size    = VK_WHOLE_SIZE,
+    VkDeviceSize        offset  = 0,
+    string              file    = __FILE__,
+    size_t              line    = __LINE__,
+    string              func    = __FUNCTION__
+    ) if( hasMemReqs!META || is( META == Meta_Memory )) {
+    vkAssert( meta.isValid, "Vulkan state not assigned", file, line, func );       // meta struct must be initialized with a valid vulkan state pointer
+    VkMappedMemoryRange mapped_memory_range = {
+        memory  : meta.device_memory,
+        size    : size,
+        offset  : offset,
+    };
+    meta.device.vkInvalidateMappedMemoryRanges( 1, & mapped_memory_range ).vkAssert( "Invalidate Mapped Memory Range", file, line, func );
+    return meta;
+}
+
 
 
 /// upload data to the VkDeviceMemory object of the coresponding buffer or image through memory mapping
