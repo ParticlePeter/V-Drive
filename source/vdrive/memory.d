@@ -121,7 +121,7 @@ void unmapMemory( ref Vulkan vk, VkDeviceMemory memory ) {
 auto createMappedMemoryRange(
     ref Vulkan          vk,
     VkDeviceMemory      memory,
-    VkDeviceSize        size    = 0,
+    VkDeviceSize        size    = VK_WHOLE_SIZE,
     VkDeviceSize        offset  = 0,
     string              file    = __FILE__,
     size_t              line    = __LINE__,
@@ -129,7 +129,7 @@ auto createMappedMemoryRange(
     ) {
     VkMappedMemoryRange mapped_memory_range = {
         memory  : memory,
-        size    : size > 0 ? size : VK_WHOLE_SIZE,
+        size    : size,
         offset  : offset,
     };
     return mapped_memory_range;
@@ -558,7 +558,7 @@ auto createMappedMemoryRange( META )(
 /// memory must have been mapped beforehand
 auto ref flushMappedMemoryRange( META )(
     ref META            meta,
-    VkDeviceSize        size    = 0,
+    VkDeviceSize        size    = VK_WHOLE_SIZE,
     VkDeviceSize        offset  = 0,
     string              file    = __FILE__,
     size_t              line    = __LINE__,
@@ -567,7 +567,7 @@ auto ref flushMappedMemoryRange( META )(
     vkAssert( meta.isValid, "Vulkan state not assigned", file, line, func );       // meta struct must be initialized with a valid vulkan state pointer
     VkMappedMemoryRange mapped_memory_range = {
         memory  : meta.device_memory,
-        size    : size > 0 ? size : VK_WHOLE_SIZE,
+        size    : size,
         offset  : offset,
     };
     meta.device.vkFlushMappedMemoryRanges( 1, & mapped_memory_range ).vkAssert( "Flush Mapped Memory Range", file, line, func );
