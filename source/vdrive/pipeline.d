@@ -859,3 +859,10 @@ auto ref construct(
     ) {
     return meta.construct( VK_NULL_HANDLE, pipeline_layout, file, line, func );
 }
+
+
+
+
+bool is_constructed( Core_Pipeline pso ) { return pso.pipeline != VK_NULL_HANDLE; }
+bool is_constructed( Meta_Graphics pso ) { return pso.pipeline != VK_NULL_HANDLE; }
+bool is_constructed( Meta_Compute  pso ) { return pso.pipeline != VK_NULL_HANDLE; }
