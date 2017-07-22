@@ -68,15 +68,15 @@ auto createSampler(
 ///     vk = reference to a VulkanState struct
 ///     buffer = for which the view will be created
 ///     format = of the view
-///     offset = into the original buffer
-///     range  = of the view, can be VK_WHOLE_SIZE (starting at offset)
+///     offset = optional offset into the original buffer
+///     range  = optional range of the view (starting at offset), VK_WHOLE_SIZE if not specified
 /// Returns: VkBufferView
 auto createBufferView(
     ref Vulkan      vk,
     VkBuffer        buffer,
     VkFormat        format,
-    VkDeviceSize    offset,
-    VkDeviceSize    range,
+    VkDeviceSize    offset = 0,
+    VkDeviceSize    range = VK_WHOLE_SIZE,
 //  VkBufferViewCreateFlags flags = 0,
     string          file = __FILE__,
     size_t          line = __LINE__,
