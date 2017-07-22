@@ -117,7 +117,7 @@ const( char )* toCharPtr( VkResult vkResult ) nothrow @nogc {
         case VK_ERROR_INCOMPATIBLE_DISPLAY_KHR      : return "VK_ERROR_INCOMPATIBLE_DISPLAY_KHR";
         case VK_ERROR_VALIDATION_FAILED_EXT         : return "VK_ERROR_VALIDATION_FAILED_EXT";
         case VK_ERROR_INVALID_SHADER_NV             : return "VK_ERROR_INVALID_SHADER_NV";
-        case VK_NV_EXTENSION_1_ERROR                : return "VK_NV_EXTENSION_1_ERROR";
+    //  case VK_NV_EXTENSION_1_ERROR                : return "VK_NV_EXTENSION_1_ERROR";
         case VK_ERROR_OUT_OF_POOL_MEMORY_KHR        : return "VK_ERROR_OUT_OF_POOL_MEMORY_KHR";
         case VK_ERROR_INVALID_EXTERNAL_HANDLE_KHR   : return "VK_ERROR_INVALID_EXTERNAL_HANDLE_KHR";
         default                                     : return "UNKNOWN_RESULT";
