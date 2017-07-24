@@ -23,7 +23,7 @@ import core.stdc.stdio : printf;
 /// Returns: VkShaderModule
 auto createShaderModule(
     ref Vulkan  vk,
-    string      shader_path,
+    string      shader_path,            // Todo(pp): turn this into a const( char )*
     string      file = __FILE__,
     size_t      line = __LINE__,
     string      func = __FUNCTION__
