@@ -45,7 +45,85 @@ auto toStringz( T )( T data ) if( is( T == string ) || is( T : char[] )) {
 }
 
 
-void toPtrArray( string[] data, const( char )*[] pointer_buffer, char[] concat_buffer ) {
+/// convert string slice into Array!const( char )* slice
+/// Todo(pp): might be broken, test it!
+/// Params:
+///     data = slice of strings
+///     terminator = optional final character in the concatenated buffer
+/// Returns: Array!const( char )*[], array of pointers into a stringz array
+auto toPtrArray( string[] data, char terminator = '\?' ) {
+    Array!char concat_buffer;                               // Todo(pp): this shouldn't work and needs testing
+    return data.toPtrArray( concat_buffer, terminator );    // concat_buffer should be destroyed when leaving this func
+}
+
+
+/// copy all strings of a string slice into reference argument concat_buffer
+/// terminating each string with a '\0' character
+/// original content of concat_buffer is kept, the array is resized appropriately
+/// another dynamic array with const( char )* pointer into the concat_buffer is returned 
+/// Params:
+///     data = slice of strings
+///     concat_buffer = reference to buffer for the string copy and '\0' per string append
+///     terminator = optional final character in the concatenated buffer
+/// Returns: Array!const( char )*[], array of pointers into the concat_buffer stringz array
+auto toPtrArray( string[] data, ref Array!char concat_buffer, char terminator = '\?' ) {
+    Array!( const( char )* ) pointer_buffer;
+    data.toPtrArray( pointer_buffer, concat_buffer, terminator );
+    return pointer_buffer;
+}
+
+
+/// copy all strings of a string slice into reference argument concat_buffer
+/// terminating each string with a '\0' character
+/// original content of concat_buffer is kept, the array is resized appropriately
+/// pointer into the concat_buffer are appended to the reference argument pointer_buffer 
+/// Params:
+///     data = slice of strings
+///     concat_buffer = reference to buffer for the string copy and '\0' per string append
+///     pointer_buffer = reference to pointer buffer where pointer into concat_buffer are appended
+///     terminator = optional final character in the concatenated buffer
+/// Returns: start index of the appended pointer
+auto toPtrArray( string[] data, ref Array!( const( char )* ) pointer_buffer, ref Array!char concat_buffer, char terminator = '\?' ) {
+    // early exit if data is empty
+    if( data.length == 0 ) return pointer_buffer.length;
+
+    size_t new_buffer_length = 0;
+    foreach( ref s; data )
+        new_buffer_length += s.length + 1;
+
+    if( terminator != '\?' ) {
+        ++new_buffer_length;
+        if( terminator != '\0' ) {
+            ++new_buffer_length;
+        }
+    }
+
+    size_t concat_buffer_start = concat_buffer.length;
+    concat_buffer.length = concat_buffer_start + new_buffer_length;
+
+    size_t pointer_buffer_start = pointer_buffer.length;
+    pointer_buffer.length = pointer_buffer_start + data.length;
+
+    data.toPtrArray( pointer_buffer.data[ pointer_buffer_start .. $ ], concat_buffer.data[ concat_buffer_start .. $ ], terminator );
+    return pointer_buffer_start;
+}
+
+
+/// copy all strings of a string slice into reference argument concat_buffer
+/// terminating each string with a '\0' character
+/// concat_buffer must have sufficient space for the concatenation
+/// pointer into the concat_buffer are stored into pointer_buffer
+/// which also must have sufficient space of count of data.length 
+/// Params:
+///     data = slice of strings
+///     concat_buffer = buffer for the string copy and '\0' per string append with sufficient space
+///     pointer_buffer = buffer where pointer into concat_buffer are stored with sufficient space
+///     terminator = optional final character in the concatenated buffer, concat_buffer must accommodate it
+/// Returns: start index of the appended pointer
+void toPtrArray( string[] data, const( char )*[] pointer_buffer, char[] concat_buffer, char terminator = '\?' ) {
+    // early exit if data is empty
+    if( data.length == 0 ) return;
+
     size_t copy_target_index = 0;
     foreach( i, ref s; data ) {
         pointer_buffer[i] = & concat_buffer[ copy_target_index ];
@@ -54,29 +132,17 @@ void toPtrArray( string[] data, const( char )*[] pointer_buffer, char[] concat_b
         concat_buffer[ copy_target_index + s.length ] = '\0';
         copy_target_index += s.length + 1;
     }
+
+    if( terminator != '\?' ) {
+        concat_buffer[ copy_target_index ] = terminator;
+        if( terminator != '\0' ) {
+            concat_buffer[ copy_target_index + 1 ] = '\0';
+        }
+    }
 }
 
 
-auto toPtrArray( string[] data, ref Array!char concat_buffer ) {
-    size_t buffer_length = 0;
-    foreach( ref s; data )
-        buffer_length += s.length + 1;
 
-    if( concat_buffer.length < buffer_length )
-        concat_buffer.length = buffer_length;
-
-    Array!( const( char )* ) pointer_buffer;
-    pointer_buffer.length = data.length;
-    data.toPtrArray( pointer_buffer.data, concat_buffer.data );
-
-    return pointer_buffer;
-}
-
-
-auto toPtrArray( string[] data ) {
-    Array!char concat_buffer;
-    return data.toPtrArray( concat_buffer );
-}
 
 
 auto toPtrArray( string data, const( char )*[] pointer_buffer ) {
