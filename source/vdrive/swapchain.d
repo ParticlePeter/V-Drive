@@ -70,7 +70,7 @@ mixin( Forward_To_Inner_Struct!( Meta_Swapchain, VkSwapchainCreateInfoKHR, "meta
 
 
 auto ref createSwapchain( 
-    ref Meta_Swapchain    meta,
+    ref Meta_Swapchain  meta,
     string              file = __FILE__,
     size_t              line = __LINE__,
     string              func = __FUNCTION__
