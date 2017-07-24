@@ -1047,10 +1047,13 @@ void recordTransition(
 
 
 
+bool is_null( Meta_Memory meta ) { return meta.memory.is_null_handle; }
+bool is_null( Meta_Buffer meta ) { return meta.buffer.is_null_handle; }
+bool is_null( Meta_Image  meta ) { return meta.image .is_null_handle; }
 
-bool is_constructed( Meta_Memory meta ) { return meta.memory != VK_NULL_HANDLE; }
-bool is_constructed( Meta_Buffer meta ) { return meta.buffer != VK_NULL_HANDLE; }
-bool is_constructed( Meta_Image  meta ) { return meta.image  != VK_NULL_HANDLE; }
+bool is_constructed( Meta_Memory meta ) { return !meta.is_null; }
+bool is_constructed( Meta_Buffer meta ) { return !meta.is_null; }
+bool is_constructed( Meta_Image  meta ) { return !meta.is_null; }
 
 
 

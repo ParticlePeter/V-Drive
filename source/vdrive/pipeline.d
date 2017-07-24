@@ -862,7 +862,10 @@ auto ref construct(
 
 
 
+bool is_null( Core_Pipeline pso ) { return pso.pipeline.is_null_handle; }
+bool is_null( Meta_Graphics pso ) { return pso.pipeline.is_null_handle; }
+bool is_null( Meta_Compute  pso ) { return pso.pipeline.is_null_handle; }
 
-bool is_constructed( Core_Pipeline pso ) { return pso.pipeline != VK_NULL_HANDLE; }
-bool is_constructed( Meta_Graphics pso ) { return pso.pipeline != VK_NULL_HANDLE; }
-bool is_constructed( Meta_Compute  pso ) { return pso.pipeline != VK_NULL_HANDLE; }
+bool is_constructed( Core_Pipeline pso ) { return !pso.is_null; }
+bool is_constructed( Meta_Graphics pso ) { return !pso.is_null; }
+bool is_constructed( Meta_Compute  pso ) { return !pso.is_null; }

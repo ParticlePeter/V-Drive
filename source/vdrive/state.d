@@ -305,52 +305,59 @@ void destroy( ref Vulkan vk, ref VkDebugReportCallbackEXT handle )  { vkDestroyD
 //VkIndirectCommandsLayoutNVX
 
 
-template isDispatchHandle( T ... ) if( T.length == 1 ) {
+template is_dispatch_handle( T ) {
     static if(
-        is( typeof( T[0] ) == VkInstance )
-    ||  is( typeof( T[0] ) == VkPhysicalDevice )
-    ||  is( typeof( T[0] ) == VkDevice )
-    ||  is( typeof( T[0] ) == VkQueue )
-    ||  is( typeof( T[0] ) == VkCommandBuffer )) {
-        enum bool isDispatchHandle = true;
+        is( T == VkInstance )
+    ||  is( T == VkPhysicalDevice )
+    ||  is( T == VkDevice )
+    ||  is( T == VkQueue )
+    ||  is( T == VkCommandBuffer )) {
+        enum bool is_dispatch_handle = true;
     } else {
-        enum bool isDispatchHandle = false;
+        enum bool is_dispatch_handle = false;
     }
 }
 
 
-template isNonDispatchHandle( T ... ) if( T.length == 1 ) {
+template is_non_dispatch_handle( T ) {
     static if(
-        is( typeof( T[0] ) == VkSemaphore )
-    ||  is( typeof( T[0] ) == VkFence )
-    ||  is( typeof( T[0] ) == VkDeviceMemory )
-    ||  is( typeof( T[0] ) == VkBuffer )
-    ||  is( typeof( T[0] ) == VkImage )
-    ||  is( typeof( T[0] ) == VkEvent )
-    ||  is( typeof( T[0] ) == VkQueryPool )
-    ||  is( typeof( T[0] ) == VkBufferView )
-    ||  is( typeof( T[0] ) == VkImageView )
-    ||  is( typeof( T[0] ) == VkShaderModule )
-    ||  is( typeof( T[0] ) == VkPipelineCache )
-    ||  is( typeof( T[0] ) == VkPipelineLayout )
-    ||  is( typeof( T[0] ) == VkRenderPass )
-    ||  is( typeof( T[0] ) == VkPipeline )
-    ||  is( typeof( T[0] ) == VkDescriptorSetLayout )
-    ||  is( typeof( T[0] ) == VkSampler )
-    ||  is( typeof( T[0] ) == VkDescriptorPool )
-    ||  is( typeof( T[0] ) == VkDescriptorSet )
-    ||  is( typeof( T[0] ) == VkFramebuffer )
-    ||  is( typeof( T[0] ) == VkCommandPool )
-    ||  is( typeof( T[0] ) == VkSurfaceKHR )
-    ||  is( typeof( T[0] ) == VkSwapchainKHR )
-    ||  is( typeof( T[0] ) == VkDisplayKHR )
-    ||  is( typeof( T[0] ) == VkDisplayModeKHR )
-    ||  is( typeof( T[0] ) == VkDescriptorUpdateTemplateKHR )
-    ||  is( typeof( T[0] ) == VkDebugReportCallbackEXT )
-    ||  is( typeof( T[0] ) == VkObjectTableNVX )
-    ||  is( typeof( T[0] ) == VkIndirectCommandsLayoutNVX )) {
-        enum bool isNonDispatchHandle = true;
+        is( T == VkSemaphore )
+    ||  is( T == VkFence )
+    ||  is( T == VkDeviceMemory )
+    ||  is( T == VkBuffer )
+    ||  is( T == VkImage )
+    ||  is( T == VkEvent )
+    ||  is( T == VkQueryPool )
+    ||  is( T == VkBufferView )
+    ||  is( T == VkImageView )
+    ||  is( T == VkShaderModule )
+    ||  is( T == VkPipelineCache )
+    ||  is( T == VkPipelineLayout )
+    ||  is( T == VkRenderPass )
+    ||  is( T == VkPipeline )
+    ||  is( T == VkDescriptorSetLayout )
+    ||  is( T == VkSampler )
+    ||  is( T == VkDescriptorPool )
+    ||  is( T == VkDescriptorSet )
+    ||  is( T == VkFramebuffer )
+    ||  is( T == VkCommandPool )
+    ||  is( T == VkSurfaceKHR )
+    ||  is( T == VkSwapchainKHR )
+    ||  is( T == VkDisplayKHR )
+    ||  is( T == VkDisplayModeKHR )
+    ||  is( T == VkDescriptorUpdateTemplateKHR )
+    ||  is( T == VkDebugReportCallbackEXT )
+    ||  is( T == VkObjectTableNVX )
+    ||  is( T == VkIndirectCommandsLayoutNVX )
+    ) {
+        enum bool is_non_dispatch_handle = true;
     } else {
-        enum bool isNonDispatchHandle = false;
+        enum bool is_non_dispatch_handle = false;
     }
+}
+
+
+alias is_null = is_null_handle;
+bool is_null_handle( T )( T handle ) if( is_non_dispatch_handle!T ) {
+    return handle == VK_NULL_HANDLE;
 }
