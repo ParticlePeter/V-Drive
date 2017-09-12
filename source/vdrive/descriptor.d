@@ -389,9 +389,9 @@ auto reset( ref Meta_Descriptor_Layout meta ) {
 auto ref addLayoutBinding(
     ref Meta_Descriptor_Layout meta,
     uint32_t            binding,
-    uint32_t            descriptor_count,
     VkDescriptorType    descriptor_type,
     VkShaderStageFlags  shader_stage_flags,
+    uint32_t            descriptor_count,
     string              file = __FILE__,
     size_t              line = __LINE__,
     string              func = __FUNCTION__
@@ -442,7 +442,7 @@ auto ref addLayoutBindingImmutable(
     // first call the normal addLayoutBinding()
     // we would prefere a binding count of 0 as we will update this value with adding samplers
     // but the value must be greater 0 by design, we will set the descriptor count of the appropriate struct to 0 later
-    meta.addLayoutBinding( binding, 1, descriptor_type, shader_stage_flags, file, line, func );
+    meta.addLayoutBinding( binding, descriptor_type, shader_stage_flags, 1, file, line, func );
 
     // than mark the added VkDescriptorSetLayoutBinding accepting only immutable samplers
     // we do this by setting the pImmutableSamplers field to an arbitrary address, not null
@@ -1031,7 +1031,7 @@ auto ref addLayoutBinding(
     // the added layout binding afterwards
     meta.add_write_descriptor = true;
     meta.meta_descriptor_layout     //descriptor_count must not be 0, increment it and add the layout binding
-        .addLayoutBinding( binding, ++descriptor_count, descriptor_type, shader_stage_flags, file, line, func )
+        .addLayoutBinding( binding, descriptor_type, shader_stage_flags, ++descriptor_count, file, line, func )
         .descriptor_set_layout_bindings[ $-1 ]      // access the added layout binding (last)
         .descriptorCount--;     // decrement its descriptorCount - crazy that all this works!
 
