@@ -180,6 +180,7 @@ void invalidateMappedMemoryRanges(
 }
 
 
+
 ///////////////////////////////////////
 // Meta_Memory and related functions //
 ///////////////////////////////////////
@@ -592,11 +593,7 @@ auto ref flushMappedMemoryRange( META )(
     string              func    = __FUNCTION__
     ) if( hasMemReqs!META || is( META == Meta_Memory )) {
     vkAssert( meta.isValid, "Vulkan state not assigned", file, line, func );       // meta struct must be initialized with a valid vulkan state pointer
-    VkMappedMemoryRange mapped_memory_range = {
-        memory  : meta.device_memory,
-        size    : size,
-        offset  : offset,
-    };
+    auto mapped_memory_range = meta.createMappedMemoryRange( size, offset );
     meta.device.vkFlushMappedMemoryRanges( 1, & mapped_memory_range ).vkAssert( "Flush Mapped Memory Range", file, line, func );
     return meta;
 }
@@ -613,11 +610,7 @@ auto ref invalidateMappedMemoryRange( META )(
     string              func    = __FUNCTION__
     ) if( hasMemReqs!META || is( META == Meta_Memory )) {
     vkAssert( meta.isValid, "Vulkan state not assigned", file, line, func );       // meta struct must be initialized with a valid vulkan state pointer
-    VkMappedMemoryRange mapped_memory_range = {
-        memory  : meta.device_memory,
-        size    : size,
-        offset  : offset,
-    };
+    auto mapped_memory_range = meta.createMappedMemoryRange( size, offset );
     meta.device.vkInvalidateMappedMemoryRanges( 1, & mapped_memory_range ).vkAssert( "Invalidate Mapped Memory Range", file, line, func );
     return meta;
 }
@@ -708,6 +701,12 @@ auto createBuffer( ref Vulkan vk, VkBufferUsageFlags usage, VkDeviceSize size, V
 }
 
 
+
+
+//////////////////////////////////////
+// Meta_Image and related functions //
+//////////////////////////////////////
+
 /// struct to capture image and memory creation as well as binding
 /// the struct can travel through several methods and can be filled with necessary data
 /// first thing after creation of this struct must be the assignment of the address of a valid vulkan state struct
@@ -750,10 +749,6 @@ struct Meta_Image {
 }
 
 
-
-//////////////////////////////////////
-// Meta_Image and related functions //
-//////////////////////////////////////
 
 /// init a simple VkImage with one level and one layer, sharing_family_queue_indices controls the sharing mode
 /// store vulkan data in argument Meta_Image container, return container for chaining
@@ -988,7 +983,7 @@ void recordTransition(
     VkPipelineStageFlags    src_stage_mask = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
     VkPipelineStageFlags    dst_stage_mask = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
     VkDependencyFlags       dependency_flags = 0,
-    ) {
+    ) nothrow {
     VkImageMemoryBarrier layout_transition_barrier = {
         srcAccessMask       : src_accsess_mask,
         dstAccessMask       : dst_accsess_mask,
