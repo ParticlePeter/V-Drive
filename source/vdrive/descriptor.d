@@ -63,6 +63,115 @@ auto createSampler(
 }
 
 
+struct Meta_Sampler {
+    mixin               Vulkan_State_Pointer;
+    VkSamplerCreateInfo sampler_ci = {
+    //  flags                   : 0,
+        magFilter               : VK_FILTER_LINEAR,
+        minFilter               : VK_FILTER_LINEAR,
+        mipmapMode              : VK_SAMPLER_MIPMAP_MODE_NEAREST,
+        addressModeU            : VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+        addressModeV            : VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+        addressModeW            : VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+        mipLodBias              : 0,
+        anisotropyEnable        : VK_FALSE,
+        maxAnisotropy           : 1,
+        compareEnable           : VK_FALSE,
+        compareOp               : VK_COMPARE_OP_NEVER,
+        minLod                  : 0,
+        maxLod                  : 0,
+        borderColor             : VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK,
+        unnormalizedCoordinates : VK_FALSE,
+    };
+    VkSampler           sampler;
+}
+
+
+auto ref filter(
+    ref Meta_Sampler    meta,
+    VkFilter            mag_filter,
+    VkFilter            min_filter,
+    VkBorderColor       border_color = VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK
+    ) {
+    meta.sampler_ci.magFilter   = mag_filter;
+    meta.sampler_ci.minFilter   = min_filter;
+    meta.sampler_ci.borderColor = border_color;
+    return meta;
+}
+
+
+auto ref mipmap(
+    ref Meta_Sampler    meta,
+    VkSamplerMipmapMode mipmap_mode,
+    float               mip_lod_bias = 0,
+    float               min_lod = 0,
+    float               max_lod = 0
+    ) {
+    meta.sampler_ci.mipmapMode  = mipmap_mode;
+    meta.sampler_ci.mipLodBias  = mip_lod_bias;
+    meta.sampler_ci.minLod      = min_lod;
+    meta.sampler_ci.maxLod      = max_lod;
+    return meta;
+}
+
+
+auto ref addressMode(
+    ref Meta_Sampler        meta,
+    VkSamplerAddressMode    addressModeU,
+    VkSamplerAddressMode    addressModeV,
+    VkSamplerAddressMode    addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE
+    ) {
+    meta.sampler_ci.addressModeU = addressModeU;
+    meta.sampler_ci.addressModeV = addressModeV;
+    meta.sampler_ci.addressModeW = addressModeW;
+    return meta;
+}
+
+
+auto ref anisotropy(
+    ref Meta_Sampler    meta,
+    VkBool32            anisotropy_enable,
+    float               max_anisotropy = 1
+    ) {
+    meta.sampler_ci.anisotropyEnable    = anisotropy_enable;
+    meta.sampler_ci.maxAnisotropy       = max_anisotropy;
+    return meta;
+}
+
+
+auto ref compare(
+    ref Meta_Sampler    meta,
+    VkBool32            compare_enable,
+    VkCompareOp         compare_op = VK_COMPARE_OP_NEVER
+    ) {
+    meta.sampler_ci.compareEnable   = compare_enable;
+    meta.sampler_ci.compareOp       = compare_op;
+    return meta;
+}
+
+
+auto ref unnormalizedCoordinates(
+    ref Meta_Sampler    meta,
+    VkBool32            unnormalized_coordinates
+    ) {
+    meta.sampler_ci.unnormalizedCoordinates   = unnormalized_coordinates;
+    return meta;
+}
+
+
+auto ref construct(
+    ref Meta_Sampler    meta,
+    string              file    = __FILE__,
+    size_t              line    = __LINE__,
+    string              func    = __FUNCTION__
+    ) {
+    // assert that meta struct is initialized with a valid vulkan state pointer
+    meta.isValid.vkAssert( "Meta Struct not initialized", file, line, func );
+    meta.device.vkCreateSampler( & meta.sampler_ci, meta.allocator, & meta.sampler ).vkAssert( "Construct Sampler", file, line, func );
+    return meta;
+}
+
+
 /// create a VkBufferView which can be exclusively used as a descriptor
 /// Params:
 ///     vk = reference to a VulkanState struct
