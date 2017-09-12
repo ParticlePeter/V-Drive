@@ -37,7 +37,7 @@ void destroy( ref Vulkan vk, ref Core_Pipeline core ) {
 
 /// private template to constraint template arg to Meta_Graphics or Meta_Compute
 private template isPipeline( T ) {
-        enum isPipeline = is( T == Meta_Graphics ) || is( T == Meta_Compute );
+    enum isPipeline = is( T == Meta_Graphics ) || is( T == Meta_Compute );
 }
 
 /// add VkDescriptorSetLayout to either Meta_Graphics or Meta_Pipeline, use alias addDescriptorSetLayout instead
@@ -221,6 +221,13 @@ auto reset( ref Meta_Graphics meta ) {
     meta.descriptor_set_layouts.clear;
     meta.push_constant_ranges.clear;
     return result;
+}
+
+
+/// extract core pipeline elements VkPipeline and VkPipelineLayout
+/// without resetting the internal data structures
+auto extractCore( ref Meta_Graphics meta ) {
+    return Core_Pipeline( meta.pipeline, meta.pipeline_layout );
 }
 
 
@@ -702,7 +709,7 @@ auto ref construct(
         &pipeline_create_info,  // pCreateInfos
         meta.allocator,         // pAllocator
         &meta.pipeline          // pPipelines
-        ).vkAssert( "Graphics Pipeline", file, line, func );
+        ).vkAssert( "Construct Graphics Pipeline", file, line, func );
 
     return meta;
 }
@@ -843,7 +850,7 @@ auto ref construct(
         &meta.pipeline_create_info, // pCreateInfos
         meta.allocator,             // pAllocator
         &meta.pipeline              // pPipelines
-        ).vkAssert( "Compute Pipeline", file, line, func );
+        ).vkAssert( "Construct Compute Pipeline", file, line, func );
 
     return meta;
 }
