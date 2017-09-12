@@ -702,6 +702,29 @@ auto createBuffer( ref Vulkan vk, VkBufferUsageFlags usage, VkDeviceSize size, V
 
 
 
+/////////////////////////////
+// general image functions //
+/////////////////////////////
+
+/// query the properties of a certain image format
+auto imageFormatProperties(
+    ref Vulkan          vk,
+    VkFormat            format,
+    VkImageType         type,
+    VkImageTiling       tiling,
+    VkImageUsageFlags   usage,
+    VkImageCreateFlags  flags = 0,
+    string              file = __FILE__,
+    size_t              line = __LINE__,
+    string              func = __FUNCTION__
+    ) {
+    VkImageFormatProperties image_format_properties;
+    vk.gpu.vkGetPhysicalDeviceImageFormatProperties(
+        format, type, tiling, usage, flags, & image_format_properties ).vkAssert( "Image Format Properties", file, line, func );
+    return image_format_properties;
+}
+
+
 
 //////////////////////////////////////
 // Meta_Image and related functions //
