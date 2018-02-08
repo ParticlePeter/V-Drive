@@ -361,3 +361,11 @@ alias is_null = is_null_handle;
 bool is_null_handle( T )( T handle ) if( is_non_dispatch_handle!T ) {
     return handle == VK_NULL_HANDLE;
 }
+
+
+mixin template Is_Null(             alias handle ) { bool is_null()         { return handle == VK_NULL_HANDLE; }}
+mixin template Is_Constructed(      alias handle ) { bool is_constructed()  { return handle != VK_NULL_HANDLE; }}
+mixin template Is_Null_Constructed( alias handle ) {
+    bool is_null()         { return handle == VK_NULL_HANDLE; }
+    bool is_constructed()  { return handle != VK_NULL_HANDLE; }
+}
