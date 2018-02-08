@@ -256,7 +256,8 @@ auto sizedArray( uint max_length, T )( uint length ) {
 }
 
 
-template D_OR_S_ARRAY( uint count, T ) {
-    static if( count == uint.max ) alias D_OR_S_ARRAY = Array!T;
-    else                 alias D_OR_S_ARRAY = SArray!( count, T );
+template D_OR_S_ARRAY( int count, T ) {
+         static if( count == int.max )  alias D_OR_S_ARRAY = Array!T;               // resize-able array
+    else static if( count > 0 )         alias D_OR_S_ARRAY = SArray!( count, T );   // static array mimicking resize-able array
+    else                                alias D_OR_S_ARRAY = T[ - count ];          // static array
 }
