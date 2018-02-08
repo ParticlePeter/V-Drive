@@ -16,38 +16,112 @@ import erupted;
 
 
 /// struct to collect subpass relevant data
-private struct Meta_Subpass {
-    VkSubpassDescriptionFlags       flags;
-    VkPipelineBindPoint             pipeline_bind_point = VK_PIPELINE_BIND_POINT_GRAPHICS;  // currently this is the only acceptable value, but might change in future 
-    Array!VkAttachmentReference     input_reference;
-    Array!VkAttachmentReference     color_reference;
-    Array!VkAttachmentReference     resolve_reference;
-    Array!VkAttachmentReference     preserve_reference;
-    VkAttachmentReference           depth_stencil_reference; //= VK_ATTACHMENT_UNUSED;
+private struct Meta_Subpass_T(
+    int32_t input_ref_count,
+    int32_t color_ref_count,
+    int32_t resolve_ref_count,
+    int32_t preserve_ref_count,
+    ) {
+    VkSubpassDescriptionFlags                                   flags;
+    VkPipelineBindPoint                                         pipeline_bind_point = VK_PIPELINE_BIND_POINT_GRAPHICS;  // currently this is the only acceptable value, but might change in future
+    D_OR_S_ARRAY!( input_ref_count,     VkAttachmentReference ) input_reference;
+    D_OR_S_ARRAY!( color_ref_count,     VkAttachmentReference ) color_reference;
+    D_OR_S_ARRAY!( resolve_ref_count,   VkAttachmentReference ) resolve_reference;
+    D_OR_S_ARRAY!( preserve_ref_count,  VkAttachmentReference ) preserve_reference;
+    VkAttachmentReference                                       depth_stencil_reference; //= VK_ATTACHMENT_UNUSED;
+
+    auto static_config() {
+        size_t[4] result;
+        result[0] = input_reference.length;
+        result[1] = color_reference.length;
+        result[2] = resolve_reference.length;
+        result[3] = preserve_reference.length;
+        return result;
+    }
 }
 
+alias Meta_Subpass  = Meta_Subpass_T!( int32_t.max, int32_t.max, int32_t.max, int32_t.max );
 
-struct Meta_Renderpass {
+
+/// private template to constraint template arg to Meta_Graphics or Meta_Compute
+private template isRenderpass( T ) { enum isRenderpass = is( typeof( isRenderPassImpl( T.init )));  }
+private void isRenderPassImpl( int32_t a, int32_t b, int32_t c, int32_t d, int32_t e, int32_t f, int32_t g, )( Meta_Renderpass_T!( a, b, c, d, e, f, g ) meta_rp ) {}
+
+
+struct Meta_Renderpass_T(
+    int32_t attachment_count,
+    int32_t dependency_count,
+    int32_t subpass_count,
+    int32_t max_input_ref_count,
+    int32_t max_color_ref_count,
+    int32_t max_resolve_ref_count,
+    int32_t max_preserve_ref_count,
+    ) {
     mixin                           Vulkan_State_Pointer;
-    VkRenderPass                    render_pass() { return begin_info.renderPass; }
+    ref VkRenderPass                render_pass() { return begin_info.renderPass; }
     VkRenderPassBeginInfo           begin_info;     // the actual render pass is stored in a member of this struct
-    Array!VkAttachmentDescription   attachment_descriptions;
-    Array!Meta_Subpass              subpasses;
-    private Meta_Subpass*           subpass;
-    Array!VkSubpassDependency       subpass_dependencies;
+
+    private Meta_Subpass_T!(
+        max_input_ref_count,
+        max_color_ref_count,
+        max_resolve_ref_count,
+        max_preserve_ref_count )*   subpass;
     private VkSubpassDependency*    subpass_dependency;
 
+    D_OR_S_ARRAY!( attachment_count, VkAttachmentDescription )  attachment_descriptions;
+    D_OR_S_ARRAY!( dependency_count, VkSubpassDependency )      subpass_dependencies;
+    D_OR_S_ARRAY!( subpass_count, Meta_Subpass_T!(
+        max_input_ref_count,
+        max_color_ref_count,
+        max_resolve_ref_count,
+        max_preserve_ref_count ))                               subpasses;
+
+
     //mixin Dispatch_To_Inner_Struct!begin_info;    // Does not work because it has precedence over UFCS
-    
+
+    auto static_config() {
+        size_t[7] result;
+        result[0] = attachment_descriptions.length;
+        result[1] = subpass_dependencies.length;
+        result[2] = subpasses.length;
+        foreach( ref sp; subpasses ) {
+            if( result[3] < sp.input_reference.length    ) result[3] = sp.input_reference.length;
+            if( result[4] < sp.color_reference.length    ) result[4] = sp.color_reference.length;
+            if( result[5] < sp.resolve_reference.length  ) result[5] = sp.resolve_reference.length;
+            if( result[6] < sp.preserve_reference.length ) result[6] = sp.preserve_reference.length;
+        }
+        return result;
+    }
+
     void destroyResources() {
         vk.device.vkDestroyRenderPass( render_pass, vk.allocator );
     }
 }
 
 
+alias Meta_Renderpass  = Meta_Renderpass_T!( int32_t.max, int32_t.max, int32_t.max, int32_t.max, int32_t.max, int32_t.max, int32_t.max );
 
-auto ref renderPassAttachment(
-    ref Meta_Renderpass meta,
+/// reset all internal data and return internal renderpass begin info
+/// which holds the render pass as member
+auto reset( META )( ref META meta ) if( isRenderpass!META ) {
+    meta.subpass = null;
+    meta.subpass_dependency = null;
+    meta.attachment_descriptions.clear;
+    meta.subpass_dependencies.clear;
+    meta.subpasses.clear;
+    return meta.begin_info;
+}
+
+
+auto beginInfo( META )( ref META meta ) if( isRenderpass!META ) {
+    return meta.begin_info;
+}
+
+
+
+
+auto ref renderPassAttachment( META )(
+    ref META                meta,
     VkFormat                image_format,
     VkSampleCountFlagBits   sample_count,
     VkAttachmentLoadOp      load_op,
@@ -55,7 +129,8 @@ auto ref renderPassAttachment(
     VkAttachmentLoadOp      stencil_load_op,
     VkAttachmentStoreOp     stencil_store_op,
     VkImageLayout           initial_layout,
-    VkImageLayout           final_layout    = VK_IMAGE_LAYOUT_MAX_ENUM ) {
+    VkImageLayout           final_layout    = VK_IMAGE_LAYOUT_MAX_ENUM
+    ) if( isRenderpass!META ) {
 
     VkAttachmentDescription attachment_description = {
         format              : image_format,
@@ -73,55 +148,54 @@ auto ref renderPassAttachment(
 }
 
 
-auto ref renderPassAttachment(
-    ref Meta_Renderpass meta,
+auto ref renderPassAttachment( META )(
+    ref META                meta,
     VkFormat                image_format,
     VkSampleCountFlagBits   sample_count,
     VkAttachmentLoadOp      load_op,
     VkAttachmentStoreOp     store_op,
     VkImageLayout           initial_layout,
-    VkImageLayout           final_layout    = VK_IMAGE_LAYOUT_MAX_ENUM ) {
-
+    VkImageLayout           final_layout    = VK_IMAGE_LAYOUT_MAX_ENUM
+    ) if( isRenderpass!META ) {
     return renderPassAttachment( meta, image_format, sample_count, load_op, store_op,
         VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_STORE_OP_DONT_CARE, initial_layout, final_layout );
 };
 
 
-auto ref renderPassAttachImpl( alias load_op, alias store_op )(
-    ref Meta_Renderpass     meta,
-    VkFormat                image_format,
-    VkSampleCountFlagBits   sample_count,
-    VkImageLayout           initial_layout,
-    VkImageLayout           final_layout    = VK_IMAGE_LAYOUT_MAX_ENUM ) {
+auto ref renderPassAttachment_Load_None( META )( ref META meta, VkFormat image_format, VkSampleCountFlagBits sample_count, VkImageLayout initial_layout, VkImageLayout final_layout = VK_IMAGE_LAYOUT_MAX_ENUM ) if( isRenderpass!META ) {
+    return renderPassAttachment( meta, image_format, sample_count, VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_STORE_OP_DONT_CARE, VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_STORE_OP_DONT_CARE, initial_layout, final_layout );
+};
 
-    return renderPassAttachment( meta, image_format, sample_count, load_op, store_op,
-        VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_STORE_OP_DONT_CARE, initial_layout, final_layout );
+auto ref renderPassAttachment_Load_Store( META )( ref META meta, VkFormat image_format, VkSampleCountFlagBits sample_count, VkImageLayout initial_layout, VkImageLayout final_layout = VK_IMAGE_LAYOUT_MAX_ENUM ) if( isRenderpass!META ) {
+    return renderPassAttachment( meta, image_format, sample_count, VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_STORE_OP_STORE, VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_STORE_OP_DONT_CARE, initial_layout, final_layout );
+};
+
+auto ref renderPassAttachment_Clear_None( META )( ref META meta, VkFormat image_format, VkSampleCountFlagBits sample_count, VkImageLayout initial_layout, VkImageLayout final_layout = VK_IMAGE_LAYOUT_MAX_ENUM ) if( isRenderpass!META ) {
+    return renderPassAttachment( meta, image_format, sample_count, VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_DONT_CARE, VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_STORE_OP_DONT_CARE, initial_layout, final_layout );
+};
+
+auto ref renderPassAttachment_Clear_Store( META )( ref META meta, VkFormat image_format, VkSampleCountFlagBits sample_count, VkImageLayout initial_layout, VkImageLayout final_layout = VK_IMAGE_LAYOUT_MAX_ENUM ) if( isRenderpass!META ) {
+    return renderPassAttachment( meta, image_format, sample_count, VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE, VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_STORE_OP_DONT_CARE, initial_layout, final_layout );
+};
+
+auto ref renderPassAttachment_None_None( META )( ref META meta, VkFormat image_format, VkSampleCountFlagBits sample_count, VkImageLayout initial_layout, VkImageLayout final_layout = VK_IMAGE_LAYOUT_MAX_ENUM ) if( isRenderpass!META ) {
+    return renderPassAttachment( meta, image_format, sample_count, VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_STORE_OP_DONT_CARE, VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_STORE_OP_DONT_CARE, initial_layout, final_layout );
+};
+
+auto ref renderPassAttachment_None_Store( META )( ref META meta, VkFormat image_format, VkSampleCountFlagBits sample_count, VkImageLayout initial_layout, VkImageLayout final_layout = VK_IMAGE_LAYOUT_MAX_ENUM ) if( isRenderpass!META ) {
+    return renderPassAttachment( meta, image_format, sample_count, VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_STORE_OP_STORE, VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_STORE_OP_DONT_CARE, initial_layout, final_layout );
 };
 
 
-alias renderPassAttachment_Load_None    = renderPassAttachImpl!( VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_STORE_OP_DONT_CARE );
-alias renderPassAttachment_Load_Store   = renderPassAttachImpl!( VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_STORE_OP_STORE );
-alias renderPassAttachment_Clear_None   = renderPassAttachImpl!( VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_DONT_CARE );
-alias renderPassAttachment_Clear_Store  = renderPassAttachImpl!( VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE );
-alias renderPassAttachment_None_None    = renderPassAttachImpl!( VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_STORE_OP_DONT_CARE );
-alias renderPassAttachment_None_Store   = renderPassAttachImpl!( VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_STORE_OP_STORE );
+enum Subpass_Ref_Type : uint32_t { input, color, resolve, preserve, depth_stencil };
 
 
-// cannot use subpassReference as function overload as aliases bellow cannot be set for function overloads with different args
-auto ref firstSubpassReference( string reference )( ref Meta_Renderpass meta, VkImageLayout render_layout = VK_IMAGE_LAYOUT_MAX_ENUM ) {
-    assert( meta.attachment_descriptions.length > 0 );
-    return subpassReference!reference( meta, toUint( meta.attachment_descriptions.length - 1 ), render_layout );
-}
-
-alias subpassRefInput           = firstSubpassReference!( "input" );
-alias subpassRefColor           = firstSubpassReference!( "color" );
-alias subpassRefResolve         = firstSubpassReference!( "resolve" );
-alias subpassRefPreserve        = firstSubpassReference!( "preserve" );
-alias subpassRefDepthStencil    = firstSubpassReference!( "depth_stencil" );
-
-
-auto ref subpassReference( string reference )( ref Meta_Renderpass meta, uint32_t attachment_index, VkImageLayout render_layout = VK_IMAGE_LAYOUT_MAX_ENUM ) {
-
+auto ref subpassReference( META )(
+    ref META                meta,
+    Subpass_Ref_Type        ref_type,
+    uint32_t                attachment_index,
+    VkImageLayout           render_layout = VK_IMAGE_LAYOUT_MAX_ENUM
+    ) if( isRenderpass!META ) {
     if( meta.subpasses.length == 0 )
         meta.addSubpass;
 
@@ -134,22 +208,41 @@ auto ref subpassReference( string reference )( ref Meta_Renderpass meta, uint32_
     if( meta.attachment_descriptions[$-1].finalLayout == VK_IMAGE_LAYOUT_MAX_ENUM )
         meta.attachment_descriptions[$-1].finalLayout = attachment_reference.layout;
 
-         static if( reference == "input" )          meta.subpass.input_reference.insert( attachment_reference );
-    else static if( reference == "color" )          meta.subpass.color_reference.insert( attachment_reference );
-    else static if( reference == "resolve" )        meta.subpass.resolve_reference.insert( attachment_reference );
-    else static if( reference == "preserve" )       meta.subpass.preserve_reference.insert( attachment_reference );
-    else static if( reference == "depth_stencil" )  meta.subpass.depth_stencil_reference = attachment_reference;
+    final switch( ref_type ) {
+        case Subpass_Ref_Type.input           : meta.subpass.input_reference.append( attachment_reference );      break;
+        case Subpass_Ref_Type.color           : meta.subpass.color_reference.append( attachment_reference );      break;
+        case Subpass_Ref_Type.resolve         : meta.subpass.resolve_reference.append( attachment_reference );    break;
+        case Subpass_Ref_Type.preserve        : meta.subpass.preserve_reference.append( attachment_reference );   break;
+        case Subpass_Ref_Type.depth_stencil   : meta.subpass.depth_stencil_reference = attachment_reference;      break;
+    }
 
     return meta;
 }
 
-alias subpassRefInput           = subpassReference!( "input" );
-alias subpassRefColor           = subpassReference!( "color" );
-alias subpassRefResolve         = subpassReference!( "resolve" );
-alias subpassRefPreserve        = subpassReference!( "preserve" );
-alias subpassRefDepthStencil    = subpassReference!( "depth_stencil" );
+
+auto ref subpassRefInput(        META )( ref META meta, uint32_t attachment_index, VkImageLayout render_layout = VK_IMAGE_LAYOUT_MAX_ENUM ) if( isRenderpass!META ) { return meta.subpassReference( Subpass_Ref_Type.input,         attachment_index, render_layout ); }
+auto ref subpassRefColor(        META )( ref META meta, uint32_t attachment_index, VkImageLayout render_layout = VK_IMAGE_LAYOUT_MAX_ENUM ) if( isRenderpass!META ) { return meta.subpassReference( Subpass_Ref_Type.color,         attachment_index, render_layout ); }
+auto ref subpassRefResolve(      META )( ref META meta, uint32_t attachment_index, VkImageLayout render_layout = VK_IMAGE_LAYOUT_MAX_ENUM ) if( isRenderpass!META ) { return meta.subpassReference( Subpass_Ref_Type.resolve,       attachment_index, render_layout ); }
+auto ref subpassRefPreserve(     META )( ref META meta, uint32_t attachment_index, VkImageLayout render_layout = VK_IMAGE_LAYOUT_MAX_ENUM ) if( isRenderpass!META ) { return meta.subpassReference( Subpass_Ref_Type.preserve,      attachment_index, render_layout ); }
+auto ref subpassRefDepthStencil( META )( ref META meta, uint32_t attachment_index, VkImageLayout render_layout = VK_IMAGE_LAYOUT_MAX_ENUM ) if( isRenderpass!META ) { return meta.subpassReference( Subpass_Ref_Type.depth_stencil, attachment_index, render_layout ); }
 
 
+// cannot use subpassReference as function overload as aliases bellow cannot be set for function overloads with different args
+auto ref subpassReference( META )(
+    ref META                meta,
+    Subpass_Ref_Type        ref_type,
+    VkImageLayout           render_layout = VK_IMAGE_LAYOUT_MAX_ENUM
+    ) if( isRenderpass!META ) {
+    assert( meta.attachment_descriptions.length > 0 );
+    return subpassReference( meta, ref_type, toUint( meta.attachment_descriptions.length - 1 ), render_layout );
+}
+
+
+auto ref subpassRefInput(        META )( ref META meta, VkImageLayout render_layout = VK_IMAGE_LAYOUT_MAX_ENUM ) if( isRenderpass!META ) { return meta.subpassReference( Subpass_Ref_Type.input,         toUint( meta.attachment_descriptions.length - 1 ), render_layout ); }
+auto ref subpassRefColor(        META )( ref META meta, VkImageLayout render_layout = VK_IMAGE_LAYOUT_MAX_ENUM ) if( isRenderpass!META ) { return meta.subpassReference( Subpass_Ref_Type.color,         toUint( meta.attachment_descriptions.length - 1 ), render_layout ); }
+auto ref subpassRefResolve(      META )( ref META meta, VkImageLayout render_layout = VK_IMAGE_LAYOUT_MAX_ENUM ) if( isRenderpass!META ) { return meta.subpassReference( Subpass_Ref_Type.resolve,       toUint( meta.attachment_descriptions.length - 1 ), render_layout ); }
+auto ref subpassRefPreserve(     META )( ref META meta, VkImageLayout render_layout = VK_IMAGE_LAYOUT_MAX_ENUM ) if( isRenderpass!META ) { return meta.subpassReference( Subpass_Ref_Type.preserve,      toUint( meta.attachment_descriptions.length - 1 ), render_layout ); }
+auto ref subpassRefDepthStencil( META )( ref META meta, VkImageLayout render_layout = VK_IMAGE_LAYOUT_MAX_ENUM ) if( isRenderpass!META ) { return meta.subpassReference( Subpass_Ref_Type.depth_stencil, toUint( meta.attachment_descriptions.length - 1 ), render_layout ); }
 
 
 
@@ -159,12 +252,15 @@ alias subpassRefDepthStencil    = subpassReference!( "depth_stencil" );
 /// Params:
 ///     meta = reference to a Meta_Renderpass struct
 ///     subpass_description_flags = optionally add a ( currently the only one: VK_ATTACHMENT_DESCRIPTION_MAY_ALIAS_BIT ) flag
-/// Returns: the passed in Meta_Structure for function chaining 
-auto ref addSubpass( ref Meta_Renderpass meta, VkSubpassDescriptionFlags subpass_description_flags = 0 ) {
+/// Returns: the passed in Meta_Structure for function chaining
+auto ref addSubpass( META )(
+    ref META                    meta,
+    VkSubpassDescriptionFlags   subpass_description_flags = 0
+    ) if( isRenderpass!META ) {
     meta.subpasses.length = meta.subpasses.length + 1;
-    meta.subpass = &meta.subpasses[ $-1 ];
+    meta.subpass = & meta.subpasses[ $-1 ];
     meta.subpass.flags = subpass_description_flags;
-    return meta; 
+    return meta;
 }
 
 
@@ -172,11 +268,11 @@ auto ref addSubpass( ref Meta_Renderpass meta, VkSubpassDescriptionFlags subpass
 /// consecutive subpass related function calls will create data for this VkSubpassDependency if no index is specified
 /// Params:
 ///     meta = reference to a Meta_Renderpass struct
-/// Returns: the passed in Meta_Structure for function chaining 
-auto ref addDependency( ref Meta_Renderpass meta ) {
+/// Returns: the passed in Meta_Structure for function chaining
+auto ref addDependency( META )( ref META meta ) if( isRenderpass!META ) {
     meta.subpass_dependencies.length = meta.subpass_dependencies.length + 1;
-    meta.subpass_dependency = &meta.subpass_dependencies[ $-1 ];
-    return meta; 
+    meta.subpass_dependency = & meta.subpass_dependencies[ $-1 ];
+    return meta;
 }
 
 
@@ -185,11 +281,11 @@ auto ref addDependency( ref Meta_Renderpass meta ) {
 /// consecutive subpass related function calls will create data for this VkSubpassDependency if no index is specified
 /// Params:
 ///     meta = reference to a Meta_Renderpass struct
-/// Returns: the passed in Meta_Structure for function chaining 
-auto ref addDependencyByRegion( ref Meta_Renderpass meta ) {
+/// Returns: the passed in Meta_Structure for function chaining
+auto ref addDependencyByRegion( META )( ref META meta ) if( isRenderpass!META ) {
     meta.addDependency;
     meta.subpass_dependencies[ $-1 ].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
-    return meta; 
+    return meta;
 }
 
 
@@ -200,7 +296,12 @@ auto ref addDependencyByRegion( ref Meta_Renderpass meta ) {
 ///     stage_mask = the source stage mask
 ///     access_mask = the source access mask
 /// Returns: the passed in Meta_Structure for function chaining
-auto ref srcDependency( ref Meta_Renderpass meta, uint32_t subpass, VkPipelineStageFlags stage_mask, VkAccessFlags access_mask ) {
+auto ref srcDependency( META )(
+    ref META                meta,
+    uint32_t                subpass,
+    VkPipelineStageFlags    stage_mask,
+    VkAccessFlags           access_mask
+    ) if( isRenderpass!META ) {
     assert( meta.subpass_dependencies.length > 0 );
     with( meta.subpass_dependencies[ $-1 ] ) {
         srcSubpass      = subpass;
@@ -218,7 +319,12 @@ auto ref srcDependency( ref Meta_Renderpass meta, uint32_t subpass, VkPipelineSt
 ///     stage_mask = the destination stage mask
 ///     access_mask = the destination access mask
 /// Returns: the passed in Meta_Structure for function chaining
-auto ref dstDependency( ref Meta_Renderpass meta, uint32_t subpass, VkPipelineStageFlags stage_mask, VkAccessFlags access_mask ) {
+auto ref dstDependency( META )(
+    ref META                meta,
+    uint32_t                subpass,
+    VkPipelineStageFlags    stage_mask,
+    VkAccessFlags           access_mask
+    ) if( isRenderpass!META ) {
     assert( meta.subpass_dependencies.length > 0 );
     with( meta.subpass_dependencies[ $-1 ] ) {
         dstSubpass      = subpass;
@@ -235,7 +341,11 @@ auto ref dstDependency( ref Meta_Renderpass meta, uint32_t subpass, VkPipelineSt
 ///     source = the source subpass
 ///     destination = the destination subpass
 /// Returns: the passed in Meta_Structure for function chaining
-auto ref subpassDependency( ref Meta_Renderpass meta, uint32_t source, uint32_t destination ) {
+auto ref subpassDependency( META )(
+    ref META                meta,
+    uint32_t                source,
+    uint32_t                destination
+    ) if( isRenderpass!META ) {
     assert( meta.subpass_dependencies.length > 0 );
     with( meta.subpass_dependencies[ $-1 ] ) {
         srcSubpass = source;
@@ -251,7 +361,11 @@ auto ref subpassDependency( ref Meta_Renderpass meta, uint32_t source, uint32_t 
 ///     source = the source stage mask
 ///     destination = the destination stage mask
 /// Returns: the passed in Meta_Structure for function chaining
-auto ref stageMaskDependency( ref Meta_Renderpass meta, VkPipelineStageFlags source, VkPipelineStageFlags destination ) {
+auto ref stageMaskDependency( META )(
+    ref META                meta,
+    VkPipelineStageFlags    source,
+    VkPipelineStageFlags    destination
+    ) if( isRenderpass!META ) {
     assert( meta.subpass_dependencies.length > 0 );
     with( meta.subpass_dependencies[ $-1 ] ) {
         srcStageMask = source;
@@ -267,7 +381,11 @@ auto ref stageMaskDependency( ref Meta_Renderpass meta, VkPipelineStageFlags sou
 ///     source = the source access mask
 ///     destination = the destination access mask
 /// Returns: the passed in Meta_Structure for function chaining
-auto ref accessMaskDependency( ref Meta_Renderpass meta, VkAccessFlags source, VkAccessFlags destination ) {
+auto ref accessMaskDependency( META )(
+    ref META                meta,
+    VkAccessFlags           source,
+    VkAccessFlags           destination
+    ) if( isRenderpass!META ) {
     assert( meta.subpass_dependencies.length > 0 );
     with( meta.subpass_dependencies[ $-1 ] ) {
         srcAccessMask = source;
@@ -279,7 +397,7 @@ auto ref accessMaskDependency( ref Meta_Renderpass meta, VkAccessFlags source, V
 
 // As long as only one possible flag exists, the function bellow is redundant
 // use addDependencyByRegion instead
-/*auto ref dependencyFlags( ref Meta_Renderpass meta, VkDependencyFlags dependency_flags ) {
+/*auto ref dependencyFlags( META )( ref META meta, VkDependencyFlags dependency_flags ) if( isRenderpass!META ) {
     assert( meta.subpass_dependencies.length > 0 );
     meta.subpass_dependencies[ $-1 ].dependencyFlags = dependency_flags;
     return meta;
@@ -292,8 +410,10 @@ auto ref accessMaskDependency( ref Meta_Renderpass meta, VkAccessFlags source, V
 ///     meta = reference to a Meta_Renderpass struct
 ///     clear_value = will be set into the meta render pass VkRenderPassBeginInfo. Storage must be managed outside
 /// Returns: the passed in Meta_Structure for function chaining
-auto ref clearValues( Array_T )( ref Meta_Renderpass meta, Array_T clear_value )
-if( is( Array_T == Array!VkClearValue ) || is( Array_T : VkClearValue[] )) {
+auto ref clearValues( Array_T, META )(
+    ref META meta,
+    Array_T clear_value
+    ) if( is( Array_T == Array!VkClearValue ) || is( Array_T : VkClearValue[] ) && isRenderpass!META ) {
     meta.begin_info.pClearValues = clear_value.ptr;
     meta.begin_info.clearValueCount = clear_value.length.toUint;
     return meta;
@@ -304,8 +424,8 @@ if( is( Array_T == Array!VkClearValue ) || is( Array_T : VkClearValue[] )) {
 /// construct a VkRenderPass from specified resources of Meta_Renderpass structure and store it there as well
 /// Params:
 ///     meta = reference to a Meta_Renderpass struct
-/// Returns: the passed in Meta_Structure for function chaining 
-auto ref construct( ref Meta_Renderpass meta ) {
+/// Returns: the passed in Meta_Structure for function chaining
+auto ref construct( META )( ref META meta ) if( isRenderpass!META ) {
     // assert that meta struct is initialized with a valid vulkan state pointer
     assert( meta.isValid );
 
@@ -315,7 +435,7 @@ auto ref construct( ref Meta_Renderpass meta ) {
 
         // assert that resolve references length is less or equal to color references length
         // do nothing if resolve references length is 0, but if reference length is strictly less then color reference length
-        // fill resolve reference length with VkAttachmentReference( VK_ATTACHMENT_UNUSED, layout arbitrary ) 
+        // fill resolve reference length with VkAttachmentReference( VK_ATTACHMENT_UNUSED, layout arbitrary )
         assert( subpass.resolve_reference.length <= subpass.color_reference.length );
         if( subpass.resolve_reference.length > 0 && subpass.resolve_reference.length < subpass.color_reference.length ) {
             auto old_length = subpass.resolve_reference.length;
@@ -325,13 +445,13 @@ auto ref construct( ref Meta_Renderpass meta ) {
 
         // fill the current VkSubpassDescription with data from corresponding Meta_Subpass
         with( subpass_descriptions[i] ) {
-            pipelineBindPoint       =  subpass.pipeline_bind_point;
-            inputAttachmentCount    =  subpass.input_reference.length.toUint;
-            pInputAttachments       =  subpass.input_reference.ptr;
-            colorAttachmentCount    =  subpass.color_reference.length.toUint;
-            pColorAttachments       =  subpass.color_reference.ptr;
-            pResolveAttachments     =  subpass.resolve_reference.ptr;
-            pDepthStencilAttachment = &subpass.depth_stencil_reference;
+            pipelineBindPoint       =   subpass.pipeline_bind_point;
+            inputAttachmentCount    =   subpass.input_reference.length.toUint;
+            pInputAttachments       =   subpass.input_reference.ptr;
+            colorAttachmentCount    =   subpass.color_reference.length.toUint;
+            pColorAttachments       =   subpass.color_reference.ptr;
+            pResolveAttachments     =   subpass.resolve_reference.ptr;
+            pDepthStencilAttachment = & subpass.depth_stencil_reference;
         }
     }
 
@@ -346,7 +466,7 @@ auto ref construct( ref Meta_Renderpass meta ) {
         pDependencies   : meta.subpass_dependencies.ptr,
     };
 
-    vkCreateRenderPass( meta.device, &render_pass_create_info, meta.allocator, &meta.begin_info.renderPass ).vkAssert;
+    vkCreateRenderPass( meta.device, & render_pass_create_info, meta.allocator, & meta.begin_info.renderPass ).vkAssert;
     return meta;
 }
 
@@ -356,7 +476,8 @@ auto ref construct( ref Meta_Renderpass meta ) {
 // Meta_Framebuffer //
 //////////////////////
 
-struct Meta_FB( uint32_t framebuffer_count = 1, size_t clear_value_count = uint32_t.max ) {
+struct Meta_FB( int32_t framebuffer_count = 1, int32_t clear_value_count = int32_t.max ) {
+    static assert( framebuffer_count != 0, "Count of framebuffers must not be 0!" );
     mixin       Vulkan_State_Pointer;
 
     // required for template functions
@@ -366,7 +487,7 @@ struct Meta_FB( uint32_t framebuffer_count = 1, size_t clear_value_count = uint3
     VkRect2D                                                                render_area;
     D_OR_S_ARRAY!( fb_count, VkFramebuffer )                                framebuffers;
     static if( cv_count > 0 )   D_OR_S_ARRAY!( cv_count, VkClearValue )     clear_values;
-    
+
     auto ref opCall( ref Vulkan vk ) {
         this.vk( vk );
         return this;
@@ -399,8 +520,8 @@ struct Meta_FB( uint32_t framebuffer_count = 1, size_t clear_value_count = uint3
     }
 }
 
-alias Meta_Framebuffer  = Meta_FB!( 1, uint32_t.max );
-alias Meta_Framebuffers = Meta_FB!( uint32_t.max, uint32_t.max );
+alias Meta_Framebuffer  = Meta_FB!( 1, int32_t.max );
+alias Meta_Framebuffers = Meta_FB!( int32_t.max, int32_t.max );
 
 /// If T is a vector, this evaluates to true, otherwise false
 private template isSingleBuffer( T )  {  enum isSingleBuffer = is( typeof( isSingleBufferImpl( T.init ))); }
@@ -456,7 +577,7 @@ auto ref setClearValue( META_FB, T )(
     else    static if( is( T == int32_t ))  clear_value.color.int32     = rgba;
     else    static if( is( T == uint32_t )) clear_value.color.uint32    = rgba;
     return  setClearValue( meta, index, clear_value, file, line, func );
-} 
+}
 
 
 /// Set attachment specific (framebuffer attachment index) depth-stencil clear value
@@ -497,6 +618,7 @@ auto ref setClearValue( META_FB )(
     string          func = __FUNCTION__
     ) if( isMultiBuffer!META_FB ) {
 
+    // Todo(pp): update this to usage of D_OR_S_ARRAY
     // if using dynamic arrays
 //    static if( META_FB.cv_count == uint32_t.max ) {
         if( index == uint32_t.max )                     // signal to append clear_value instead of setting to a specific index ...
@@ -512,7 +634,7 @@ auto ref setClearValue( META_FB )(
         if( index == uint32_t.max )                 // signal to append clear_value instead of setting to a specific index ...
             index = clear_values_length;            // ... hence set the index to the length of the current array length
         vkAssert( index < META_FB.cv_count,         // assert that the current index fits into the static array bounds
-            "Meta_Framebuffer with static clear value array param index must be greater than the static array length", 
+            "Meta_Framebuffer with static clear value array param index must be greater than the static array length",
             file, line, func );
         clear_values_length = index + 1;            // set the occupied length of the static clear_value array
         meta.clear_values[ index ] = clear_value;
@@ -569,14 +691,14 @@ auto ref addClearValue( META_FB, T )(
 ///     depth   = the depth clear value
 ///     stencil = the stencil clear value, defaults to 0
 /// Returns: the passed in Meta_Structure for function chaining
-auto ref addClearValue( META_FB, U )(
+auto ref addClearValue( META_FB, UINT32_T )(
     ref META_FB meta,
     float       depth,
-    U           stencil = 0,
+    UINT32_T    stencil = 0,
     string      file = __FILE__,
     size_t      line = __LINE__,
     string      func = __FUNCTION__
-    ) if( isMultiBuffer!META_FB && is( U : uint32_t )) {
+    ) if( isMultiBuffer!META_FB && is( UINT32_T : uint32_t )) {
     return setClearValue( meta, uint32_t.max, depth, stencil, file, line, func );
 }
 
@@ -604,7 +726,7 @@ auto ref addClearValue( META_FB )(
 /// Params:
 ///     meta    = reference to a Meta_Framebuffer or Meta_Framebuffers
 ///     offset  = the offset of the render area
-/// Returns: the passed in Meta_Structure for function chaining 
+/// Returns: the passed in Meta_Structure for function chaining
 auto ref renderAreaOffset( META_FB )( ref META_FB meta, VkOffset2D offset ) if( isMultiBuffer!META_FB ) {
     meta.render_area.offset = offset;
     return meta;
@@ -618,7 +740,7 @@ auto ref renderAreaOffset( META_FB )( ref META_FB meta, VkOffset2D offset ) if( 
 ///     meta    = reference to a Meta_Framebuffer or Meta_Framebuffers
 ///     x       = the offset of the render area in x
 ///     y       = the offset of the render area in y
-/// Returns: the passed in Meta_Structure for function chaining 
+/// Returns: the passed in Meta_Structure for function chaining
 auto ref renderAreaOffset( META_FB )( ref META_FB meta, int32_t x, int32_t y ) if( isMultiBuffer!META_FB ) {
     return meta.renderAreaOffset( VkOffset2D( x, y ));
 }
@@ -721,31 +843,59 @@ auto ref attachFramebuffer( META_FB )(
 /// this should be called once if the framebuffer related members of the VkRenderPassBeginInfo are not changing later on
 /// or before vkCmdBeginRenderPass to switch framebuffer, render area (hint, see renderAreaOffset/Extent) and clear values
 /// Params:
-///     meta_renderpass  = reference to a Meta_Renderpass structure holding the VkRenderPassBeginInfo
+///     meta_renderpass  = reference to a Meta_Renderpass_T structure holding the VkRenderPassBeginInfo
 ///     meta_framebuffers = reference to the Meta_Framebuffer structure whose framebuffer and resources will be attached
 ///     framebuffer_length = the index to select a framebuffer from the member framebuffer array
 /// Returns: the passed in Meta_Structure for function chaining
-auto ref attachFramebuffer( META_FB )(
-    ref Meta_Renderpass meta_renderpass,
+auto ref attachFramebuffer( META_RP, META_FB )(
+    ref META_RP         meta_renderpass,
     ref META_FB         meta_framebuffers,
     uint32_t            framebuffer_index = 0
+    ) if( isRenderpass!META_RP && isMultiBuffer!META_FB ) {
+    meta_renderpass.begin_info.attachFramebuffer( meta_framebuffers, framebuffer_index );
+    //with( meta_renderpass.begin_info ) {
+    //    framebuffer     = meta_framebuffers( framebuffer_index );
+    //    renderArea      = meta_framebuffers.render_area;
+    //    pClearValues    = meta_framebuffers.clear_values.ptr;
+    //    clearValueCount = meta_framebuffers.clear_values.length.toUint;
+    //}
+    return meta_renderpass;
+}
+
+/// set members of a VkRenderPassBeginInfo with the corresponding members of a Meta_Framebuffers structure
+/// this should be called once if the framebuffer related members of the VkRenderPassBeginInfo are not changing later on
+/// or before vkCmdBeginRenderPass to switch framebuffer, render area (hint, see renderAreaOffset/Extent) and clear values
+/// Params:
+///     render_pass_bi      = reference to a VkRenderPassBeginInfo
+///     meta_framebuffers   = reference to the Meta_Framebuffer structure whose framebuffer and resources will be attached
+///     framebuffer_length  = the index to select a framebuffer from the member framebuffer array
+void attachFramebuffer( META_FB )(
+    ref VkRenderPassBeginInfo   render_pass_bi,
+    ref META_FB                 meta_framebuffers,
+    uint32_t                    framebuffer_index = 0
     ) if( isMultiBuffer!META_FB ) {
-    with( meta_renderpass.begin_info ) {
-        framebuffer     = meta_framebuffers( framebuffer_index );
-        renderArea      = meta_framebuffers.render_area;
-        pClearValues    = meta_framebuffers.clear_values.ptr;
-        clearValueCount = meta_framebuffers.clear_values.length.toUint;
-    } return meta_renderpass;
+    render_pass_bi.framebuffer     = meta_framebuffers( framebuffer_index );
+    render_pass_bi.renderArea      = meta_framebuffers.render_area;
+    render_pass_bi.pClearValues    = meta_framebuffers.clear_values.ptr;
+    render_pass_bi.clearValueCount = meta_framebuffers.clear_values.length.toUint;
 }
 
 /// set framebuffer member of a Meta_Renderpass.VkRenderPassBeginInfo with a framebuffer not changing its framebuffer related resources
 /// Params:
 ///     meta_renderpass = reference to a Meta_Renderpass structure holding the VkRenderPassBeginInfo
-///     framebuffer      = the VkFramebuffer to attach to VkRenderPassBeginInfo
+///     framebuffer     = the VkFramebuffer to attach to VkRenderPassBeginInfo
 /// Returns: the passed in Meta_Structure for function chaining
-auto ref attachFramebuffer( ref Meta_Renderpass meta_renderpass, VkFramebuffer framebuffer ) {
+auto ref attachFramebuffer( META_RP )( ref META_RP meta_renderpass, VkFramebuffer framebuffer ) if( isRenderpass!META_RP ) {
     meta_renderpass.begin_info.framebuffer = framebuffer;
     return meta_renderpass;
+}
+
+/// set framebuffer member of a VkRenderPassBeginInfo with a framebuffer not changing its framebuffer related resources
+/// Params:
+///     render_pass_bi  = reference to a VkRenderPassBeginInfo
+///     framebuffer     = the VkFramebuffer to attach to VkRenderPassBeginInfo
+void attachFramebuffer( ref VkRenderPassBeginInfo render_pass_bi, VkFramebuffer framebuffer ) {
+    render_pass_bi.framebuffer = framebuffer;
 }
 
 
@@ -780,7 +930,7 @@ auto ref initFramebuffer( META_FB )(
         meta.renderAreaExtent( framebuffer_extent );
 
     VkFramebufferCreateInfo framebuffer_create_info = {
-        renderPass      : render_pass,                  // this defines render pass COMPATIBILITY   
+        renderPass      : render_pass,                  // this defines render pass COMPATIBILITY
         attachmentCount : image_views.length.toUint,    // must be equal to the attachment count on render pass
         pAttachments    : image_views.ptr,
         width           : framebuffer_extent.width,
@@ -790,7 +940,7 @@ auto ref initFramebuffer( META_FB )(
 
     // create the VkFramebuffer
     meta.device
-        .vkCreateFramebuffer( &framebuffer_create_info, meta.allocator, meta.framebuffers.ptr )
+        .vkCreateFramebuffer( & framebuffer_create_info, meta.allocator, meta.framebuffers.ptr )
         .vkAssert( file, line, func );
 
     return meta;
@@ -801,7 +951,7 @@ auto ref initFramebuffer( META_FB )(
 /// Params:
 ///     meta                = reference to a Meta_Framebuffer or Meta_Framebuffers
 ///     meta_renderpass     = the render_pass member is required for VkFramebufferCreateInfo to specify COMPATIBLE renderpasses,
-///                         additionally framebuffer[0], clear_value and extent are set into the VkRenderPassBeginInfo member  
+///                         additionally framebuffer[0], clear_value and extent are set into the VkRenderPassBeginInfo member
 ///     framebuffer_extent  = the extent of the render area
 ///     image_views         = these will be attached to each of the VkFramebuffer(s) attachments 0 .. first_image_views.length
 /// Returns: the passed in Meta_Structure for function chaining
@@ -859,8 +1009,8 @@ auto createFramebuffer(
 ///     render_pass         = required for VkFramebufferCreateInfo to specify COMPATIBLE renderpasses
 ///     framebuffer_extent  = the extent of the framebuffer, this is not(!) the render area
 ///     first_image_views   = these will be attached to each of the VkFramebuffer(s) attachments 0 .. first_image_views.length
-///     dynamic_image_views = the count of these specifies the count if VkFramebuffers(s), dynamic_imag_views[i] will be attached to framebuffer[i] attachment[first_image_views.length] 
-///     last_image views    = these will be attached to each of the VkFramebuffer(s) attachments first_image_views.length + 1 .. last_image_view_length + 1 
+///     dynamic_image_views = the count of these specifies the count if VkFramebuffers(s), dynamic_imag_views[i] will be attached to framebuffer[i] attachment[first_image_views.length]
+///     last_image views    = these will be attached to each of the VkFramebuffer(s) attachments first_image_views.length + 1 .. last_image_view_length + 1
 /// Returns: the passed in Meta_Structure for function chaining
 auto ref initFramebuffers( META_FB, uint32_t max_image_view_count = uint32_t.max )(
     ref META_FB             meta,
@@ -897,7 +1047,7 @@ auto ref initFramebuffers( META_FB, uint32_t max_image_view_count = uint32_t.max
     foreach( i, image_view; last_image_views )  image_views[ first_image_views.length + 1 + i ] = image_view;
 
     VkFramebufferCreateInfo framebuffer_create_info = {
-        renderPass      : render_pass,                      // this defines render pass COMPATIBILITY   
+        renderPass      : render_pass,                      // this defines render pass COMPATIBILITY
         attachmentCount : image_views.length.toUint,        // must be equal to the attachment count on render pass
         pAttachments    : image_views.ptr,
         width           : framebuffer_extent.width,
@@ -911,7 +1061,7 @@ auto ref initFramebuffers( META_FB, uint32_t max_image_view_count = uint32_t.max
     foreach( i; 0 .. meta.framebuffers.length ) {
         image_views[ first_image_views.length ] = dynamic_image_views[ i ];
         meta.device
-            .vkCreateFramebuffer( &framebuffer_create_info, meta.allocator, & meta.framebuffers[ i ] )
+            .vkCreateFramebuffer( & framebuffer_create_info, meta.allocator, & meta.framebuffers[ i ] )
             .vkAssert( file, line, func );
     }
 
@@ -923,14 +1073,14 @@ auto ref initFramebuffers( META_FB, uint32_t max_image_view_count = uint32_t.max
 /// Params:
 ///     meta                = reference to a Meta_Framebuffer or Meta_Framebuffers
 ///     meta_renderpass = the render_pass member is required for VkFramebufferCreateInfo to specify COMPATIBLE renderpasses,
-///                             additionally framebuffer[0], clear_value and extent are set into the VkRenderPassBeginInfo member  
+///                             additionally framebuffer[0], clear_value and extent are set into the VkRenderPassBeginInfo member
 ///     extent              = the extent of the render area
 ///     first_image_views   = these will be attached to each of the VkFramebuffer(s) attachments 0 .. first_image_views.length
-///     dynamic_image_views = the count of these specifies the count if VkFramebuffers(s), dynamic_imag_views[i] will be attached to framebuffer[i] attachment[first_image_views.length] 
+///     dynamic_image_views = the count of these specifies the count if VkFramebuffers(s), dynamic_imag_views[i] will be attached to framebuffer[i] attachment[first_image_views.length]
 /// Returns: the passed in Meta_Structure for function chaining
-auto ref initFramebuffers( META_FB, uint32_t max_image_view_count = uint32_t.max )(
+auto ref initFramebuffers( META_RP, META_FB, uint32_t max_image_view_count = uint32_t.max )(
     ref META_FB             meta,
-    ref Meta_Renderpass     meta_renderpass,
+    ref META_RP             meta_renderpass,
     VkExtent2D              framebuffer_extent,
     VkImageView[]           first_image_views,
     VkImageView[]           dynamic_image_views,
@@ -939,7 +1089,7 @@ auto ref initFramebuffers( META_FB, uint32_t max_image_view_count = uint32_t.max
     string                  file = __FILE__,
     size_t                  line = __LINE__,
     string                  func = __FUNCTION__
-    ) if( isMultiBuffer!META_FB ) {
+    ) if( isRenderpass!META_RP && isMultiBuffer!META_FB ) {
     meta.initFramebuffers!( META_FB, max_image_view_count )(
         meta_renderpass.begin_info.renderPass, framebuffer_extent,
         first_image_views, dynamic_image_views, last_image_views,
@@ -972,9 +1122,9 @@ auto createFramebuffers(
 }
 
 
-auto createFramebuffers(
+auto createFramebuffers( META_RP )(
     ref Vulkan              vk,
-    ref Meta_Renderpass     meta_renderpass,
+    ref META_RP             meta_renderpass,
     VkExtent2D              framebuffer_extent,
     VkImageView[]           first_image_views,
     VkImageView[]           dynamic_image_views,
@@ -983,7 +1133,7 @@ auto createFramebuffers(
     string                  file = __FILE__,
     size_t                  line = __LINE__,
     string                  func = __FUNCTION__
-    ) {
+    ) if( isRenderpass!META_RP ) {
     Meta_Framebuffers  meta = vk;
     return meta.initFramebuffers(
         meta_renderpass, framebuffer_extent,
