@@ -206,7 +206,7 @@ nothrow @nogc:
 
 //struct Static_Array( size : N, T, N = uint ) if( __traits( isIntegral, size )) {
 struct Static_Array( uint size, T ) {
-    alias N = uint;
+    alias N = typeof( size );
     alias data this;
     T[ size ] data;
     private N count = 0;
@@ -221,9 +221,9 @@ struct Static_Array( uint size, T ) {
     const N length()    { return count; }
     const N opDollar()  { return count; }
     const bool empty()  { return count == 0; }
-    N capacity()        { return size; } 
-     
-    //@property T* ptr()                      { return data.ptr; }
+    N capacity()        { return size; }
+
+    @property T* ptr()  { return count == 0 ? null : data.ptr; }
 
     ref inout( T ) opIndex( size_t i, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__  ) inout {
     //ref T opIndex( size_t i, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
