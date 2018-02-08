@@ -42,7 +42,7 @@ auto createShaderModule(
         shader_path_z.length = shader_path_z.length + spv.length;   // resize the shader_path_z array with the length of the new extension
         shader_path_z[ $-1 ] = '\0';                                // set the last value to a terminating character, required for propper vkAssert
         import core.stdc.string : memcpy;                           // import and use memcopy to copy into the char array
-        memcpy( &shader_path_z.data[ $ - 5 ], spv.ptr, 4 );         // copy the .spv extension at [ $ - spv.length - "\0".length ] = [ $ - 4 - 1 ] 
+        memcpy( &shader_path_z.data[ $ - 5 ], spv.ptr, 4 );         // copy the .spv extension at [ $ - spv.length - "\0".length ] = [ $ - 4 - 1 ]
         string spir_path = shader_path_z.data[ 0 .. $-1 ].idup;     // create string from the char array
 
         // assert that either the original or the newly composed path exist
@@ -216,80 +216,73 @@ union  MapEntry32 {
 }
 
 
-struct Meta_SC( uint32_t specialization_count ) {
-    alias sc_count = specialization_count;
+
+alias Meta_Specialization = Meta_Specialization_T!( int32_t.max );
+
+
+// Todo(pp): This struct currently works only in conjunction with MapEntry32
+// to be able to use it with any specialization data structure, of witch
+// the size is unknown in advance (each entry can have a different size) we need to:
+// - change the type of specialization_data member to byte
+// - change the first addMapEntry overloads first argument to a template argument
+// - compute its size in bytes and append the bytes to our byte array
+struct Meta_Specialization_T( int32_t specialization_count ) {
+    alias sz_count = specialization_count;
     VkSpecializationInfo specialization_info;
 
-    D_OR_S_ARRAY!( sc_count, VkSpecializationMapEntry ) specialization_map_entries;
-    D_OR_S_ARRAY!( sc_count, MapEntry32 )               specialization_data;
+    D_OR_S_ARRAY!( sz_count, VkSpecializationMapEntry ) specialization_map_entries;
+    D_OR_S_ARRAY!( sz_count, MapEntry32 )               specialization_data;
 
     void reset() {
        specialization_map_entries.clear;
-       specialization_data.clear; 
+       specialization_data.clear;
     }
-}
 
 
-alias Meta_Specialization = Meta_SC!( uint32_t.max );
+    // add a simple 4 specialization constant map entry of type uint32_t, int32_t or float
+    // VkSpecializationMapEntry offset is deduced from constants added so far and size is 4 bytes
+    auto ref addMapEntry( MapEntry32 data = MapEntry32.max, uint32_t constantID = uint32_t.max ) {
 
-private template isMetaSC( T )  {  enum isMetaSC = is( typeof( isMetaSCImpl( T.init ))); }
-private void isMetaSCImpl( uint sc_count )( Meta_SC!( sc_count ) meta ) {}
+        if( constantID == uint32_t.max )
+            constantID = specialization_map_entries.length
+                ? specialization_map_entries[ $-1 ].constantID + 1 : 0;
+
+        return addMapEntry( VkSpecializationMapEntry(
+            constantID, toUint( specialization_data.length * MapEntry32.sizeof ), MapEntry32.sizeof ), data );
+    }
 
 
-// add a simple 4 specialization constant map entry of type uint32_t, int32_t or float
-// VkSpecializationMapEntry offset is deduced from constants added so far and size is 4 bytes
-auto ref addMapEntry( META_SC )(
-    ref META_SC     meta,
-    MapEntry32      data = MapEntry32.max,
-    uint32_t        constantID = uint32_t.max
-    ) if(  isMetaSC!META_SC ) {
+    // add custom VkSpecializationMapEntry describing more advanced layout in terms of offset and size
+    // data for the constants can than be passed into construct function
+    // a simple map entry can still be supplied, but then it should be supplied with each call
+    // to this particular meta struct, and no data be specified with construct function
+    auto ref addMapEntry( VkSpecializationMapEntry specialization_map_entry, MapEntry32 map_entry = MapEntry32.max ) {
+        specialization_map_entries.append( specialization_map_entry );
+        if( map_entry.u < uint32_t.max ) specialization_data.append( map_entry );
+        return this;
+    }
 
-    if( constantID == uint32_t.max )
-        constantID = meta.specialization_map_entries.length
-            ? meta.specialization_map_entries[ $-1 ].constantID + 1 : 0;
 
-    return meta.addMapEntry(
-        VkSpecializationMapEntry(
-            constantID,
-            ( meta.specialization_data.length * MapEntry32.sizeof ).toUint,
-            MapEntry32.sizeof ),
-        data );
-}
+    // construct the specialization constants with either internal data
+    // or optionally with external data passed in as void[] array
+    auto ref construct() {
+        with( specialization_info ) {
+            mapEntryCount   = specialization_map_entries.length.toUint;
+            pMapEntries     = specialization_map_entries.ptr;
+            dataSize        = toUint( specialization_data.length * MapEntry32.sizeof );
+            pData           = specialization_data.ptr;
+        } return this;
+    }
 
-// add custom VkSpecializationMapEntry describing more advanced layot in terms of offset and size
-// data for the constants can than be passed into construct function
-// a simple map entry can still be supplied, but then it should be supplied with each call
-// to this particular meta struct, and no data be specified with construct function
-auto ref addMapEntry( META_SC )(
-    ref META_SC                 meta,
-    VkSpecializationMapEntry    specialization_map_entry,
-    MapEntry32                  map_entry = MapEntry32.max
-    ) if( isMetaSC!META_SC ) {
 
-    meta.specialization_map_entries.append( specialization_map_entry );
-    if( map_entry.u < uint32_t.max ) meta.specialization_data.append( map_entry );
-    return meta;
-}
-
-// construct the specialization constants with either internal data
-// or optionally with external data passed in as void[] array
-auto ref construct( META_SC )(
-    ref META_SC     meta,
-    void[]          specialization_constants = []
-    ) if(  isMetaSC!META_SC ) {
-
-    uint32_t data_size  = ( specialization_constants == []
-        ? meta.specialization_data.length * MapEntry32.sizeof
-        : specialization_constants.length ).toUint;
-
-    const( void )* p_data = specialization_constants == []
-        ? meta.specialization_data.ptr
-        : specialization_constants.ptr;
-
-    with( meta.specialization_info ) {
-        mapEntryCount   = meta.specialization_map_entries.length.toUint;
-        pMapEntries     = meta.specialization_map_entries.ptr;
-        dataSize        = data_size;
-        pData           = p_data;
+    // construct the specialization constants with either internal data
+    // or optionally with external data passed in as void[] array
+    auto ref construct( void[] specialization_constants ) {
+        with( specialization_info ) {
+            mapEntryCount   = specialization_map_entries.length.toUint;
+            pMapEntries     = specialization_map_entries.ptr;
+            dataSize        = specialization_constants.length.toUint;
+            pData           = specialization_constants.ptr;
+        } return this;
     }
 }
