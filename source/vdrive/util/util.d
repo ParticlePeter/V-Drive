@@ -254,3 +254,36 @@ auto Forward_To_Inner_Struct( outer, inner, string path, ignore... )() {
         }
     } return result;
 }
+
+
+// function which creates to inner struct forwarding functions
+auto Forward_To_Inner_Struct( inner, string path, ignore... )() {
+    // import helper template from std.meta to decide if member is found in ignore list
+    import std.meta : anySatisfy;
+    string result;                                                              // comment this if debugging and formating this template
+    foreach( member; __traits( allMembers, inner )) {
+        // https://forum.dlang.org/post/hucredzrhbbjzcesjqbg@forum.dlang.org
+        enum skip = anySatisfy!( skipper!( member ).shouldSkip, ignore );       // evaluate if member is in ignore list
+        static if( !skip && member != "sType" && member != "pNext" && member != "flags" ) {     // skip, also these
+            import vdrive.util.string : snakeCaseCT;                            // convertor from camel to snake case
+            enum member_snake = member.snakeCaseCT;                             // convert to snake case
+            //enum result = "\n"                                                // enum string wich will be mixed in, use only for pragma( msg ) output
+            result ~= "\n"                                                      // comment this if debugging and formating this template
+                ~ "    /// forward member " ~ member ~ " of inner " ~ inner.stringof ~ " as setter function to this\n"
+                ~ "    /// Params:\n"
+                ~ "    /// \t" ~ member_snake ~ " = the value forwarded to the inner struct\n"
+                ~ "    /// Returns: ref to this for function chaining\n"
+                ~ "    auto ref " ~ member ~ "( "
+                ~ typeof( __traits( getMember,  inner, member )).stringof ~ " " ~ member_snake ~ " ) {\n"
+                ~ "        " ~ path ~ "." ~ member ~ " = " ~ member_snake ~ ";\n        return this;\n    }\n"
+                ~ "\n"
+                ~ "    /// forward member " ~ member ~ " of inner " ~ inner.stringof ~ " as getter function to this\n"
+                ~ "    /// Params:\n"
+                ~ "    /// Returns: copy of " ~ path ~ "." ~ member ~ "\n"
+                ~ "    auto " ~ member ~ "() {\n"
+                ~ "        return " ~ path ~ "." ~ member ~ ";\n    }\n\n";
+            //pragma( msg, result );
+            //mixin( result );
+        }
+    } return result;
+}
