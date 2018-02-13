@@ -233,16 +233,18 @@ struct Meta_Swapchain_T( int32_t max_image_count ) {
         VkSurfaceCapabilitiesKHR surface_capabilities;
         vkGetPhysicalDeviceSurfaceCapabilitiesKHR( gpu, surface, & surface_capabilities );
 
-        import std.algorithm : clamp;
-        minImageCount = minImageCount.clamp( surface_capabilities.minImageCount, surface_capabilities.maxImageCount );
+              if( minImageCount < surface_capabilities.minImageCount )  minImageCount = surface_capabilities.minImageCount;
+        else  if( minImageCount > surface_capabilities.maxImageCount )  minImageCount = surface_capabilities.maxImageCount;
         vkAssert( minImageCount > 0, "No image in the swapchain", file, line, func );
 
         //printf( "\nImage Count: %u\n", image_count );
 
         // Determine surface resolution
-        if( surface_capabilities.currentExtent.width == -1 ) {
-            imageExtent.width  = imageExtent.width.clamp(  surface_capabilities.minImageExtent.width,  surface_capabilities.maxImageExtent.width  );
-            imageExtent.height = imageExtent.height.clamp( surface_capabilities.minImageExtent.height, surface_capabilities.maxImageExtent.height );
+        if( surface_capabilities.currentExtent.width == uint32_t.max ) {
+                  if( imageExtent.width  < surface_capabilities.minImageExtent.width  )  imageExtent.width  = surface_capabilities.minImageExtent.width;
+            else  if( imageExtent.width  > surface_capabilities.maxImageExtent.width  )  imageExtent.width  = surface_capabilities.maxImageExtent.width;
+                  if( imageExtent.height < surface_capabilities.minImageExtent.height )  imageExtent.height = surface_capabilities.minImageExtent.height;
+            else  if( imageExtent.height > surface_capabilities.maxImageExtent.height )  imageExtent.height = surface_capabilities.maxImageExtent.height;
         } else {
             imageExtent = surface_capabilities.currentExtent;
         }
