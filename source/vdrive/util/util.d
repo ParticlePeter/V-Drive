@@ -297,3 +297,9 @@ auto Forward_To_Inner_Struct( inner, string path, ignore... )() {
         }
     } return result;
 }
+
+
+
+template EnumMemberCount( E ) if ( is( E == enum )) {
+    enum EnumMemberCount = [ __traits(allMembers, E) ].length;
+}
