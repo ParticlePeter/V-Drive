@@ -358,3 +358,40 @@ if( is( Array_T == Array!VkPresentModeKHR ) || is( Array_T : VkPresentModeKHR[] 
 
     return result_mode;
 }
+
+
+/// get swapchain images using a VkDevice and its VkSwapchainKHR
+alias getSwapchainImages = getSwapchainImages_t!( int32_t.max );
+auto  getSwapchainImages_t( int32_t max_image_count )(
+    VkDevice        device,
+    VkSwapchainKHR  swapchain,
+    string          file = __FILE__,
+    size_t          line = __LINE__,
+    string          func = __FUNCTION__
+    ) {
+    return listVulkanProperty!( max_image_count, VkImage, vkGetSwapchainImagesKHR, VkDevice, VkSwapchainKHR )( file, line, func, device, swapchain );
+}
+
+
+/// get swapchain image view using a VkDevice and its VkSwapchainKHR
+alias getSwapchainImageViews = getSwapchainImageViews_t!( int32_t.max );
+auto  getSwapchainImageViews_t( int32_t max_image_count )(
+    ref Vulkan              vk,
+    VkSwapchainKHR          swapchain,
+    VkImageViewCreateInfo   image_view_ci,
+    string          file = __FILE__,
+    size_t          line = __LINE__,
+    string          func = __FUNCTION__
+    ) {
+    // get swapchain images
+    auto swapchain_images = getSwapchainImages_t!max_image_count( vk.device, swapchain, file, line, func );
+
+    // allocate storage for image views and create one view per swapchain image in a loop
+    D_OR_S_ARRAY!( max_image_count, VkImageView ) swapchain_image_views;
+    swapchain_image_views.length = swapchain_images.length;
+    foreach( i; 0 .. swapchain_images.length ) {
+        image_view_ci.image = swapchain_images[i];   // complete VkImageViewCreateInfo with image i:
+        vkCreateImageView( vk.device, & image_view_ci, vk.allocator, & swapchain_image_views[i] ).vkAssert( "Create Image View", file, line, func );
+    }
+    return swapchain_image_views;
+}
