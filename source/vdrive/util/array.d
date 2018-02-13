@@ -40,7 +40,7 @@ auto toStringz( T )( T data ) if( is( T == string ) || is( T : char[] )) {
     result.length = data.length + 1;
     result[ data.length ] = '\0';
     import core.stdc.string : memcpy;
-    memcpy( result.ptr, data.ptr, data.length );    //result.data[ 0 .. data.length ] = data[]; 
+    memcpy( result.ptr, data.ptr, data.length );    //result.data[ 0 .. data.length ] = data[];
     return result;
 }
 
@@ -60,7 +60,7 @@ auto toPtrArray( string[] data, char terminator = '\?' ) {
 /// copy all strings of a string slice into reference argument concat_buffer
 /// terminating each string with a '\0' character
 /// original content of concat_buffer is kept, the array is resized appropriately
-/// another dynamic array with const( char )* pointer into the concat_buffer is returned 
+/// another dynamic array with const( char )* pointer into the concat_buffer is returned
 /// Params:
 ///     data = slice of strings
 ///     concat_buffer = reference to buffer for the string copy and '\0' per string append
@@ -76,7 +76,7 @@ auto toPtrArray( string[] data, ref Array!char concat_buffer, char terminator = 
 /// copy all strings of a string slice into reference argument concat_buffer
 /// terminating each string with a '\0' character
 /// original content of concat_buffer is kept, the array is resized appropriately
-/// pointer into the concat_buffer are appended to the reference argument pointer_buffer 
+/// pointer into the concat_buffer are appended to the reference argument pointer_buffer
 /// Params:
 ///     data = slice of strings
 ///     concat_buffer = reference to buffer for the string copy and '\0' per string append
@@ -113,7 +113,7 @@ auto toPtrArray( string[] data, ref Array!( const( char )* ) pointer_buffer, ref
 /// terminating each string with a '\0' character
 /// concat_buffer must have sufficient space for the concatenation
 /// pointer into the concat_buffer are stored into pointer_buffer
-/// which also must have sufficient space of count of data.length 
+/// which also must have sufficient space of count of data.length
 /// Params:
 ///     data = slice of strings
 ///     concat_buffer = buffer for the string copy and '\0' per string append with sufficient space
@@ -149,7 +149,7 @@ auto toPtrArray( string data, const( char )*[] pointer_buffer ) {
     if( data.length == 0 )
         return null;
 
-    size_t pointer_count = 1; 
+    size_t pointer_count = 1;
     pointer_buffer[0] = & data[0];
 
     foreach( i, c; data ) {
@@ -158,7 +158,7 @@ auto toPtrArray( string data, const( char )*[] pointer_buffer ) {
                 return pointer_buffer[ 0..pointer_count ];
             }
             pointer_buffer[ pointer_count ] = & data[ i + 1 ];
-            ++pointer_count;  
+            ++pointer_count;
         }
     }
     import core.stdc.stdio : printf;
@@ -171,7 +171,7 @@ auto toPtrArray( string data ) {
     size_t pointer_count = 0;       // count '\0'
     foreach( c; data )
         if( c == '\0' )
-            ++pointer_count;  
+            ++pointer_count;
 
     Array!( const( char )* ) pointer_buffer;
     pointer_buffer.length = pointer_count;
