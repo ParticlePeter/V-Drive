@@ -19,7 +19,7 @@ mixin template Vulkan_State_Pointer() {
     private Vulkan*         vk_ptr;
     alias                   vk this;
 
-    nothrow:
+    nothrow @nogc:
     this( ref Vulkan vk )               { vk_ptr = &vk; }
     ref Vulkan vk()                     { return * vk_ptr; }
     void vk( ref Vulkan vk )            { vk_ptr = &vk; }
@@ -104,7 +104,7 @@ void initInstance( T )(
 }
 
 
-void initInstance( 
+void initInstance(
     ref Vulkan          vk,
     string              extension_names = "",
     string              layer_names = "",
@@ -128,7 +128,7 @@ void initInstance(
     initInstance!( string[] )( vk, extension_names, layer_names, application_info_ptr, file, line, func );
 }
 
-void initInstance( 
+void initInstance(
     ref Vulkan          vk,
     const( char* )[]    extension_names,
     const( char* )[]    layer_names = [],
