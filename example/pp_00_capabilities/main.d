@@ -117,7 +117,7 @@ int main() {
     uint32_t device_count;
     vk.instance.vkEnumeratePhysicalDevices( & device_count, null ).vkAssert( "Ennumerate Physical Devices" );
 
-    printf( "Found %d physical devices supporting Vulka\n\n", device_count );
+    printf( "Found %d physical devices supporting Vulkan\n\n", device_count );
 
     if( device_count == 0 ) {
         printf( "\nPress enter to exit!!!\n" );

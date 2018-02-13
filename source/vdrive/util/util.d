@@ -59,7 +59,7 @@ void vkAssert(
     assert( vkResult == VK_SUCCESS );
 }
 
-
+/// print helper for vkAssert
 private char[256] buffer;
 private void printHelper(
     const( char )* message,
@@ -148,10 +148,10 @@ auto listVulkanProperty( int32_t size, ReturnType, alias vkFunc, Args... )( stri
     */
 
     do {
-        vkFunc( args, &count, null ).vkAssert( file, line, func );
+        vkFunc( args, & count, null ).vkAssert( file, line, func );
         if( count == 0 )  break;
         result.length = count;
-        vkResult = vkFunc( args, &count, result.ptr );
+        vkResult = vkFunc( args, & count, result.ptr );
     } while( vkResult == VK_INCOMPLETE );
 
     vkResult.vkAssert( file, line, func ); // check if everything went right
