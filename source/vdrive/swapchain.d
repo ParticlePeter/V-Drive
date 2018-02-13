@@ -345,8 +345,11 @@ struct Meta_Swapchain_T( int32_t max_image_count ) {
     }
 
 
+    /// get minimal config for internal D_OR_S_ARRAY
     auto static_config() {
-        return swapchain_image_views.length;
+        size_t[1] result;   // return static array even if we have only one value to maintain conssitency
+        result[0] = swapchain_image_views.length;
+        return result;
     }
 }
 
