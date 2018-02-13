@@ -260,7 +260,8 @@ auto swapchainImageViews( ref Meta_Swapchain meta, VkImageViewCreateInfo image_v
 ////////////////////////////
 
 /// list surface formats
-auto listSurfaceFormats(
+alias listSurfaceFormats = listSurfaceFormats_t!( int32_t.max );
+auto  listSurfaceFormats_t( int32_t max_formats )(
     VkPhysicalDevice    gpu,
     VkSurfaceKHR        surface,
     bool                printInfo = true,
@@ -269,11 +270,11 @@ auto listSurfaceFormats(
     string              func = __FUNCTION__
     ) {
     auto surface_formats = listVulkanProperty!(
-        VkSurfaceFormatKHR, vkGetPhysicalDeviceSurfaceFormatsKHR, VkPhysicalDevice, VkSurfaceKHR )
+        max_formats, VkSurfaceFormatKHR, vkGetPhysicalDeviceSurfaceFormatsKHR, VkPhysicalDevice, VkSurfaceKHR )
             ( file, line, func, gpu, surface );
 
     if( surface_formats.length == 0 ) {
-        printf( "No Surface Formats available!" );
+        printf( "No Surface Formats available for the passed in physical device!" );
     } else if( printInfo ) {
         foreach( surface_format; surface_formats )
             surface_format.printTypeInfo;
@@ -281,6 +282,7 @@ auto listSurfaceFormats(
     }
     return surface_formats;
 }
+
 
 /// filter surface formats
 alias filter = filterSurfaceFormats;
@@ -312,7 +314,8 @@ if( is( Array_T == Array!VkSurfaceFormatKHR ) || is( Array_T : VkSurfaceFormatKH
 
 
 /// list presentation modes
-auto listPresentModes(
+alias listPresentModes = listPresentModes_t!( int32_t.max );
+auto  listPresentModes_t( int32_t max_modes )(
     VkPhysicalDevice    gpu,
     VkSurfaceKHR        surface,
     bool                printInfo = true,
@@ -321,7 +324,7 @@ auto listPresentModes(
     string              func = __FUNCTION__
     ) {
     auto present_modes = listVulkanProperty!(
-        VkPresentModeKHR, vkGetPhysicalDeviceSurfacePresentModesKHR, VkPhysicalDevice, VkSurfaceKHR )
+        max_modes, VkPresentModeKHR, vkGetPhysicalDeviceSurfacePresentModesKHR, VkPhysicalDevice, VkSurfaceKHR )
             ( file, line, func, gpu, surface );
 
     if( printInfo ) {
@@ -339,9 +342,10 @@ auto listPresentModes(
     return present_modes;
 }
 
+
 /// list presentation modes
 alias filter = filterPresentModes;
-auto filterPresentModes( Array_T )( Array_T present_modes, VkPresentModeKHR[] include_modes, bool first_available_as_fallback = true )
+auto  filterPresentModes( Array_T )( Array_T present_modes, VkPresentModeKHR[] include_modes, bool first_available_as_fallback = true )
 if( is( Array_T == Array!VkPresentModeKHR ) || is( Array_T : VkPresentModeKHR[] )) {
     // if first_available_as_fallback is false and no present mode can be filtered this returns an non existing present mode
     auto result_mode = first_available_as_fallback && present_modes.length > 0 ? present_modes[0] : VK_PRESENT_MODE_MAX_ENUM_KHR;
