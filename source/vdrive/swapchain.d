@@ -332,14 +332,14 @@ struct Meta_Swapchain_T( int32_t max_image_count ) {
             vkCreateImageView( vk.device, & image_view_ci, allocator, & swapchain_image_views[i] ).vkAssert( "Create Image View", file, line, func );
         }
 
-        // Todo(pp): debug not working variant with Access violation
+        // Todo(pp): debug this, not working variant (access violation)
         //swapchain_image_views = vk.getSwapchainImageViews_t!max_image_count( swapchain, image_view_ci );
 
         return this;
     }
 
 
-
+    /// construct swapchain and image views from internal data
     auto ref construct( string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
         createSwapchain( file, line, func );
         createImageViews( VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_VIEW_TYPE_2D, file, line, func );    // must pass same default values to reach file, line, func
