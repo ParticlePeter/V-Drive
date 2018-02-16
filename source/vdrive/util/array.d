@@ -203,12 +203,14 @@ unittest {
 
 
 nothrow @nogc:
+import vdrive.util.util : vkAssert;
 
-
+/// Static array mimicking a dynamic one. Data ends up on stack, and can not be reallocated
+/// the array has still a capacity and length of how many elements are in use
 struct Static_Array( uint size, T ) {
     alias Size_T = typeof( size );
-    private T[ size ] m_data;
     private Size_T count = 0;
+    private T[ size ] m_data;
 
     alias data this;
     T[] data() { return m_data[ 0 .. count ]; }
@@ -220,15 +222,13 @@ struct Static_Array( uint size, T ) {
         count = l;
     }
 
-    const Size_T length()   { return count; }
-    const Size_T opDollar() { return count; }
-    const bool empty()      { return count == 0; }
-    Size_T capacity()       { return size; }
-
+    Size_T length()     { return count; }
+    Size_T opDollar()   { return count; }
+    Size_T capacity()   { return size; }
+    bool empty()        { return count == 0; }
     @property T* ptr()  { return count == 0 ? null : m_data.ptr; }
 
     ref inout( T ) opIndex( size_t i, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__  ) inout {
-        import vdrive.util.util : vkAssert;
         vkAssert( i < size, "Array out of bounds!", file, line, func );
         return m_data[ i ];
     }
@@ -237,7 +237,6 @@ struct Static_Array( uint size, T ) {
     inout @property ref inout( T ) back()   { return m_data[ count - 1 ]; }
 
     void append( S )( S stuff, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) if( is( S : T )) {
-        import vdrive.util.util : vkAssert;
         vkAssert( count < size, "Memory not sufficient to append additional data!", file, line, func );
         m_data[ count ] = stuff;
         ++count;
@@ -249,15 +248,55 @@ struct Static_Array( uint size, T ) {
 alias SArray = Static_Array;
 
 
-auto sizedArray( uint max_length, T )( uint length ) {
-    SArray!( max_length, T ) array;
-    array.length = length;
+/// empty array has no data but functions same as Dynamic and static Arrays
+/// it is useful in place where no data is required in meta structs
+/// but when (dummy) methods are required for static validation
+private struct Empty_Array( T ) {
+    alias Size_T = uint;
+//  alias data this;
+//  T[] data() { return m_data[ 0 .. count ]; }
+
+    // set desired length, which must not be greater then the array size
+    //void length( Size_T l, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__  ) {}
+    void length( Size_T l ) {}
+    Size_T length()     { return 0; }
+    Size_T capacity()   { return 0; }
+//  Size_T opDollar()   { return 0; }
+    bool empty()        { return true; }
+    @property T* ptr()  { return null; }
+
+    inout( T ) opIndex( size_t i, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__  ) inout {
+        vkAssert( false, "Empty_Struct has no data!", file, line, func );
+        return T();
+    }
+
+    //auto opSlice( size_t i, size_t j ) { return T[];}
+    //inout @property inout( T ) front()  { vkAssert( false, "Empty_Struct has no data!"; return T(); }
+    //inout @property inout( T ) back()   { vkAssert( false, "Empty_Struct has no data!"; return T(); }
+
+    void append( S )( S stuff, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) if( is( S : T )) {
+        vkAssert( false, "Empty_Struct has no memory, no data can be appended or set!", file, line, func );
+    }
+
+    void clear() {}
+}
+
+alias EArray = Empty_Array;
+
+
+/// sized array overload forwarding to D_OR_S_ARRAY template
+auto sizedArray( int max_length, T )( size_t length ) {
+    D_OR_S_ARRAY!( max_length, T ) array;
+    static if( max_length > 0 )
+        array.length = cast( uint )length;
     return array;
 }
 
 
+/// template that creates a Dynamic, Static (mimicking dynamic), Empty, or DLang Static Array
 template D_OR_S_ARRAY( int count, T ) {
          static if( count == int.max )  alias D_OR_S_ARRAY = Array!T;               // resize-able array
     else static if( count > 0 )         alias D_OR_S_ARRAY = SArray!( count, T );   // static array mimicking resize-able array
-    else                                alias D_OR_S_ARRAY = T[ - count ];          // static array
+    else static if( count < 0 )         alias D_OR_S_ARRAY = T[ - count ];          // static array
+    else                                alias D_OR_S_ARRAY = EArray!T;
 }
