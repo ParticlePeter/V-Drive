@@ -55,6 +55,29 @@ enum Subpass_Ref_Type : uint32_t { input, color, resolve, preserve, depth_stenci
 /// private template to constraint template arg to Meta_Graphics or Meta_Compute
 private template isRenderpass( T ) { enum isRenderpass = is( typeof( isRenderPassImpl( T.init )));  }
 private void isRenderPassImpl( int32_t a, int32_t b, int32_t c, int32_t d, int32_t e, int32_t f, int32_t g, )( Meta_Renderpass_T!( a, b, c, d, e, f, g ) meta_rp ) {}
+/// Wraps the essential Vulkan objects created with the editing procedure
+/// of Meta_Render_Pass, all other internal structures are obsolete
+/// after construction so that the Meta_Descriptor_Layout can be reused
+/// after being reset
+struct Core_Render_Pass {
+    VkRenderPassBeginInfo           render_pass_bi;     // the actual render pass is stored in a member of this struct
+    ref VkRenderPass                render_pass() { return render_pass_bi.renderPass; }
+    // Todo(pp): Why does mixing in the template result in: Error: need 'this' for 'renderPass' of type 'VkRenderPass_handle*' ?
+//  mixin     Is_Null_Constructed!( render_pass_bi.renderPass );
+    bool is_null()         { return render_pass_bi.renderPass == VK_NULL_HANDLE; }
+    bool is_constructed()  { return render_pass_bi.renderPass != VK_NULL_HANDLE; }
+
+}
+
+
+/// destroy all wrapped Vulkan objects
+/// Params:
+///     vk = Vulkan state struct holding the device through which these resources were created
+///     core = the wrapped VkDescriptorPool ( with it the VkDescriptorSet ) and the VkDescriptorSetLayout to destroy
+/// Returns: this reference for function chaining
+void destroy( ref Vulkan vk, ref Core_Render_Pass core ) {
+    vdrive.state.destroy( vk, core.render_pass );          // no nice syntax, vdrive.state.destroy overloads
+}
 
 
 struct Meta_Renderpass_T(
@@ -83,30 +106,6 @@ struct Meta_Renderpass_T(
     D_OR_S_ARRAY!( subpass_count, Meta_Subpass )                subpasses;
 
 
-
-    void destroyResources() {
-        vk.device.vkDestroyRenderPass( render_pass, vk.allocator );
-    }
-
-
-    // Todo(pp): rather return a Core_Renderpass wrapping the begin info and a property retrieving the render pass to maintain consistency
-    /// reset all internal data and return internal render pass begin info
-    /// which holds the render pass as member
-    auto reset() {
-        subpass = null;
-        subpass_dependency = null;
-        attachment_descriptions.clear;
-        subpass_dependencies.clear;
-        subpasses.clear;
-        return render_pass_bi;
-    }
-
-
-    auto beginInfo() {
-        return render_pass_bi;
-    }
-
-
     /// get minimal config for internal D_OR_S_ARRAY
     auto static_config() {
         size_t[7] result;
@@ -120,6 +119,38 @@ struct Meta_Renderpass_T(
             if( result[6] < sp.preserve_reference.length ) result[6] = sp.preserve_reference.length;
         }
         return result;
+    }
+
+
+
+    void destroyResources() {
+        vk.device.vkDestroyRenderPass( render_pass, vk.allocator );
+    }
+
+
+    /// reset all internal data and return wrapped Vulkan object
+    /// VkRenderPassBeginInfo which holds the VkRenderPass as member
+    auto reset() {
+        Core_Render_Pass result = { render_pass_bi };
+        render_pass_bi = VkRenderPassBeginInfo.init;
+        subpass = null; subpass_dependency = null;
+        attachment_descriptions.clear;
+        subpass_dependencies.clear;
+        subpasses.clear;
+        return result;
+    }
+
+
+    /// extract core render pass element VkRenderPassBeginInfo with VkRenderPass
+    /// without resetting the internal data structures
+    auto extractCore() {
+        return Core_Render_Pass( render_pass_bi );
+    }
+
+
+    /// get the internal VkRenderPassBeginInfo with VkRenderPass
+    auto beginInfo() {
+        return render_pass_bi;
     }
 
 
