@@ -476,11 +476,50 @@ struct Meta_Render_Pass_T(
         vkCreateRenderPass( device, & render_pass_create_info, allocator, & render_pass_bi.renderPass ).vkAssert;
         return this;
     }
+
+
+
+    /// set members of this.render_pass_bi with the corresponding members of a Meta_Framebuffer (multi) structure
+    /// this should be called once if the framebuffer related members of the VkRenderPassBeginInfo are not changing later on
+    /// or before vkCmdBeginRenderPass to switch framebuffer, render area (hint, see renderAreaOffset/Extent) and clear values
+    /// Params:
+    ///     meta_framebuffers = reference to the Meta_Framebuffer structure whose framebuffer and resources will be attached
+    ///     framebuffer_length = the index to select a framebuffer from the member framebuffer array
+    /// Returns: this reference for function chaining
+    auto ref attachFramebuffer( META_FB )( ref META_FB meta_framebuffer, uint32_t framebuffer_index = 0 ) if( isMultiBuffer!META_FB ) {
+        meta_framebuffer.attachToRenderPassBI( render_pass_bi, framebuffer_index );
+        return this;
+    }
+
+    /*
+    /// set members of this.render_pass_bi with the corresponding members of a Meta_Framebuffer (single) structure
+    /// this should be called once if the framebuffer related members of the VkRenderPassBeginInfo are not changing later on
+    /// or before vkCmdBeginRenderPass to switch framebuffer, render area (hint, see renderAreaOffset/Extent) and clear values
+    /// Params:
+    ///     meta_framebuffer = the Meta_Framebuffer structure whose framebuffer and resources will be attached
+    /// Returns: this reference for function chaining
+    auto ref attachFramebuffer( META_FB )( ref META_FB meta_framebuffer ) if( isSingleBuffer!META_FB ) {
+        with( meta_render_pass.render_pass_bi ) {
+            framebuffer     = meta_framebuffer( 0 );
+            renderArea      = meta_framebuffer.render_area;
+            pClearValues    = meta_framebuffer.clear_values.ptr;
+            clearValueCount = meta_framebuffer.clear_values.length.toUint;
+        } return this;
+    }
+    */
+
+
+    /// set framebuffer member of a Meta_Render_Pass.VkRenderPassBeginInfo with a framebuffer not changing its framebuffer related resources
+    /// Params:
+    ///     framebuffer     = the VkFramebuffer to attach to VkRenderPassBeginInfo
+    /// Returns: this reference for function chaining
+    auto ref attachFramebuffer( VkFramebuffer framebuffer ) {
+        render_pass_bi.framebuffer = framebuffer;
+        return this;
+    }
 }
 
-
 alias Meta_Render_Pass  = Meta_Render_Pass_T!( int32_t.max, int32_t.max, int32_t.max, int32_t.max, int32_t.max, int32_t.max, int32_t.max );
-
 
 
 
@@ -742,140 +781,32 @@ private template isMultiBuffer( T )  {  enum isMultiBuffer = is( typeof( isMulti
 private void isMultiBufferImpl( uint fb_count, uint cv_count )( Meta_Framebuffer_T!( fb_count, cv_count ) meta ) {}
 
 
+    //////////////////////////////////////////////////
+    // connect Meta_Framebuffer to Meta_Render_Pass //
+    //////////////////////////////////////////////////
 
-
-
-//////////////////////////////////////////////////
-// connect Meta_Framebuffer to Meta_Render_Pass //
-//////////////////////////////////////////////////
-
-
-/*
-/// set members of a Meta_Renderpass.VkRenderPassBeginInfo with the corresponding members of a Meta_Framebuffer structure
-/// this should be called once if the framebuffer related members of the VkRenderPassBeginInfo are not changing later on
-/// or before vkCmdBeginRenderPass to switch framebuffer, render area (hint, see renderAreaOffset/Extent) and clear values
-/// Params:
-///     meta_renderpass = reference to a Meta_Renderpass structure holding the VkRenderPassBeginInfo
-///     meta_framebuffer = the Meta_Framebuffer structure whose framebuffer and resources will be attached
-/// Returns: the passed in Meta_Structure for function chaining
-auto ref attachFramebuffer( META_FB )(
-    ref Meta_Renderpass meta_renderpass,
-    ref META_FB         meta_framebuffer
-    ) if( isSingleBuffer!META_FB ) {
-    with( meta_renderpass.render_pass_bi ) {
-        framebuffer     = meta_framebuffer( 0 );
-        renderArea      = meta_framebuffer.render_area;
-        pClearValues    = meta_framebuffer.clear_values.ptr;
-        clearValueCount = meta_framebuffer.clear_values.length.toUint;
-    } return meta_renderpass;
-}
-*/
-/// set members of a Meta_Renderpass.VkRenderPassBeginInfo with the corresponding members of a Meta_Framebuffers structure
-/// this should be called once if the framebuffer related members of the VkRenderPassBeginInfo are not changing later on
-/// or before vkCmdBeginRenderPass to switch framebuffer, render area (hint, see renderAreaOffset/Extent) and clear values
-/// Params:
-///     meta_renderpass  = reference to a Meta_Renderpass_T structure holding the VkRenderPassBeginInfo
-///     meta_framebuffers = reference to the Meta_Framebuffer structure whose framebuffer and resources will be attached
-///     framebuffer_length = the index to select a framebuffer from the member framebuffer array
-/// Returns: the passed in Meta_Structure for function chaining
-auto ref attachFramebuffer( META_RP, META_FB )(
-    ref META_RP         meta_renderpass,
-    ref META_FB         meta_framebuffers,
-    uint32_t            framebuffer_index = 0
-    ) if( isRenderpass!META_RP && isMultiBuffer!META_FB ) {
-    meta_renderpass.render_pass_bi.attachFramebuffer( meta_framebuffers, framebuffer_index );
-    //with( meta_renderpass.render_pass_bi ) {
-    //    framebuffer     = meta_framebuffers( framebuffer_index );
-    //    renderArea      = meta_framebuffers.render_area;
-    //    pClearValues    = meta_framebuffers.clear_values.ptr;
-    //    clearValueCount = meta_framebuffers.clear_values.length.toUint;
+    /// set members of a VkRenderPassBeginInfo with the corresponding members of this structure
+    /// this should be called once if the framebuffer related members of the VkRenderPassBeginInfo are not changing later on
+    /// or before vkCmdBeginRenderPass to switch framebuffer, render area (hint, see renderAreaOffset/Extent) and clear values
+    /// Params:
+    ///     render_pass_bi      = reference to a VkRenderPassBeginInfo
+    ///     framebuffer_length  = the index to select a framebuffer from the member framebuffer array
+    //static if( fb_count == 1 ) {
+    //    void attachToRenderPassBI( ref VkRenderPassBeginInfo render_pass_bi ) {
+    //        render_pass_bi.framebuffer      = framebuffer;
+    //        render_pass_bi.renderArea       = render_area;
+    //        render_pass_bi.pClearValues     = clear_values.ptr;
+    //        render_pass_bi.clearValueCount  = clear_values.length.toUint;
+    //    }
+    //} else {
+    void attachToRenderPassBI( ref VkRenderPassBeginInfo render_pass_bi, uint32_t framebuffer_index = 0 ) {
+        render_pass_bi.framebuffer      = framebuffers[ framebuffer_index ];
+        render_pass_bi.renderArea       = render_area;
+        render_pass_bi.pClearValues     = clear_values.ptr;
+        render_pass_bi.clearValueCount  = clear_values.length.toUint;
+    }
     //}
-    return meta_renderpass;
-}
 
-/// set members of a VkRenderPassBeginInfo with the corresponding members of a Meta_Framebuffers structure
-/// this should be called once if the framebuffer related members of the VkRenderPassBeginInfo are not changing later on
-/// or before vkCmdBeginRenderPass to switch framebuffer, render area (hint, see renderAreaOffset/Extent) and clear values
-/// Params:
-///     render_pass_bi      = reference to a VkRenderPassBeginInfo
-///     meta_framebuffers   = reference to the Meta_Framebuffer structure whose framebuffer and resources will be attached
-///     framebuffer_length  = the index to select a framebuffer from the member framebuffer array
-void attachFramebuffer( META_FB )(
-    ref VkRenderPassBeginInfo   render_pass_bi,
-    ref META_FB                 meta_framebuffers,
-    uint32_t                    framebuffer_index = 0
-    ) if( isMultiBuffer!META_FB ) {
-    render_pass_bi.framebuffer     = meta_framebuffers( framebuffer_index );
-    render_pass_bi.renderArea      = meta_framebuffers.render_area;
-    render_pass_bi.pClearValues    = meta_framebuffers.clear_values.ptr;
-    render_pass_bi.clearValueCount = meta_framebuffers.clear_values.length.toUint;
-}
-
-/// set framebuffer member of a Meta_Renderpass.VkRenderPassBeginInfo with a framebuffer not changing its framebuffer related resources
-/// Params:
-///     meta_renderpass = reference to a Meta_Renderpass structure holding the VkRenderPassBeginInfo
-///     framebuffer     = the VkFramebuffer to attach to VkRenderPassBeginInfo
-/// Returns: the passed in Meta_Structure for function chaining
-auto ref attachFramebuffer( META_RP )( ref META_RP meta_renderpass, VkFramebuffer framebuffer ) if( isRenderpass!META_RP ) {
-    meta_renderpass.render_pass_bi.framebuffer = framebuffer;
-    return meta_renderpass;
-}
-
-/// set framebuffer member of a VkRenderPassBeginInfo with a framebuffer not changing its framebuffer related resources
-/// Params:
-///     render_pass_bi  = reference to a VkRenderPassBeginInfo
-///     framebuffer     = the VkFramebuffer to attach to VkRenderPassBeginInfo
-void attachFramebuffer( ref VkRenderPassBeginInfo render_pass_bi, VkFramebuffer framebuffer ) {
-    render_pass_bi.framebuffer = framebuffer;
-}
-
-
-/// initialize the VkFramebuffer and store them in the meta structure
-/// Params:
-///     meta                = reference to a Meta_Framebuffer or Meta_Framebuffers
-///     render_pass         = required for VkFramebufferCreateInfo to specify COMPATIBLE renderpasses
-///     framebuffer_extent  = the extent of the framebuffer, this is not(!) the render area
-///     image_views         = these will be attached to each of the VkFramebuffer(s) attachments 0 .. first_image_views.length
-/// Returns: the passed in Meta_Structure for function chaining
-auto ref initFramebuffer( META_FB )(
-    ref META_FB             meta,
-    VkRenderPass            render_pass,
-    VkExtent2D              framebuffer_extent,
-    VkImageView[]           image_views,
-    bool                    destroy_old_clear_values = true,
-    string                  file = __FILE__,
-    size_t                  line = __LINE__,
-    string                  func = __FUNCTION__
-    ) if( isSingleBuffer!META_FB ) {
-    // assert that meta struct is initialized with a valid vulkan state pointer
-    vkAssert( meta.isValid, "Meta_Struct is not initialized with a vulkan state pointer!", file, line, func );
-
-    // if we have some old resources we delete them first
-    if( !meta.empty ) meta.destroyResources( destroy_old_clear_values );
-
-    // the framebuffer_extent is not(!) the render_area, but rather a specification of how big the framebuffer is
-    // the render area specifies a render able window into this framebuffer
-    // this window must also be set as scissors in the VkPipeline
-    // here, if no render area was specified use the full framebuffer extent
-    if( meta.render_area.extent.width == 0 || meta.render_area.extent.height == 0 )
-        meta.renderAreaExtent( framebuffer_extent );
-
-    VkFramebufferCreateInfo framebuffer_create_info = {
-        renderPass      : render_pass,                  // this defines render pass COMPATIBILITY
-        attachmentCount : image_views.length.toUint,    // must be equal to the attachment count on render pass
-        pAttachments    : image_views.ptr,
-        width           : framebuffer_extent.width,
-        height          : framebuffer_extent.height,
-        layers          : 1,
-    };
-
-    // create the VkFramebuffer
-    meta.device
-        .vkCreateFramebuffer( & framebuffer_create_info, meta.allocator, meta.framebuffers.ptr )
-        .vkAssert( file, line, func );
-
-    return meta;
-}
 
 
 /// initialize the VkFramebuffer and store it in the meta structure
