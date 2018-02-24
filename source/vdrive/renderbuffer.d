@@ -596,10 +596,10 @@ struct Meta_Framebuffer_T( int32_t framebuffer_count = 1, int32_t clear_value_co
     auto ref setClearValue( T )( uint32_t index, T[4] rgba, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__
         ) if( is( T == float ) || is( T == int32_t ) || is( T == uint32_t )) {
         VkClearValue clear_value;
-                static if( is( T == float ))    clear_value.color.float32   = rgba;
-        else    static if( is( T == int32_t ))  clear_value.color.int32     = rgba;
-        else    static if( is( T == uint32_t )) clear_value.color.uint32    = rgba;
-        return  setClearValue( index, clear_value, file, line, func );
+             static if( is( T == float ))    clear_value.color.float32 = rgba;
+        else static if( is( T == int32_t ))  clear_value.color.int32   = rgba;
+        else static if( is( T == uint32_t )) clear_value.color.uint32  = rgba;
+        return setClearValue( index, clear_value, file, line, func );
     }
 
 
@@ -624,13 +624,8 @@ struct Meta_Framebuffer_T( int32_t framebuffer_count = 1, int32_t clear_value_co
     ///     clear_value = the VkClearValue clear value
     /// Returns: this reference for function chaining
     auto ref setClearValue( uint32_t index, VkClearValue clear_value, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
-        if( index == uint32_t.max )                 // signal to append clear_value instead of setting to a specific index ...
-            index = clear_values.length.toUint;     // ... hence set the index to the length of the current array length
-        if( clear_values.length <= index ) {        // if index is greater then the array ...
-            clear_values.length  = index + 1;       // ... resize the array
-        }
+        vkAssert( index < clear_values.length, "Index out of bounds. Resize the array clear_values array first if possible", file, line, func );
         clear_values[ index ] = clear_value;
-
         return this;
     }
 
@@ -643,10 +638,9 @@ struct Meta_Framebuffer_T( int32_t framebuffer_count = 1, int32_t clear_value_co
     ///     b       = blue clear value
     ///     a       = alpha clear value
     /// Returns: this reference for function chaining
-    auto ref addClearValue( T )( T r, T g, T b, T a, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__
-        ) if( is( T == float ) || is( T == int32_t ) || is( T == uint32_t )) {
+    auto ref addClearValue( T )( T r, T g, T b, T a ) if( is( T == float ) || is( T == int32_t ) || is( T == uint32_t )) {
         T[4] rgba = [ r, g, b, a ];
-        return addClearValue( rgba, file, line, func );
+        return addClearValue( rgba );
     }
 
 
@@ -654,10 +648,13 @@ struct Meta_Framebuffer_T( int32_t framebuffer_count = 1, int32_t clear_value_co
     /// The element type must be either float, int32_t or uint32_t
     /// Params:
     ///     rgba    = the rgba clear value as array or four component math vector
-        return setClearValue( uint32_t.max, rgba, file, line, func );
     /// Returns: this reference for function chaining
-    auto ref addClearValue( T )( T[4] rgba, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__
-        ) if( is( T == float ) || is( T == int32_t ) || is( T == uint32_t )) {
+    auto ref addClearValue( T )( T[4] rgba ) if( is( T == float ) || is( T == int32_t ) || is( T == uint32_t )) {
+        VkClearValue clear_value;
+             static if( is( T == float ))    clear_value.color.float32 = rgba;
+        else static if( is( T == int32_t ))  clear_value.color.int32   = rgba;
+        else static if( is( T == uint32_t )) clear_value.color.uint32  = rgba;
+        return addClearValue( clear_value );
     }
 
 
@@ -667,19 +664,19 @@ struct Meta_Framebuffer_T( int32_t framebuffer_count = 1, int32_t clear_value_co
     ///     depth   = the depth clear value
     ///     stencil = the stencil clear value, defaults to 0
     /// Returns: this reference for function chaining
-    auto ref addClearValue( UINT32_T )( float depth, UINT32_T stencil = 0, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__
-        ) if( is( UINT32_T : uint32_t )) {
-        return setClearValue( uint32_t.max, depth, stencil, file, line, func );
+    auto ref addClearValue( UINT32_T )( float depth, UINT32_T stencil = 0 ) if( is( UINT32_T : uint32_t )) {
+        VkClearValue clear_value = { depthStencil : VkClearDepthStencilValue( depth, stencil ) };
+        return addClearValue( clear_value );
     }
 
 
     /// add (append) attachment specific (framebuffer attachment index) VkClearValue
-    /// Stencil value defaults to 0
     /// Params:
     ///     clear_value = the VkClearValue clear value
-        return setClearValue( uint32_t.max, clear_value, file, line, func );
     /// Returns: this reference for function chaining
-    auto ref addClearValue( VkClearValue clear_value, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+    auto ref addClearValue( VkClearValue clear_value ) {
+        clear_values.append( clear_value );
+        return this;
     }
 
 
