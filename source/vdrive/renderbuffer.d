@@ -228,7 +228,7 @@ struct Meta_Render_Pass_T(
     /// consecutive subpass related function calls will create resources for this Meta_Structure if no index is specified
     /// Params:
     ///     subpass_description_flags = optionally add a ( currently the only one: VK_ATTACHMENT_DESCRIPTION_MAY_ALIAS_BIT ) flag
-    /// Returns: the passed in Meta_Structure for function chaining
+    /// Returns: this reference for function chaining
     auto ref addSubpass( VkSubpassDescriptionFlags subpass_description_flags = 0 ) {
         subpasses.length = subpasses.length + 1;
         subpass = & subpasses[ $-1 ];
@@ -414,9 +414,8 @@ struct Meta_Render_Pass_T(
     /// set clear values into the render pass begin info
     /// usage of either this function or attachFramebuffer(s) is required to set clear values for the later used VkRenderPassBeginInfo
     /// Params:
-    ///     meta = reference to a Meta_Renderpass struct
     ///     clear_value = will be set into the meta render pass VkRenderPassBeginInfo. Storage must be managed outside
-    /// Returns: the passed in Meta_Structure for function chaining
+    /// Returns: this reference for function chaining
     auto ref clearValues( Array_T )( Array_T clear_value ) if( is( Array_T == Array!VkClearValue ) || is( Array_T : VkClearValue[] )) {
         render_pass_bi.pClearValues = clear_value.ptr;
         render_pass_bi.clearValueCount = clear_value.length.toUint;
@@ -427,8 +426,7 @@ struct Meta_Render_Pass_T(
 
     /// construct a VkRenderPass from specified resources of Meta_Render_Pass structure and store it there as well
     /// Params:
-    ///     meta = reference to a Meta_Renderpass struct
-    /// Returns: the passed in Meta_Structure for function chaining
+    /// Returns: this reference for function chaining
     auto ref construct( string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
         // assert that meta struct is initialized with a valid vulkan state pointer
         vkAssert( isValid, "Meta_Struct not initialized with a vulkan state pointer", file, line, func );
@@ -534,32 +532,30 @@ struct Meta_Framebuffer_T( int32_t framebuffer_count = 1, int32_t clear_value_co
     }
 
 
-    /// Set attachment specific (framebuffer attachment index) r, g, b, a clear value
+    /// set attachment specific (framebuffer attachment index) r, g, b, a clear value
     /// The type of all values must be the same and either float, int32_t or uint32_t
     /// Params:
-    ///     meta    = reference to a Meta_Framebuffer or Meta_Framebuffers struct
     ///     index   = framebuffer attachment index
     ///     r       = red clear value
     ///     g       = green clear value
     ///     b       = blue clear value
     ///     a       = alpha clear value
-    /// Returns: the passed in Meta_Structure for function chaining
-    auto ref setClearValue( T )( uint32_t index, T r, T g, T b, T a, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ )
-        if( is( T == float ) || is( T == int32_t ) || is( T == uint32_t )) {
+    /// Returns: this reference for function chaining
+    auto ref setClearValue( T )( uint32_t index, T r, T g, T b, T a, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__
+        ) if( is( T == float ) || is( T == int32_t ) || is( T == uint32_t )) {
         T[4] rgba = [ r, g, b, a ];
-        return this.setClearValue( index, rgba, file, line, func );
+        return setClearValue( index, rgba, file, line, func );
     }
 
 
-    /// Set attachment specific (framebuffer attachment index) rgba clear value array or math vector (e.g. dlsl)
+    /// set attachment specific (framebuffer attachment index) rgba clear value array or math vector (e.g. dlsl)
     /// The element type must be either float, int32_t or uint32_t
     /// Params:
-    ///     meta    = reference to a Meta_Framebuffer or Meta_Framebuffers struct
     ///     index   = framebuffer attachment index
     ///     rgba    = the rgba clear value as array or four component math vector
-    /// Returns: the passed in Meta_Structure for function chaining
-    auto ref setClearValue( T )( uint32_t index, T[4] rgba, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ )
-        if( is( T == float ) || is( T == int32_t ) || is( T == uint32_t )) {
+    /// Returns: this reference for function chaining
+    auto ref setClearValue( T )( uint32_t index, T[4] rgba, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__
+        ) if( is( T == float ) || is( T == int32_t ) || is( T == uint32_t )) {
         VkClearValue clear_value;
                 static if( is( T == float ))    clear_value.color.float32   = rgba;
         else    static if( is( T == int32_t ))  clear_value.color.int32     = rgba;
@@ -568,28 +564,26 @@ struct Meta_Framebuffer_T( int32_t framebuffer_count = 1, int32_t clear_value_co
     }
 
 
-    /// Set attachment specific (framebuffer attachment index) depth-stencil clear value
+    /// set attachment specific (framebuffer attachment index) depth-stencil clear value
     /// Stencil value defaults to 0
     /// Params:
-    ///     meta    = reference to a Meta_Framebuffer or Meta_Framebuffers struct
     ///     index   = framebuffer attachment index
     ///     depth   = the depth clear value
     ///     stencil = the stencil clear value, defaults to 0
-    /// Returns: the passed in Meta_Structure for function chaining
-    auto ref setClearValue( UINT32_T )( uint32_t index, float depth, UINT32_T stencil = 0, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ )
-        if( is( UINT32_T : uint32_t )) {
+    /// Returns: this reference for function chaining
+    auto ref setClearValue( UINT32_T )( uint32_t index, float depth, UINT32_T stencil = 0, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__
+        ) if( is( UINT32_T : uint32_t )) {
         VkClearValue clear_value = { depthStencil : VkClearDepthStencilValue( depth, stencil ) };
         return setClearValue( index, clear_value, file, line, func );
     }
 
 
-    /// Set attachment specific (framebuffer attachment index) VkClearValue
+    /// set attachment specific (framebuffer attachment index) VkClearValue
     /// Stencil value defaults to 0
     /// Params:
-    ///     meta        = reference to a Meta_Framebuffer or Meta_Framebuffers struct
     ///     index       = framebuffer attachment index
     ///     clear_value = the VkClearValue clear value
-    /// Returns: the passed in Meta_Structure for function chaining
+    /// Returns: this reference for function chaining
     auto ref setClearValue( uint32_t index, VkClearValue clear_value, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
         if( index == uint32_t.max )                 // signal to append clear_value instead of setting to a specific index ...
             index = clear_values.length.toUint;     // ... hence set the index to the length of the current array length
@@ -602,64 +596,51 @@ struct Meta_Framebuffer_T( int32_t framebuffer_count = 1, int32_t clear_value_co
     }
 
 
-    /// Add (append) attachment specific (framebuffer attachment index) r, g, b, a clear value
+    /// add (append) attachment specific (framebuffer attachment index) r, g, b, a clear value
     /// The type of all values must be the same and either float, int32_t or uint32_t
     /// Params:
-    ///     meta    = reference to a Meta_Framebuffer or Meta_Framebuffers struct
     ///     r       = red clear value
     ///     g       = green clear value
     ///     b       = blue clear value
     ///     a       = alpha clear value
-    /// Returns: the passed in Meta_Structure for function chaining
-    auto ref addClearValue( T )( T r, T g, T b, T a, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ )
-        if( is( T == float ) || is( T == int32_t ) || is( T == uint32_t )) {
-        return setClearValue( uint32_t.max, r, g, b, a, file, line, func );
+    /// Returns: this reference for function chaining
+    auto ref addClearValue( T )( T r, T g, T b, T a, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__
+        ) if( is( T == float ) || is( T == int32_t ) || is( T == uint32_t )) {
+        T[4] rgba = [ r, g, b, a ];
+        return addClearValue( rgba, file, line, func );
     }
 
 
-    /// Add (append) attachment specific (framebuffer attachment index) rgba clear value array or math vector (e.g. dlsl)
+    /// add (append) attachment specific (framebuffer attachment index) rgba clear value array or math vector (e.g. dlsl)
     /// The element type must be either float, int32_t or uint32_t
     /// Params:
-    ///     meta    = reference to a Meta_Framebuffer or Meta_Framebuffers struct
     ///     rgba    = the rgba clear value as array or four component math vector
-    /// Returns: the passed in Meta_Structure for function chaining
-    auto ref addClearValue( T )( T[4] rgba, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ )
-        if( is( T == float ) || is( T == int32_t ) || is( T == uint32_t )) {
         return setClearValue( uint32_t.max, rgba, file, line, func );
+    /// Returns: this reference for function chaining
+    auto ref addClearValue( T )( T[4] rgba, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__
+        ) if( is( T == float ) || is( T == int32_t ) || is( T == uint32_t )) {
     }
 
 
-    /// Add (append) attachment specific (framebuffer attachment index) depth-stencil clear value
+    /// add (append) attachment specific (framebuffer attachment index) depth-stencil clear value
     /// Stencil value defaults to 0
     /// Params:
-    ///     meta    = reference to a Meta_Framebuffer or Meta_Framebuffers struct
     ///     depth   = the depth clear value
     ///     stencil = the stencil clear value, defaults to 0
-    /// Returns: the passed in Meta_Structure for function chaining
-    auto ref addClearValue( UINT32_T )(
-        float       depth,
-        UINT32_T    stencil = 0,
-        string      file = __FILE__,
-        size_t      line = __LINE__,
-        string      func = __FUNCTION__
+    /// Returns: this reference for function chaining
+    auto ref addClearValue( UINT32_T )( float depth, UINT32_T stencil = 0, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__
         ) if( is( UINT32_T : uint32_t )) {
         return setClearValue( uint32_t.max, depth, stencil, file, line, func );
     }
 
 
-    /// Add (append) attachment specific (framebuffer attachment index) VkClearValue
+    /// add (append) attachment specific (framebuffer attachment index) VkClearValue
     /// Stencil value defaults to 0
     /// Params:
-    ///     meta        = reference to a Meta_Framebuffer or Meta_Framebuffers struct
     ///     clear_value = the VkClearValue clear value
-    /// Returns: the passed in Meta_Structure for function chaining
-    auto ref addClearValue(
-        VkClearValue    clear_value,
-        string          file = __FILE__,
-        size_t          line = __LINE__,
-        string          func = __FUNCTION__
-        ) {
         return setClearValue( uint32_t.max, clear_value, file, line, func );
+    /// Returns: this reference for function chaining
+    auto ref addClearValue( VkClearValue clear_value, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
     }
 
 
@@ -667,9 +648,8 @@ struct Meta_Framebuffer_T( int32_t framebuffer_count = 1, int32_t clear_value_co
     /// the render area is passed into a VkRenderPassBeginInfo when the appropriate attachFramebuffer (see bellow) overload is called
     /// for vulkan itself this parameter is just an optimization hint and must be properly set as scissor parameter of VkPipelineViewportStateCreateInfo
     /// Params:
-    ///     meta    = reference to a Meta_Framebuffer or Meta_Framebuffers
     ///     offset  = the offset of the render area
-    /// Returns: the passed in Meta_Structure for function chaining
+    /// Returns: this reference for function chaining
     auto ref renderAreaOffset( VkOffset2D offset ) {
         render_area.offset = offset;
         return this;
@@ -680,10 +660,9 @@ struct Meta_Framebuffer_T( int32_t framebuffer_count = 1, int32_t clear_value_co
     /// the render area is passed into a VkRenderPassBeginInfo when the appropriate attachFramebuffer (see bellow) overload is called
     /// for vulkan itself this parameter is just an optimization hint and must be properly set as scissor parameter of VkPipelineViewportStateCreateInfo
     /// Params:
-    ///     meta    = reference to a Meta_Framebuffer or Meta_Framebuffers
     ///     x       = the offset of the render area in x
     ///     y       = the offset of the render area in y
-    /// Returns: the passed in Meta_Structure for function chaining
+    /// Returns: this reference for function chaining
     auto ref renderAreaOffset( int32_t x, int32_t y ) {
         return renderAreaOffset( VkOffset2D( x, y ));
     }
@@ -693,9 +672,8 @@ struct Meta_Framebuffer_T( int32_t framebuffer_count = 1, int32_t clear_value_co
     /// the render area is passed into a VkRenderPassBeginInfo when the appropriate attachFramebuffer (see bellow) overload is called
     /// for vulkan itself this parameter is just an optimization hint and must be properly set as scissor parameter of VkPipelineViewportStateCreateInfo
     /// Params:
-    ///     meta    = reference to a Meta_Framebuffer or Meta_Framebuffers
     ///     extent  = the extent of the render area
-    /// Returns: the passed in Meta_Structure for function chaining
+    /// Returns: this reference for function chaining
     auto ref renderAreaExtent( VkExtent2D extent ) {
         render_area.extent = extent;
         return this;
@@ -706,10 +684,9 @@ struct Meta_Framebuffer_T( int32_t framebuffer_count = 1, int32_t clear_value_co
     /// the render area is passed into a VkRenderPassBeginInfo when the appropriate attachFramebuffer (see bellow) overload is called
     /// for vulkan itself this parameter is just an optimization hint and must be properly set as scissor parameter of VkPipelineViewportStateCreateInfo
     /// Params:
-    ///     meta    = reference to a Meta_Framebuffer or Meta_Framebuffers
     ///     width   = the width of the render area
     ///     height  = the height of the render area
-    /// Returns: the passed in Meta_Structure for function chaining
+    /// Returns: this reference for function chaining
     auto ref renderAreaExtent( uint32_t width, uint32_t height ) {
         return renderAreaExtent( VkExtent2D( width, height ));
     }
@@ -719,9 +696,8 @@ struct Meta_Framebuffer_T( int32_t framebuffer_count = 1, int32_t clear_value_co
     /// the render area is passed into a VkRenderPassBeginInfo when the appropriate attachFramebuffer (see bellow) overload is called
     /// for vulkan itself this parameter is just an optimization hint and must be properly set as scissor parameter of VkPipelineViewportStateCreateInfo
     /// Params:
-    ///     meta    = reference to a Meta_Framebuffer or Meta_Framebuffers
     ///     area    = the render area
-    /// Returns: the passed in Meta_Structure for function chaining
+    /// Returns: this reference for function chaining
     auto ref renderArea( VkRect2D area ) {
         render_area = area;
         return this;
@@ -732,10 +708,9 @@ struct Meta_Framebuffer_T( int32_t framebuffer_count = 1, int32_t clear_value_co
     /// the render area is passed into a VkRenderPassBeginInfo when the appropriate attachFramebuffer (see bellow) overload is called
     /// for vulkan itself this parameter is just an optimization hint and must be properly set as scissor parameter of VkPipelineViewportStateCreateInfo
     /// Params:
-    ///     meta    = reference to a Meta_Framebuffer or Meta_Framebuffers
     ///     offset  = the offset of the render area
     ///     extent  = the extent of the render area
-    /// Returns: the passed in Meta_Structure for function chaining
+    /// Returns: this reference for function chaining
     auto ref renderAreaExtent( VkOffset2D offset, VkExtent2D extent ) {
         return renderArea( VkRect2D( offset, extent ));
     }
@@ -745,12 +720,11 @@ struct Meta_Framebuffer_T( int32_t framebuffer_count = 1, int32_t clear_value_co
     /// the render area is passed into a VkRenderPassBeginInfo when the appropriate attachFramebuffer (see bellow) overload is called
     /// for vulkan itself this parameter is just an optimization hint and must be properly set as scissor parameter of VkPipelineViewportStateCreateInfo
     /// Params:
-    ///     meta    = reference to a Meta_Framebuffer or Meta_Framebuffers
     ///     x       = the offset of the render area in x
     ///     y       = the offset of the render area in y
     ///     width   = the width of the render area
     ///     height  = the height of the render area
-    /// Returns: the passed in Meta_Structure for function chaining
+    /// Returns: this reference for function chaining
     auto ref renderAreaExtent( int32_t x, int32_t y, uint32_t width, uint32_t height ) {
         return renderArea( VkRect2D( VkOffset2D( x, y ), VkExtent2D( width, height )));
     }
