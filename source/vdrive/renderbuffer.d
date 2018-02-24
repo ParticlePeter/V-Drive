@@ -294,9 +294,26 @@ struct Meta_Render_Pass_T(
     /// add a VkSubpassDependency to the subpass_dependencies array of Meta_Render_Pass
     /// consecutive subpass related function calls will create data for this VkSubpassDependency if no index is specified
     /// Returns: this reference for function chaining
-    auto ref addDependency() {
+    auto ref addDependency(
+        uint32_t                src_subpass,
+        VkPipelineStageFlags    src_stage_mask,
+        VkAccessFlags           src_access_mask,
+        uint32_t                dst_subpass,
+        VkPipelineStageFlags    dst_stage_mask,
+        VkAccessFlags           dst_access_mask,
+        VkDependencyFlags       dependency_flags = 0
+        ) {
         subpass_dependencies.length = subpass_dependencies.length + 1;
         subpass_dependency = & subpass_dependencies[ $-1 ];
+        with( subpass_dependency ) {
+            srcSubpass      = src_subpass;
+            dstSubpass      = dst_subpass;
+            srcStageMask    = src_stage_mask;
+            dstStageMask    = dst_stage_mask;
+            srcAccessMask   = src_access_mask;
+            dstAccessMask   = dst_access_mask;
+            dependencyFlags = dependency_flags;
+        }
         return this;
     }
 
