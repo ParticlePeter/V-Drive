@@ -10,10 +10,8 @@ import erupted;
 
 
 //////////////////////////////////////
-// Meta_Subpass and Meta_Renderpass //
+// Meta_Subpass and Meta_Render_Pass //
 //////////////////////////////////////
-
-
 
 /// struct to collect subpass relevant data
 private struct Meta_Subpass_T(
@@ -53,8 +51,10 @@ enum Subpass_Ref_Type : uint32_t { input, color, resolve, preserve, depth_stenci
 
 
 /// private template to constraint template arg to Meta_Graphics or Meta_Compute
-private template isRenderpass( T ) { enum isRenderpass = is( typeof( isRenderPassImpl( T.init )));  }
-private void isRenderPassImpl( int32_t a, int32_t b, int32_t c, int32_t d, int32_t e, int32_t f, int32_t g, )( Meta_Renderpass_T!( a, b, c, d, e, f, g ) meta_rp ) {}
+private template isRenderPass( T ) { enum isRenderPass = is( typeof( isRenderPassImpl( T.init )));  }
+private void isRenderPassImpl( int32_t a, int32_t b, int32_t c, int32_t d, int32_t e, int32_t f, int32_t g, )( Meta_Render_Pass_T!( a, b, c, d, e, f, g ) meta_rp ) {}
+
+
 /// Wraps the essential Vulkan objects created with the editing procedure
 /// of Meta_Render_Pass, all other internal structures are obsolete
 /// after construction so that the Meta_Descriptor_Layout can be reused
@@ -80,7 +80,7 @@ void destroy( ref Vulkan vk, ref Core_Render_Pass core ) {
 }
 
 
-struct Meta_Renderpass_T(
+struct Meta_Render_Pass_T(
     int32_t attachment_count,
     int32_t dependency_count,
     int32_t subpass_count,
@@ -224,7 +224,7 @@ struct Meta_Renderpass_T(
 
 
 
-    /// add a Meta_Subpass to the subpasses array of Meta_Renderpass
+    /// add a Meta_Subpass to the subpasses array of Meta_Render_Pass
     /// consecutive subpass related function calls will create resources for this Meta_Structure if no index is specified
     /// Params:
     ///     subpass_description_flags = optionally add a ( currently the only one: VK_ATTACHMENT_DESCRIPTION_MAY_ALIAS_BIT ) flag
@@ -291,8 +291,7 @@ struct Meta_Renderpass_T(
     auto ref subpassRefDepthStencil( VkImageLayout render_layout = VK_IMAGE_LAYOUT_MAX_ENUM ) { return subpassReference( Subpass_Ref_Type.depth_stencil, toUint( attachment_descriptions.length - 1 ), render_layout ); }
 
 
-
-    /// add a VkSubpassDependency to the subpass_dependencies array of Meta_Renderpass
+    /// add a VkSubpassDependency to the subpass_dependencies array of Meta_Render_Pass
     /// consecutive subpass related function calls will create data for this VkSubpassDependency if no index is specified
     /// Returns: this reference for function chaining
     auto ref addDependency() {
@@ -407,7 +406,7 @@ struct Meta_Renderpass_T(
 
     // TODO(pp): not having a depth attachment does not work. Fix it!
 
-    /// construct a VkRenderPass from specified resources of Meta_Renderpass structure and store it there as well
+    /// construct a VkRenderPass from specified resources of Meta_Render_Pass structure and store it there as well
     /// Params:
     ///     meta = reference to a Meta_Renderpass struct
     /// Returns: the passed in Meta_Structure for function chaining
@@ -463,7 +462,7 @@ struct Meta_Renderpass_T(
 }
 
 
-alias Meta_Renderpass  = Meta_Renderpass_T!( int32_t.max, int32_t.max, int32_t.max, int32_t.max, int32_t.max, int32_t.max, int32_t.max );
+alias Meta_Render_Pass  = Meta_Render_Pass_T!( int32_t.max, int32_t.max, int32_t.max, int32_t.max, int32_t.max, int32_t.max, int32_t.max );
 
 
 
@@ -753,9 +752,9 @@ private void isMultiBufferImpl( uint fb_count, uint cv_count )( Meta_Framebuffer
 
 
 
-/////////////////////////////////////////////////
-// connect Meta_Framebuffer to Meta_Renderpass //
-/////////////////////////////////////////////////
+//////////////////////////////////////////////////
+// connect Meta_Framebuffer to Meta_Render_Pass //
+//////////////////////////////////////////////////
 
 
 /*
@@ -896,7 +895,7 @@ auto ref initFramebuffer( META_FB )(
 /// Returns: the passed in Meta_Structure for function chaining
 auto ref initFramebuffer( META_FB )(
     ref META_FB             meta,
-    Meta_Renderpass         meta_renderpass,
+    Meta_Render_Pass        meta_render_pass,
     VkExtent2D              framebuffer_extent,
     VkImageView[]           image_views,
     bool                    destroy_old_clear_values = true,
@@ -904,8 +903,8 @@ auto ref initFramebuffer( META_FB )(
     size_t                  line = __LINE__,
     string                  func = __FUNCTION__
     ) if( isSingleBuffer!META_FB ) {
-    meta.initFramebuffer( meta_renderpass.render_pass_bi.renderPass, framebuffer_extent, image_views, destroy_old_clear_values, file, line, func );
-    meta_renderpass.attachFramebuffer( meta );
+    meta.initFramebuffer( meta_render_pass.render_pass_bi.renderPass, framebuffer_extent, image_views, destroy_old_clear_values, file, line, func );
+    meta_render_pass.attachFramebuffer( meta );
     return meta;
 }
 
@@ -929,7 +928,7 @@ auto createFramebuffer(
 
 auto createFramebuffer(
     ref Vulkan              vk,
-    Meta_Renderpass         meta_renderpass,
+    Meta_Render_Pass         meta_render_pass,
     VkExtent2D              framebuffer_extent,
     VkImageView[]           image_views,
     bool                    destroy_old_clear_values = true,
@@ -938,7 +937,7 @@ auto createFramebuffer(
     string                  func = __FUNCTION__
     ) {
     Meta_Framebuffer meta = vk;
-    return meta.initFramebuffer( meta_renderpass, framebuffer_extent, image_views, destroy_old_clear_values, file, line, func );
+    return meta.initFramebuffer( meta_render_pass, framebuffer_extent, image_views, destroy_old_clear_values, file, line, func );
 }
 
 
@@ -1011,15 +1010,15 @@ auto ref initFramebuffers( META_FB, uint32_t max_image_view_count = uint32_t.max
 /// initialize the VkFramebuffer(s) and store them in the meta structure
 /// Params:
 ///     meta                = reference to a Meta_Framebuffer or Meta_Framebuffers
-///     meta_renderpass = the render_pass member is required for VkFramebufferCreateInfo to specify COMPATIBLE renderpasses,
-///                             additionally framebuffer[0], clear_value and extent are set into the VkRenderPassBeginInfo member
+///     meta_render_pass    = the render_pass member is required for VkFramebufferCreateInfo to specify COMPATIBLE renderpasses,
+///                           additionally framebuffer[0], clear_value and extent are set into the VkRenderPassBeginInfo member
 ///     extent              = the extent of the render area
 ///     first_image_views   = these will be attached to each of the VkFramebuffer(s) attachments 0 .. first_image_views.length
 ///     dynamic_image_views = the count of these specifies the count if VkFramebuffers(s), dynamic_imag_views[i] will be attached to framebuffer[i] attachment[first_image_views.length]
 /// Returns: the passed in Meta_Structure for function chaining
 auto ref initFramebuffers( META_RP, META_FB, uint32_t max_image_view_count = uint32_t.max )(
     ref META_FB             meta,
-    ref META_RP             meta_renderpass,
+    ref META_RP             meta_render_pass,
     VkExtent2D              framebuffer_extent,
     VkImageView[]           first_image_views,
     VkImageView[]           dynamic_image_views,
@@ -1028,12 +1027,12 @@ auto ref initFramebuffers( META_RP, META_FB, uint32_t max_image_view_count = uin
     string                  file = __FILE__,
     size_t                  line = __LINE__,
     string                  func = __FUNCTION__
-    ) if( isRenderpass!META_RP && isMultiBuffer!META_FB ) {
     meta.initFramebuffers!( META_FB, max_image_view_count )(
-        meta_renderpass.render_pass_bi.renderPass, framebuffer_extent,
+    ) if( isRenderPass!META_RP && isMultiBuffer!META_FB ) {
+        meta_render_pass.render_pass_bi.renderPass, framebuffer_extent,
         first_image_views, dynamic_image_views, last_image_views,
         destroy_old_clear_values, file, line, func );
-    meta_renderpass.attachFramebuffer( meta, 0 );
+    meta_render_pass.attachFramebuffer( meta, 0 );
     return meta;
 }
 
@@ -1063,7 +1062,7 @@ auto createFramebuffers(
 
 auto createFramebuffers( META_RP )(
     ref Vulkan              vk,
-    ref META_RP             meta_renderpass,
+    ref META_RP             meta_render_pass,
     VkExtent2D              framebuffer_extent,
     VkImageView[]           first_image_views,
     VkImageView[]           dynamic_image_views,
@@ -1072,10 +1071,10 @@ auto createFramebuffers( META_RP )(
     string                  file = __FILE__,
     size_t                  line = __LINE__,
     string                  func = __FUNCTION__
-    ) if( isRenderpass!META_RP ) {
+    ) if( isRenderPass!META_RP ) {
     Meta_Framebuffers  meta = vk;
     return meta.initFramebuffers(
-        meta_renderpass, framebuffer_extent,
+        meta_render_pass, framebuffer_extent,
         first_image_views, dynamic_image_views, last_image_views,
         destroy_old_clear_values, file, line, func );
 }
