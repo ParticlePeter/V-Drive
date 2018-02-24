@@ -318,16 +318,15 @@ struct Meta_Render_Pass_T(
     }
 
 
-    /// add a VkSubpassDependency to the subpass_dependencies array of Meta_Renderpass
-    /// additionally its dependencyFlags is set to VK_DEPENDENCY_BY_REGION_BIT
+    /// add a VkSubpassDependency to the subpass_dependencies array of Meta_Render_Pass
     /// consecutive subpass related function calls will create data for this VkSubpassDependency if no index is specified
     /// Returns: this reference for function chaining
-    auto ref addDependencyByRegion() {
-        addDependency;
-        subpass_dependencies[ $-1 ].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+    auto ref addDependency( VkDependencyFlags dependency_flags = 0 ) {
+        subpass_dependencies.length = subpass_dependencies.length + 1;
+        subpass_dependency = & subpass_dependencies[ $-1 ];
+        subpass_dependency.dependencyFlags = dependency_flags;
         return this;
     }
-
 
 
     /// set the source subpass dependencies of the last added dependency item
