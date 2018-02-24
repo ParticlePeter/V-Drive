@@ -275,11 +275,9 @@ struct Meta_Render_Pass_T(
 
 
     // cannot use subpassReference as function overload as aliases bellow cannot be set for function overloads with different args
-    auto ref subpassReference(
-        Subpass_Ref_Type        ref_type,
-        VkImageLayout           render_layout = VK_IMAGE_LAYOUT_MAX_ENUM
-        ) {
-        assert( attachment_descriptions.length > 0 );
+    auto ref subpassReference( Subpass_Ref_Type ref_type, VkImageLayout render_layout = VK_IMAGE_LAYOUT_MAX_ENUM, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+        // assert an attachment description was added at least once
+        vkAssert( attachment_descriptions.length > 0, "No attachment description has been added so far", file, line, func );
         return subpassReference( ref_type, toUint( attachment_descriptions.length - 1 ), render_layout );
     }
 
@@ -335,8 +333,9 @@ struct Meta_Render_Pass_T(
     ///     stage_mask = the source stage mask
     ///     access_mask = the source access mask
     /// Returns: this reference for function chaining
-    auto ref srcDependency( uint32_t subpass, VkPipelineStageFlags stage_mask, VkAccessFlags access_mask ) {
-        assert( subpass_dependencies.length > 0 );
+    auto ref srcDependency( uint32_t subpass, VkPipelineStageFlags stage_mask, VkAccessFlags access_mask, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+        // assert an attachment description was added at least once
+        vkAssert( attachment_descriptions.length > 0, "No attachment description has been added so far", file, line, func );
         with( subpass_dependencies[ $-1 ] ) {
             srcSubpass      = subpass;
             srcStageMask    = stage_mask;
@@ -352,8 +351,9 @@ struct Meta_Render_Pass_T(
     ///     stage_mask = the destination stage mask
     ///     access_mask = the destination access mask
     /// Returns: this reference for function chaining
-    auto ref dstDependency( uint32_t subpass, VkPipelineStageFlags stage_mask, VkAccessFlags access_mask ) {
-        assert( subpass_dependencies.length > 0 );
+    auto ref dstDependency( uint32_t subpass, VkPipelineStageFlags stage_mask, VkAccessFlags access_mask, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+        // assert an attachment description was added at least once
+        vkAssert( attachment_descriptions.length > 0, "No attachment description has been added so far", file, line, func );
         with( subpass_dependencies[ $-1 ] ) {
             dstSubpass      = subpass;
             dstStageMask    = stage_mask;
@@ -368,8 +368,9 @@ struct Meta_Render_Pass_T(
     ///     source = the source subpass
     ///     destination = the destination subpass
     /// Returns: this reference for function chaining
-    auto ref subpassDependency( uint32_t source, uint32_t destination ) {
-        assert( subpass_dependencies.length > 0 );
+    auto ref subpassDependency( uint32_t source, uint32_t destination, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+        // assert an attachment description was added at least once
+        vkAssert( attachment_descriptions.length > 0, "No attachment description has been added so far", file, line, func );
         with( subpass_dependencies[ $-1 ] ) {
             srcSubpass = source;
             dstSubpass = destination;
@@ -383,8 +384,9 @@ struct Meta_Render_Pass_T(
     ///     source = the source stage mask
     ///     destination = the destination stage mask
     /// Returns: this reference for function chaining
-    auto ref stageMaskDependency( VkPipelineStageFlags source, VkPipelineStageFlags destination ) {
-        assert( subpass_dependencies.length > 0 );
+    auto ref stageMaskDependency( VkPipelineStageFlags source, VkPipelineStageFlags destination, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+        // assert an attachment description was added at least once
+        vkAssert( attachment_descriptions.length > 0, "No attachment description has been added so far", file, line, func );
         with( subpass_dependencies[ $-1 ] ) {
             srcStageMask = source;
             dstStageMask = destination;
@@ -398,8 +400,9 @@ struct Meta_Render_Pass_T(
     ///     source = the source access mask
     ///     destination = the destination access mask
     /// Returns: this reference for function chaining
-    auto ref accessMaskDependency( VkAccessFlags source, VkAccessFlags destination ) {
-        assert( subpass_dependencies.length > 0 );
+    auto ref accessMaskDependency( VkAccessFlags source, VkAccessFlags destination, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+        // assert an attachment description was added at least once
+        vkAssert( attachment_descriptions.length > 0, "No attachment description has been added so far", file, line, func );
         with( subpass_dependencies[ $-1 ] ) {
             srcAccessMask = source;
             dstAccessMask = destination;
@@ -426,9 +429,9 @@ struct Meta_Render_Pass_T(
     /// Params:
     ///     meta = reference to a Meta_Renderpass struct
     /// Returns: the passed in Meta_Structure for function chaining
-    auto ref construct() {
+    auto ref construct( string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
         // assert that meta struct is initialized with a valid vulkan state pointer
-        assert( isValid );
+        vkAssert( isValid, "Meta_Struct not initialized with a vulkan state pointer", file, line, func );
 
         // extract VkSubpassDescription from Meta_Subpass
         auto subpass_descriptions = sizedArray!( subpass_count, VkSubpassDescription )( subpasses.length );
@@ -437,7 +440,7 @@ struct Meta_Render_Pass_T(
             // assert that resolve references length is less or equal to color references length
             // do nothing if resolve references length is 0, but if reference length is strictly less then color reference length
             // fill resolve reference length with VkAttachmentReference( VK_ATTACHMENT_UNUSED, layout arbitrary )
-            assert( subpass.resolve_reference.length <= subpass.color_reference.length );
+            vkAssert( subpass.resolve_reference.length <= subpass.color_reference.length, "Resolve reference count must be less or equal to color reference count", file, line, func );
 
             // We need this static if here as Empty_Array has no opSlice operator
             // An Empty_Arry is used when subpass.resolve_ref_count is zero
