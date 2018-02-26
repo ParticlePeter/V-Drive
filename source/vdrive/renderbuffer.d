@@ -529,7 +529,7 @@ alias Meta_Render_Pass  = Meta_Render_Pass_T!( int32_t.max, int32_t.max, int32_t
 
 struct Meta_Framebuffer_T( int32_t framebuffer_count = 1, int32_t clear_value_count = int32_t.max ) {
     static assert( framebuffer_count != 0, "Count of framebuffers must not be 0!" );
-    mixin       Vulkan_State_Pointer;
+    mixin Vulkan_State_Pointer                  vulkan_state_pointer;
 
     // required for template functions
     alias fb_count = framebuffer_count;
@@ -805,179 +805,207 @@ private void isMultiBufferImpl( uint fb_count, uint cv_count )( Meta_Framebuffer
     //}
 
 
+    /// construct the internal VkFramebuffer
+    /// Params:
+    ///     render_pass         = required for VkFramebufferCreateInfo to specify COMPATIBLE renderpasses
+    ///     framebuffer_extent  = the extent of the framebuffer, this is not(!) the render area
+    ///     image_views         = these will be attached to each of the VkFramebuffer(s) attachments 0 .. first_image_views.length
+    /// Returns: this reference for function chaining
+    auto ref construct(
+        VkRenderPass            render_pass,
+        VkExtent2D              framebuffer_extent,
+        VkImageView[]           image_views,
+        bool                    destroy_old_clear_values = true,
+        string                  file = __FILE__,
+        size_t                  line = __LINE__,
+        string                  func = __FUNCTION__
+        ) {
+        // assert that meta struct is initialized with a valid vulkan state pointer
+        vkAssert( isValid, "Meta_Struct not initialized with a vulkan state pointer", file, line, func );
 
-/// initialize the VkFramebuffer and store it in the meta structure
+        // if we have some old resources we delete them first
+        if( !empty ) destroyResources( destroy_old_clear_values );
+
+        // the framebuffer_extent is not(!) the render_area, but rather a specification of how big the framebuffer is
+        // the render area specifies a render able window into this framebuffer
+        // this window must also be set as scissors in the VkPipeline
+        // here, if no render area was specified use the full framebuffer extent
+        if( render_area.extent.width == 0 || render_area.extent.height == 0 )
+            renderAreaExtent( framebuffer_extent );
+
+        VkFramebufferCreateInfo framebuffer_ci = {
+            renderPass      : render_pass,                  // this defines render pass COMPATIBILITY
+            attachmentCount : image_views.length.toUint,    // must be equal to the attachment count on render pass
+            pAttachments    : image_views.ptr,
+            width           : framebuffer_extent.width,
+            height          : framebuffer_extent.height,
+            layers          : 1,
+        };
+
+        // create the VkFramebuffer
+        device.vkCreateFramebuffer( & framebuffer_ci, allocator, framebuffers.ptr ).vkAssert( "Construct Framebuffer", file, line, func );
+        return this;
+    }
+
+
+    /// construct the internal VkFramebuffer(s), internally a D_OR_S_ARRAY is used to merge passed in image views into one array
+    /// with the template argument max_attachment_count the allocation strategy can be specified. This approach will be enhanced with using
+    /// a Borrowed_Array, borrowing scratch storage managed via Vulkan_State
+    /// Params:
+    ///     max_attachment_count    = template arg to specify allocation strategy temporary D_OR_S_ARRAY (reordering passed in image views)
+    ///     render_pass         = required for VkFramebufferCreateInfo to specify COMPATIBLE renderpasses
+    ///     framebuffer_extent  = the extent of the framebuffer, this is not(!) the render area
+    ///     first_image_views   = these will be attached to each of the VkFramebuffer(s) attachments 0 .. first_image_views.length
+    ///     dynamic_image_views = the count of these specifies the count if VkFramebuffers(s), dynamic_imag_views[i] will be attached to framebuffer[i] attachment[first_image_views.length]
+    ///     last_image views    = these will be attached to each of the VkFramebuffer(s) attachments first_image_views.length + 1 .. last_image_view_length + 1
+    ///     destroy_old_clear_values = should old clear_values be destroyed, and the corresponding array set to length zero
+    /// Returns: this reference for function chaining
+    auto ref construct( int32_t max_attachment_count )(
+        VkRenderPass    render_pass,
+        VkExtent2D      framebuffer_extent,
+        VkImageView[]   first_image_views,
+        VkImageView[]   dynamic_image_views,
+        VkImageView[]   last_image_views = [],
+        bool            destroy_old_clear_values = true,
+        string          file = __FILE__,
+        size_t          line = __LINE__,
+        string          func = __FUNCTION__
+        ) {
+        // assert that meta struct is initialized with a valid vulkan state pointer
+        vkAssert( isValid, "Meta_Struct not initialized with a vulkan state pointer", file, line, func );
+
+        // if we have some old resources we delete them first
+        if( !empty ) destroyResources( destroy_old_clear_values );
+
+        // the framebuffer_extent is not(!) the render_area, but rather a specification of how big the framebuffer is
+        // the render area specifies a render able window into this framebuffer
+        // this window must also be set as scissors in the VkPipeline
+        // here, if no render area was specified use the full framebuffer extent
+        if( render_area.extent.width == 0 || render_area.extent.height == 0 )
+            renderAreaExtent( framebuffer_extent );
+
+        // copy the first image views, add another image for the dynamic image views and then the last image views
+        // the dynamic image view will be filled with one of the dynamic_image_views in the framebuffer create loop
+        uint image_view_count = ( first_image_views.length + 1 + last_image_views.length ).toUint;
+        auto image_views = sizedArray!( max_attachment_count, VkImageView )( image_view_count );
+
+        foreach( i, image_view; first_image_views ) image_views[ i ] = image_view;
+        foreach( i, image_view; last_image_views )  image_views[ first_image_views.length + 1 + i ] = image_view;
+
+        VkFramebufferCreateInfo framebuffer_ci = {
+            renderPass      : render_pass,                      // this defines render pass COMPATIBILITY
+            attachmentCount : image_views.length.toUint,        // must be equal to the attachment count on render pass
+            pAttachments    : image_views.ptr,
+            width           : framebuffer_extent.width,
+            height          : framebuffer_extent.height,
+            layers          : 1,
+        };
+
+        // create a framebuffer per dynamic_image_view (e.g. for each swapchain image view)
+        framebuffers.length = dynamic_image_views.length.toUint;
+        //foreach( i, ref fb; meta.framebuffers.data ) {
+        foreach( i; 0 .. framebuffers.length ) {
+            image_views[ first_image_views.length ] = dynamic_image_views[ i ];
+            device.vkCreateFramebuffer( & framebuffer_ci, allocator, & framebuffers[ i ] ).vkAssert( "Construct Framebuffers", file, line, func );
+        }
+
+        return this;
+    }
+
+
+    /// construct the internal VkFramebuffer(s), non-template overload using a Dynamic_Array internally (see above), simply forwarding to template one
+    /// Params:
+    ///     render_pass         = required for VkFramebufferCreateInfo to specify COMPATIBLE renderpasses
+    ///     framebuffer_extent  = the extent of the framebuffer, this is not(!) the render area
+    ///     first_image_views   = these will be attached to each of the VkFramebuffer(s) attachments 0 .. first_image_views.length
+    ///     dynamic_image_views = the count of these specifies the count if VkFramebuffers(s), dynamic_imag_views[i] will be attached to framebuffer[i] attachment[first_image_views.length]
+    ///     last_image views    = these will be attached to each of the VkFramebuffer(s) attachments first_image_views.length + 1 .. last_image_view_length + 1
+    ///     destroy_old_clear_values = should old clear_values be destroyed, and the corresponding array set to length zero
+    /// Returns: this reference for function chaining
+    auto ref construct()(
+        VkRenderPass    render_pass,
+        VkExtent2D      framebuffer_extent,
+        VkImageView[]   first_image_views,
+        VkImageView[]   dynamic_image_views,
+        VkImageView[]   last_image_views = [],
+        bool            destroy_old_clear_values = true,
+        string          file = __FILE__,
+        size_t          line = __LINE__,
+        string          func = __FUNCTION__
+        ) {
+        return construct!( int.max )(
+            render_pass, framebuffer_extent, first_image_views, dynamic_image_views, last_image_views, destroy_old_clear_values,
+            file, line, func
+        );
+    }
+
+
+    /// construct the internal VkFramebuffer(s), cannot use template param here as the struct itself is a template already
+    /// Params:
+    ///     vk = reference to a VulkanState struct
+    ///     render_pass         = required for VkFramebufferCreateInfo to specify COMPATIBLE renderpasses
+    ///     framebuffer_extent  = the extent of the framebuffer, this is not(!) the render area
+    ///     first_image_views   = these will be attached to each of the VkFramebuffer(s) attachments 0 .. first_image_views.length
+    ///     dynamic_image_views = the count of these specifies the count if VkFramebuffers(s), dynamic_imag_views[i] will be attached to framebuffer[i] attachment[first_image_views.length]
+    ///     last_image views    = these will be attached to each of the VkFramebuffer(s) attachments first_image_views.length + 1 .. last_image_view_length + 1
+    ///     destroy_old_clear_values = should old clear_values be destroyed, and the corresponding array set to length zero
+    /// Returns: this reference for function chaining
+    this(
+        ref Vulkan      vk,
+        VkRenderPass    render_pass,
+        VkExtent2D      framebuffer_extent,
+        VkImageView[]   first_image_views,
+        VkImageView[]   dynamic_image_views,
+        VkImageView[]   last_image_views = [],
+        string          file = __FILE__,
+        size_t          line = __LINE__,
+        string          func = __FUNCTION__
+        ) {
+        this.vk = vk;
+        // in a constructor we assume that clear_values are empty, hence if any existed before we always destroy them first
+        construct!( int.max )( render_pass, framebuffer_extent, first_image_views, dynamic_image_views, last_image_views, true, file, line, func );
+    }
+
+    // mixed in constructor is not woking but can be made working with the following line:
+    // source: http://arsdnet.net/this-week-in-d/2016-feb-07.html
+    alias __ctor = vulkan_state_pointer.__ctor;
+}
+
+
+
+
+/// factory function so that we can parametrize the Meta_Struct, its temporary construction storage and initialization parameters in on go
 /// Params:
-///     meta                = reference to a Meta_Framebuffer or Meta_Framebuffers
-///     meta_renderpass     = the render_pass member is required for VkFramebufferCreateInfo to specify COMPATIBLE renderpasses,
-///                         additionally framebuffer[0], clear_value and extent are set into the VkRenderPassBeginInfo member
-///     framebuffer_extent  = the extent of the render area
-///     image_views         = these will be attached to each of the VkFramebuffer(s) attachments 0 .. first_image_views.length
-/// Returns: the passed in Meta_Structure for function chaining
-auto ref initFramebuffer( META_FB )(
-    ref META_FB             meta,
-    Meta_Render_Pass        meta_render_pass,
-    VkExtent2D              framebuffer_extent,
-    VkImageView[]           image_views,
-    bool                    destroy_old_clear_values = true,
-    string                  file = __FILE__,
-    size_t                  line = __LINE__,
-    string                  func = __FUNCTION__
-    ) if( isSingleBuffer!META_FB ) {
-    meta.initFramebuffer( meta_render_pass.render_pass_bi.renderPass, framebuffer_extent, image_views, destroy_old_clear_values, file, line, func );
-    meta_render_pass.attachFramebuffer( meta );
-    return meta;
-}
-
-alias create = initFramebuffer;
-
-
-auto createFramebuffer(
-    ref Vulkan              vk,
-    VkRenderPass            render_pass,
-    VkExtent2D              framebuffer_extent,
-    VkImageView[]           image_views,
-    bool                    destroy_old_clear_values = true,
-    string                  file = __FILE__,
-    size_t                  line = __LINE__,
-    string                  func = __FUNCTION__
-    ) {
-    Meta_Framebuffer meta = vk;
-    return meta.initFramebuffer( render_pass, framebuffer_extent, image_views, destroy_old_clear_values, file, line, func );
-}
-
-
-auto createFramebuffer(
-    ref Vulkan              vk,
-    Meta_Render_Pass         meta_render_pass,
-    VkExtent2D              framebuffer_extent,
-    VkImageView[]           image_views,
-    bool                    destroy_old_clear_values = true,
-    string                  file = __FILE__,
-    size_t                  line = __LINE__,
-    string                  func = __FUNCTION__
-    ) {
-    Meta_Framebuffer meta = vk;
-    return meta.initFramebuffer( meta_render_pass, framebuffer_extent, image_views, destroy_old_clear_values, file, line, func );
-}
-
-
-/// initialize the VkFramebuffer(s) and store them in the meta structure
-/// Params:
-///     meta                = reference to a Meta_Framebuffer or Meta_Framebuffers
+//      framebuffer_count       = template arg to specify struct count of framebuffers allocation strategy
+//      clear_value_count       = template arg to specify struct count of clear values allocation strategy
+//      max_attachment_count    = template arg to specify temporary storage allocation strategy
+///     vk = reference to a VulkanState struct
 ///     render_pass         = required for VkFramebufferCreateInfo to specify COMPATIBLE renderpasses
 ///     framebuffer_extent  = the extent of the framebuffer, this is not(!) the render area
 ///     first_image_views   = these will be attached to each of the VkFramebuffer(s) attachments 0 .. first_image_views.length
 ///     dynamic_image_views = the count of these specifies the count if VkFramebuffers(s), dynamic_imag_views[i] will be attached to framebuffer[i] attachment[first_image_views.length]
 ///     last_image views    = these will be attached to each of the VkFramebuffer(s) attachments first_image_views.length + 1 .. last_image_view_length + 1
-/// Returns: the passed in Meta_Structure for function chaining
-auto ref initFramebuffers( META_FB, uint32_t max_image_view_count = uint32_t.max )(
-    ref META_FB             meta,
-    VkRenderPass            render_pass,
-    VkExtent2D              framebuffer_extent,
-    VkImageView[]           first_image_views,
-    VkImageView[]           dynamic_image_views,
-    VkImageView[]           last_image_views = [],
-    bool                    destroy_old_clear_values = true,
-    string                  file = __FILE__,
-    size_t                  line = __LINE__,
-    string                  func = __FUNCTION__
-    ) if( isMultiBuffer!META_FB ) {
-    // assert that meta struct is initialized with a valid vulkan state pointer
-    vkAssert( meta.isValid, "Meta_Struct is not initialized with a vulkan state pointer!", file, line, func );
-
-    // if we have some old resources we delete them first
-    if( !meta.empty ) meta.destroyResources( destroy_old_clear_values );
-
-    // the framebuffer_extent is not(!) the render_area, but rather a specification of how big the framebuffer is
-    // the render area specifies a render able window into this framebuffer
-    // this window must also be set as scissors in the VkPipeline
-    // here, if no render area was specified use the full framebuffer extent
-    if( meta.render_area.extent.width == 0 || meta.render_area.extent.height == 0 )
-        meta.renderAreaExtent( framebuffer_extent );
-
-    // copy the first image views, add another image for the dynamic image views and then the last image views
-    // the dynamic image view will be filled with one of the dynamic_image_viewes in the framebuffer create loop
-    uint image_view_count = ( first_image_views.length + 1 + last_image_views.length ).toUint;
-    static if( max_image_view_count == uint32_t.max )   auto image_views = sizedArray!VkImageView(   image_view_count );
-    else                        auto image_views = sizedArray!( max_image_view_count, VkImageView )( image_view_count );
-
-    foreach( i, image_view; first_image_views ) image_views[ i ] = image_view;
-    foreach( i, image_view; last_image_views )  image_views[ first_image_views.length + 1 + i ] = image_view;
-
-    VkFramebufferCreateInfo framebuffer_create_info = {
-        renderPass      : render_pass,                      // this defines render pass COMPATIBILITY
-        attachmentCount : image_views.length.toUint,        // must be equal to the attachment count on render pass
-        pAttachments    : image_views.ptr,
-        width           : framebuffer_extent.width,
-        height          : framebuffer_extent.height,
-        layers          : 1,
-    };
-
-    // create a framebuffer per dynamic_image_view (e.g. for each swapchain image view)
-    meta.framebuffers.length = dynamic_image_views.length.toUint;
-    //foreach( i, ref fb; meta.framebuffers.data ) {
-    foreach( i; 0 .. meta.framebuffers.length ) {
-        image_views[ first_image_views.length ] = dynamic_image_views[ i ];
-        meta.device
-            .vkCreateFramebuffer( & framebuffer_create_info, meta.allocator, & meta.framebuffers[ i ] )
-            .vkAssert( file, line, func );
-    }
-
-    return meta;
-}
-
-
-/// initialize the VkFramebuffer(s) and store them in the meta structure
-/// Params:
-///     meta                = reference to a Meta_Framebuffer or Meta_Framebuffers
-///     meta_render_pass    = the render_pass member is required for VkFramebufferCreateInfo to specify COMPATIBLE renderpasses,
-///                           additionally framebuffer[0], clear_value and extent are set into the VkRenderPassBeginInfo member
-///     extent              = the extent of the render area
-///     first_image_views   = these will be attached to each of the VkFramebuffer(s) attachments 0 .. first_image_views.length
-///     dynamic_image_views = the count of these specifies the count if VkFramebuffers(s), dynamic_imag_views[i] will be attached to framebuffer[i] attachment[first_image_views.length]
-/// Returns: the passed in Meta_Structure for function chaining
-auto ref initFramebuffers( META_RP, META_FB, uint32_t max_image_view_count = uint32_t.max )(
-    ref META_FB             meta,
-    ref META_RP             meta_render_pass,
-    VkExtent2D              framebuffer_extent,
-    VkImageView[]           first_image_views,
-    VkImageView[]           dynamic_image_views,
-    VkImageView[]           last_image_views = [],
-    bool                    destroy_old_clear_values = true,
-    string                  file = __FILE__,
-    size_t                  line = __LINE__,
-    string                  func = __FUNCTION__
-    meta.initFramebuffers!( META_FB, max_image_view_count )(
-    ) if( isRenderPass!META_RP && isMultiBuffer!META_FB ) {
-        meta_render_pass.render_pass_bi.renderPass, framebuffer_extent,
-        first_image_views, dynamic_image_views, last_image_views,
-        destroy_old_clear_values, file, line, func );
-    meta_render_pass.attachFramebuffer( meta, 0 );
-    return meta;
-}
-
-alias create = initFramebuffers;
-
-
-
-auto createFramebuffers(
+///     destroy_old_clear_values = should old clear_values be destroyed, and the corresponding array set to length zero
+/// Returns: this reference for function chaining
+auto createFramebuffer(
+    int32_t framebuffer_count,
+    int32_t clear_value_count = int32_t.max,
+    int32_t max_attachment_count = int32_t.max
+    )(
     ref Vulkan      vk,
     VkRenderPass    render_pass,
     VkExtent2D      framebuffer_extent,
     VkImageView[]   first_image_views,
     VkImageView[]   dynamic_image_views,
     VkImageView[]   last_image_views = [],
-    bool            destroy_old_clear_values = true,
     string          file = __FILE__,
     size_t          line = __LINE__,
     string          func = __FUNCTION__
     ) {
-    Meta_Framebuffers meta = vk;
-    return meta.initFramebuffers(
-        render_pass, framebuffer_extent,
-        first_image_views, dynamic_image_views, last_image_views,
-        destroy_old_clear_values, file, line, func );
+    auto result = Meta_Framebuffer_T!( framebuffer_count, clear_value_count )( vk ); // does not work, bug?
+    result.construct!max_attachment_count( render_pass, framebuffer_extent, first_image_views, dynamic_image_views, last_image_views );
+    return result;
+}
 }
 
 
