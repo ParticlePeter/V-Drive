@@ -414,11 +414,11 @@ struct Meta_Render_Pass_T(
     /// set clear values into the render pass begin info
     /// usage of either this function or attachFramebuffer(s) is required to set clear values for the later used VkRenderPassBeginInfo
     /// Params:
-    ///     clear_value = will be set into the meta render pass VkRenderPassBeginInfo. Storage must be managed outside
+    ///     clear_values = will be set into the meta render pass VkRenderPassBeginInfo. Storage must be managed outside
     /// Returns: this reference for function chaining
-    auto ref clearValues( Array_T )( Array_T clear_value ) if( is( Array_T == Array!VkClearValue ) || is( Array_T : VkClearValue[] )) {
-        render_pass_bi.pClearValues = clear_value.ptr;
-        render_pass_bi.clearValueCount = clear_value.length.toUint;
+    auto ref clearValues( Array_T )( ref Array_T clear_values ) if( is( Array_T == Array!VkClearValue ) || is( Array_T : VkClearValue[] )) {
+        render_pass_bi.pClearValues = clear_values.ptr;
+        render_pass_bi.clearValueCount = clear_values.length.toUint;
         return this;
     }
 
