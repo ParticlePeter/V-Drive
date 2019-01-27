@@ -739,7 +739,6 @@ struct Meta_Image {
     VkImageCreateInfo       image_create_info;
     VkImageView             image_view = VK_NULL_HANDLE;
     VkImageViewCreateInfo   image_view_create_info;
-    VkSampler               sampler;
     mixin                   Memory_Member;
     version( DEBUG_NAME )   string name;
 
