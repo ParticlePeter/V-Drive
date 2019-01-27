@@ -527,6 +527,11 @@ alias Meta_Render_Pass  = Meta_Render_Pass_T!( int32_t.max, int32_t.max, int32_t
 // Meta_Framebuffer //
 //////////////////////
 
+// Todo(pp): do we really require Multi Framebuffer after split off? An array of simple framebuffer should work as well with a free function
+//           and/or mixin template for attaching first, dynamic and last image views
+//           Update: implemented, needs additional testing. Moreover free functions must also work if we use an array of Frame_Resource with Frame_Resource.framebuffer
+
+deprecated( "Use (array of) VkFramebuffer in combination with free functions and UFCS instead." )
 struct Meta_Framebuffer_T( int32_t framebuffer_count = 1, int32_t clear_value_count = int32_t.max ) {
     static assert( framebuffer_count != 0, "Count of framebuffers must not be 0!" );
     mixin Vulkan_State_Pointer                  vulkan_state_pointer;
@@ -764,18 +769,7 @@ struct Meta_Framebuffer_T( int32_t framebuffer_count = 1, int32_t clear_value_co
     auto ref renderAreaExtent( int32_t x, int32_t y, uint32_t width, uint32_t height ) {
         return renderArea( VkRect2D( VkOffset2D( x, y ), VkExtent2D( width, height )));
     }
-}
 
-alias Meta_FB = Meta_Framebuffer_T;
-alias Meta_Framebuffer  = Meta_Framebuffer_T!( 1, int32_t.max );
-alias Meta_Framebuffers = Meta_Framebuffer_T!( int32_t.max, int32_t.max );
-
-/// If T is a vector, this evaluates to true, otherwise false
-private template isSingleBuffer( T )  {  enum isSingleBuffer = is( typeof( isSingleBufferImpl( T.init ))); }
-private void isSingleBufferImpl( uint cv_count )( Meta_Framebuffer_T!( 1, cv_count ) meta ) {}
-
-private template isMultiBuffer( T )  {  enum isMultiBuffer = is( typeof( isMultiBufferImpl( T.init ))); }
-private void isMultiBufferImpl( uint fb_count, uint cv_count )( Meta_Framebuffer_T!( fb_count, cv_count ) meta ) {}
 
 
     //////////////////////////////////////////////////
@@ -972,6 +966,17 @@ private void isMultiBufferImpl( uint fb_count, uint cv_count )( Meta_Framebuffer
 }
 
 
+alias Meta_FB = Meta_Framebuffer_T;
+alias Meta_Framebuffer  = Meta_Framebuffer_T!( 1, int32_t.max );
+alias Meta_Framebuffers = Meta_Framebuffer_T!( int32_t.max, int32_t.max );
+
+/// If T is a vector, this evaluates to true, otherwise false
+private template isSingleBuffer( T )  {  enum isSingleBuffer = is( typeof( isSingleBufferImpl( T.init ))); }
+private void isSingleBufferImpl( uint cv_count )( Meta_Framebuffer_T!( 1, cv_count ) meta ) {}
+
+private template isMultiBuffer( T )  {  enum isMultiBuffer = is( typeof( isMultiBufferImpl( T.init ))); }
+private void isMultiBufferImpl( uint fb_count, uint cv_count )( Meta_Framebuffer_T!( fb_count, cv_count ) meta ) {}
+
 
 
 /// factory function so that we can parametrize the Meta_Struct, its temporary construction storage and initialization parameters in on go
@@ -1006,24 +1011,450 @@ auto createFramebuffer(
     result.construct!max_attachment_count( render_pass, framebuffer_extent, first_image_views, dynamic_image_views, last_image_views );
     return result;
 }
+
+
+private template is_D_S_BIS_array( T ) { enum is_D_S_BIS_array = __traits( isStaticArray, T ) || is_D_or_S_array!T; }
+private template isClearValueType( T ) { enum isClearValueType = is( T == float ) || is( T == int32_t ) || is( T == uint32_t ); }
+
+
+/// set attachment specific (framebuffer attachment index) r, g, b, a clear value
+/// The type of all values must be the same and either float, int32_t or uint32_t
+/// Params:
+///     clear_values    = clear values array which will be mutated
+///     index           = array index as well as framebuffer attachment index of attachment to apply this clear values
+///     r               = red clear value
+///     g               = green clear value
+///     b               = blue clear value
+///     a               = alpha clear value
+/// Returns: reference to clear_vaues for function chaining
+auto ref set( Array_T, T )(
+    ref Array_T     clear_values,
+    uint32_t        index,
+    T               r,
+    T               g,
+    T               b,
+    T               a,
+    string          file = __FILE__,
+    size_t          line = __LINE__,
+    string          func = __FUNCTION__
+
+    ) if( isDataArrayOrSlice!( Array_T, VkClearValue ) && isClearValueType!T ) {
+
+    T[4] rgba = [ r, g, b, a ];
+    return set( clear_values, index, rgba, file, line, func );
 }
 
 
-auto createFramebuffers( META_RP )(
-    ref Vulkan              vk,
-    ref META_RP             meta_render_pass,
-    VkExtent2D              framebuffer_extent,
-    VkImageView[]           first_image_views,
-    VkImageView[]           dynamic_image_views,
-    VkImageView[]           last_image_views = [],
-    bool                    destroy_old_clear_values = true,
-    string                  file = __FILE__,
-    size_t                  line = __LINE__,
-    string                  func = __FUNCTION__
-    ) if( isRenderPass!META_RP ) {
-    Meta_Framebuffers  meta = vk;
-    return meta.initFramebuffers(
-        meta_render_pass, framebuffer_extent,
-        first_image_views, dynamic_image_views, last_image_views,
-        destroy_old_clear_values, file, line, func );
+/// set attachment specific (framebuffer attachment index) rgba clear value array or math vector (e.g. dlsl)
+/// The element type must be either float, int32_t or uint32_t
+/// Params:
+///     clear_values    = clear values array which will be mutated
+///     index           = array index as well as framebuffer attachment index of attachment to apply this clear values
+///     rgba            = the rgba clear value as array or four component math vector
+/// Returns: reference to clear_vaues for function chaining
+auto ref set( Array_T, T )(
+    ref Array_T     clear_values,
+    uint32_t        index,
+    T[4]            rgba,
+    string          file = __FILE__,
+    size_t          line = __LINE__,
+    string          func = __FUNCTION__
+
+    ) if( isDataArrayOrSlice!( Array_T, VkClearValue ) && isClearValueType!T ) {
+
+    VkClearValue clear_value;
+         static if( is( T == float ))    clear_value.color.float32 = rgba;
+    else static if( is( T == int32_t ))  clear_value.color.int32   = rgba;
+    else static if( is( T == uint32_t )) clear_value.color.uint32  = rgba;
+    return set( clear_values, index, clear_value, file, line, func );
+}
+
+
+/// set attachment specific (framebuffer attachment index) depth-stencil clear value
+/// Stencil value defaults to 0
+/// Params:
+///     clear_values    = clear values array which will be mutated
+///     index           = array index as well as framebuffer attachment index of attachment to apply this clear values
+///     depth           = the depth clear value
+///     stencil         = optional stencil clear value, defaults to 0
+/// Returns: reference to clear_vaues for function chaining
+auto ref set( Array_T, UINT32_T )(
+    ref Array_T     clear_values,
+    uint32_t        index,
+    float           depth,
+    UINT32_T        stencil = 0,
+    string          file = __FILE__,
+    size_t          line = __LINE__,
+    string          func = __FUNCTION__
+
+    ) if( isDataArrayOrSlice!( Array_T, VkClearValue ) && is(  UINT32_T : uint32_t )) {
+
+    VkClearValue clear_value = { depthStencil : VkClearDepthStencilValue( depth, stencil ) };
+    return set( clear_values, index, clear_value, file, line, func );
+}
+
+
+/// set attachment specific (framebuffer attachment index) VkClearValue
+/// Stencil value defaults to 0
+/// Params:
+///     clear_values    = clear values array which will be mutated
+///     index           = array index as well as framebuffer attachment index of attachment to apply this clear values
+///     clear_value = the VkClearValue clear value
+/// Returns: reference to clear_vaues for function chaining
+auto ref set( Array_T )(
+    ref Array_T     clear_values,
+    uint32_t        index,
+    VkClearValue    clear_value,
+    string          file = __FILE__,
+    size_t          line = __LINE__,
+    string          func = __FUNCTION__
+
+    ) if( isDataArrayOrSlice!( Array_T, VkClearValue )) {
+
+    vkAssert( index < clear_values.length, "Index out of bounds. Resize the clear_values array first if possible", file, line, func );
+    clear_values[ index ] = clear_value;
+    return clear_values;
+}
+
+
+/// add (append) attachment specific (framebuffer attachment index) r, g, b, a clear value
+/// The type of all values must be the same and either float, int32_t or uint32_t
+/// Params:
+///     clear_values    = clear values array which will be mutated
+///     r               = red clear value
+///     g               = green clear value
+///     b               = blue clear value
+///     a               = alpha clear value
+/// Returns: reference to clear_vaues for function chaining
+auto ref add( Array_T, T )(
+    ref Array_T     clear_values,
+    T               r,
+    T               g,
+    T               b,
+    T               a
+
+    ) if( isDataArray!( Array_T, VkClearValue ) && isClearValueType!T ) {
+
+    T[4] rgba = [ r, g, b, a ];
+    return add( clear_values, rgba );
+}
+
+
+/// add (append) attachment specific (framebuffer attachment index) rgba clear value array or math vector (e.g. dlsl)
+/// The element type must be either float, int32_t or uint32_t
+/// Params:
+///     clear_values    = clear values array which will be mutated
+///     rgba            = the rgba clear value as array or four component math vector
+/// Returns: reference to clear_vaues for function chaining
+auto ref add( Array_T, T )( ref Array_T clear_values, T[4] rgba ) if( is_D_or_S_array!Array_T && isClearValueType!T ) {
+    VkClearValue clear_value;
+         static if( is( T == float ))    clear_value.color.float32 = rgba;
+    else static if( is( T == int32_t ))  clear_value.color.int32   = rgba;
+    else static if( is( T == uint32_t )) clear_value.color.uint32  = rgba;
+    return add( clear_values, clear_value );
+}
+
+
+/// add (append) attachment specific (framebuffer attachment index) depth-stencil clear value
+/// Stencil value defaults to 0
+/// Params:
+///     clear_values    = clear values array which will be mutated
+///     depth           = the depth clear value
+///     stencil         = optional stencil clear value, defaults to 0
+/// Returns: reference to clear_vaues for function chaining
+auto ref add( Array_T, UINT32_T )( ref Array_T clear_values, float depth, UINT32_T stencil = 0 ) if( is_D_or_S_array!Array_T && is( UINT32_T : uint32_t )) {
+    VkClearValue clear_value = { depthStencil : VkClearDepthStencilValue( depth, stencil ) };
+    return add( clear_values, clear_value );
+}
+
+
+/// add (append) attachment specific (framebuffer attachment index) VkClearValue
+/// Params:
+///     clear_values    = clear values array which will be mutated
+/// Returns: reference to clear_vaues for function chaining
+auto ref add( Array_T )( ref Array_T clear_values, VkClearValue clear_value ) if( is_D_or_S_array!Array_T ) {
+    clear_values.append( clear_value );
+    return clear_values;
+}
+
+
+
+/// attach clear values to a VkRenderPassBeginInfo, the clear values are not consumed and must be kept alive
+/// Params:
+///     render_pass_bi  = the begin info struct to which clear value get attached
+///     clear_values    = clear values array which will be attached
+/// Returns: render_pass_bi reference for function chaining
+auto ref clearValues( Array_T )( ref VkRenderPassBeginInfo render_pass_bi, ref Array_T clear_values ) if( is_D_S_BIS_array!Array_T ) {
+    render_pass_bi.pClearValues     = clear_values.ptr;
+    render_pass_bi.clearValueCount  = clear_values.length.toUint;
+    return render_pass_bi;
+}
+
+
+
+/// set the render area offset separate from the extent
+/// the render area is passed into a VkRenderPassBeginInfo when the appropriate attachFramebuffer (see bellow) overload is called
+/// for vulkan itself this parameter is just an optimization hint and must be properly set as scissor parameter of VkPipelineViewportStateCreateInfo
+/// Params:
+///     render_pass_bi  = the begin info struct for which the render area offset is specified
+///     offset          = the offset of the render area
+/// Returns: render_pass_bi reference for function chaining
+auto ref renderAreaOffset( ref VkRenderPassBeginInfo render_pass_bi, VkOffset2D offset ) {
+    render_pass_bi.renderArea.offset = offset;
+    return render_pass_bi;
+}
+
+
+/// set the render area offset separate from the extent
+/// the render area is passed into a VkRenderPassBeginInfo when the appropriate attachFramebuffer (see bellow) overload is called
+/// for vulkan itself this parameter is just an optimization hint and must be properly set as scissor parameter of VkPipelineViewportStateCreateInfo
+/// Params:
+///     render_pass_bi  = the begin info struct for which the render area offset is specified
+///     x               = the offset of the render area in x
+///     y               = the offset of the render area in y
+/// Returns: render_pass_bi reference for function chaining
+auto ref renderAreaOffset( ref VkRenderPassBeginInfo render_pass_bi, int32_t x, int32_t y ) {
+    return renderAreaOffset( render_pass_bi, VkOffset2D( x, y ));
+}
+
+
+/// set the render area extent separate from the offset
+/// the render area is passed into a VkRenderPassBeginInfo when the appropriate attachFramebuffer (see bellow) overload is called
+/// for vulkan itself this parameter is just an optimization hint and must be properly set as scissor parameter of VkPipelineViewportStateCreateInfo
+/// Params:
+///     render_pass_bi  = the begin info struct for which the render area extent is specified
+///     extent          = the extent of the render area
+/// Returns: render_pass_bi reference for function chaining
+auto ref renderAreaExtent( ref VkRenderPassBeginInfo render_pass_bi, VkExtent2D extent ) {
+    render_pass_bi.renderArea.extent = extent;
+    return render_pass_bi;
+}
+
+
+/// set the render area extent separate from the offset
+/// the render area is passed into a VkRenderPassBeginInfo when the appropriate attachFramebuffer (see bellow) overload is called
+/// for vulkan itself this parameter is just an optimization hint and must be properly set as scissor parameter of VkPipelineViewportStateCreateInfo
+/// Params:
+///     render_pass_bi  = the begin info struct for which the render area extent is specified
+///     width   = the width of the render area
+///     height  = the height of the render area
+/// Returns: render_pass_bi reference for function chaining
+auto ref renderAreaExtent( ref VkRenderPassBeginInfo render_pass_bi, uint32_t width, uint32_t height ) {
+    return renderAreaExtent( render_pass_bi, VkExtent2D( width, height ));
+}
+
+
+/// set the render area
+/// the render area is passed into a VkRenderPassBeginInfo when the appropriate attachFramebuffer (see bellow) overload is called
+/// for vulkan itself this parameter is just an optimization hint and must be properly set as scissor parameter of VkPipelineViewportStateCreateInfo
+/// Params:
+///     render_pass_bi  = the begin info struct for which the render area is specified
+///     area            = the render area
+/// Returns: render_pass_bi reference for function chaining
+auto ref renderArea( ref VkRenderPassBeginInfo render_pass_bi, VkRect2D area ) {
+    render_pass_bi.renderArea = area;
+    return render_pass_bi;
+}
+
+
+/// set the render area
+/// the render area is passed into a VkRenderPassBeginInfo when the appropriate attachFramebuffer (see bellow) overload is called
+/// for vulkan itself this parameter is just an optimization hint and must be properly set as scissor parameter of VkPipelineViewportStateCreateInfo
+/// Params:
+///     render_pass_bi  = the begin info struct for which the render area is specified
+///     offset          = the offset of the render area
+///     extent          = the extent of the render area
+/// Returns: render_pass_bi reference for function chaining
+auto ref renderArea( ref VkRenderPassBeginInfo render_pass_bi, VkOffset2D offset, VkExtent2D extent ) {
+    return renderArea( render_pass_bi, VkRect2D( offset, extent ));
+}
+
+
+/// set the render area
+/// the render area is passed into a VkRenderPassBeginInfo when the appropriate attachFramebuffer (see bellow) overload is called
+/// for vulkan itself this parameter is just an optimization hint and must be properly set as scissor parameter of VkPipelineViewportStateCreateInfo
+/// Params:
+///     render_pass_bi  = the begin info struct for which the render area is specified
+///     x               = the offset of the render area in x
+///     y               = the offset of the render area in y
+///     width           = the width of the render area
+///     height          = the height of the render area
+/// Returns: render_pass_bi reference for function chaining
+auto ref renderArea( ref VkRenderPassBeginInfo render_pass_bi, int32_t x, int32_t y, uint32_t width, uint32_t height ) {
+    return renderArea( render_pass_bi, VkRect2D( VkOffset2D( x, y ), VkExtent2D( width, height )));
+}
+
+
+
+/// construct one VkFramebuffer
+/// Params:
+///     vk          = Vulkan state struct holding the device through which this resource is created
+///     render_pass = required for VkFramebufferCreateInfo to specify COMPATIBLE renderpasses
+///     width       = framebuffer width, this is not(!) the render area width
+///     height      = framebuffer height, this is not(!) the render area height
+///     layers      = framebuffer layers, for 3D image attachments
+///     image_views = these will be attached to each of the VkFramebuffer(s) attachments 0 .. first_image_views.length
+/// Returns: a constructed VkFraemebuffer
+auto createFramebuffer(
+    ref Vulkan      vk,
+    VkRenderPass    render_pass,
+    uint32_t        width,
+    uint32_t        height,
+    uint32_t        layers,
+    VkImageView[]   image_views,
+    string          file = __FILE__,
+    size_t          line = __LINE__,
+    string          func = __FUNCTION__
+
+    ) {
+
+    VkFramebufferCreateInfo framebuffer_ci = {
+        renderPass      : render_pass,                  // this defines render pass COMPATIBILITY
+        attachmentCount : image_views.length.toUint,    // must be equal to the attachment count on render pass
+        pAttachments    : image_views.ptr,
+        width           : width,
+        height          : height,
+        layers          : layers,
+    };
+
+    // create the VkFramebuffer
+    VkFramebuffer framebuffer;
+    vk.device.vkCreateFramebuffer( & framebuffer_ci, vk.allocator, & framebuffer ).vkAssert( "Create Framebuffer", file, line, func );
+    return framebuffer;
+}
+
+
+
+/// construct one VkFramebuffer, convenience function with implicit layers argument of 1
+/// Params:
+///     vk          = Vulkan state struct holding the device through which this resource is created
+///     render_pass = required for VkFramebufferCreateInfo to specify COMPATIBLE renderpasses
+///     width       = framebuffer width, this is not(!) the render area width
+///     height      = framebuffer height, this is not(!) the render area height
+///     image_views = these will be attached to each of the VkFramebuffer(s) attachments 0 .. first_image_views.length
+/// Returns: a constructed VkFraemebuffer
+auto createFramebuffer( Array_T )(
+    ref Vulkan      vk,
+    VkRenderPass    render_pass,
+    uint32_t        width,
+    uint32_t        height,
+    VkImageView[]   image_views,
+    string          file = __FILE__,
+    size_t          line = __LINE__,
+    string          func = __FUNCTION__
+    ) {
+    return vk.createFramebuffer( render_pass, width, height, 1, image_views, file, line, func );
+}
+
+
+
+/// construct multiple VkFramebuffer, which are stored in out_buffers argument
+/// the count of created framebuffers is given through the length of out_buffers argument
+/// if any of the elements of out_buffers is already a constructed framebuffer, it will be destroyed and recreated
+/// Params:
+///     vk                  = Vulkan state struct holding the device through which this resource is created
+///     render_pass         = required for VkFramebufferCreateInfo to specify COMPATIBLE renderpasses
+///     width               = framebuffer width, this is not(!) the render area width
+///     height              = framebuffer height, this is not(!) the render area height
+///     layers              = framebuffer layers, for 3D image attachments
+///     first_image_views   = these will be attached to each of the VkFramebuffer(s) attachments 0 .. first_image_views.length
+///     dynamic_image_views = the count of these specifies the count if VkFramebuffers(s), dynamic_imag_views[i] will be attached to framebuffer[i] attachment[first_image_views.length]
+///     last_image views    = these will be attached to each of the VkFramebuffer(s) attachments first_image_views.length + 1 .. last_image_view_length + 1
+/// Returns: a VkResut enum
+VkResult createFramebuffers(
+    ref Vulkan      vk,
+    VkFramebuffer[] out_buffers,
+    VkRenderPass    render_pass,
+    uint32_t        width,
+    uint32_t        height,
+    uint32_t        layers,
+    VkImageView[]   first_image_views,
+    VkImageView[]   dynamic_image_views,
+    VkImageView[]   last_image_views = [],
+    string          file = __FILE__,
+    size_t          line = __LINE__,
+    string          func = __FUNCTION__
+
+    ) {
+
+    // assert that dynamic image view count is at least as high as framebuffer count
+    vkAssert( out_buffers.length <= dynamic_image_views.length, "Dynamic image view count must be at least as high as framebuffer count", file, line, func );
+
+    // copy the first image views, add another image for the dynamic image views and then the last image views
+    // the dynamic image view will be filled with one of the dynamic_image_views in the framebuffer create loop
+    uint image_view_count = ( first_image_views.length + 1 + last_image_views.length ).toUint;
+
+    // create temporary storage to order image views for buffer attachment
+    auto image_views = Block_Array!VkImageView( vk.scratch );
+    image_views.length = image_view_count;
+
+    foreach( i, image_view; first_image_views ) image_views[ i ] = image_view;
+    foreach( i, image_view; last_image_views )  image_views[ first_image_views.length + 1 + i ] = image_view;
+
+    VkFramebufferCreateInfo framebuffer_ci = {
+        renderPass      : render_pass,                      // this defines render pass COMPATIBILITY
+        attachmentCount : image_view_count,                 // must be equal to the attachment count on render pass
+        pAttachments    : image_views.ptr,
+        width           : width,
+        height          : height,
+        layers          : layers,
+    };
+
+    // now attach each dynamic image view to the corresponding slot of one of the out framebuffers
+    foreach( i; 0 .. out_buffers.length ) {
+
+        // attach dynamic (swapchain) image view to the current framebuffer
+        image_views[ first_image_views.length ] = dynamic_image_views[ i ];
+
+        // destroy existing frame buffer
+        import vdrive.state : destroy;
+        if( out_buffers[ i ] != VK_NULL_HANDLE )
+            vdrive.state.destroy( vk, out_buffers[ i ] );
+
+        // create new framebuffer
+        auto vk_result = vk.device.vkCreateFramebuffer( & framebuffer_ci, vk.allocator, & out_buffers[ i ] );
+
+        // check result
+        vkAssert( vk_result, "Create Framebuffers", file, line, func );
+
+        // bale out if something went wrong
+        if( vk_result != VK_SUCCESS ) return vk_result;
+    }
+
+    return VK_SUCCESS;
+}
+
+
+
+/// construct multiple VkFramebuffer, which are stored in out_buffers argument
+/// the count of created framebuffers is given through the length of out_buffers argument
+/// if any of the elements of out_buffers is already a constructed framebuffer, it will be destroyed and recreated
+/// in this convenience function the layers argument is omitted, and implicitly set to 1
+/// Params:
+///     vk                  = Vulkan state struct holding the device through which this resource is created
+///     render_pass         = required for VkFramebufferCreateInfo to specify COMPATIBLE renderpasses
+///     width               = framebuffer width, this is not(!) the render area width
+///     height              = framebuffer height, this is not(!) the render area height
+///     layers              = framebuffer layers, for 3D image attachments
+///     first_image_views   = these will be attached to each of the VkFramebuffer(s) attachments 0 .. first_image_views.length
+///     dynamic_image_views = the count of these specifies the count if VkFramebuffers(s), dynamic_imag_views[i] will be attached to framebuffer[i] attachment[first_image_views.length]
+///     last_image views    = these will be attached to each of the VkFramebuffer(s) attachments first_image_views.length + 1 .. last_image_view_length + 1
+/// Returns: a VkResut enum
+VkResult createFramebuffers(
+    ref Vulkan      vk,
+    VkFramebuffer[] out_buffers,
+    VkRenderPass    render_pass,
+    uint32_t        width,
+    uint32_t        height,
+    VkImageView[]   first_image_views,
+    VkImageView[]   dynamic_image_views,
+    VkImageView[]   last_image_views = [],
+    string          file = __FILE__,
+    size_t          line = __LINE__,
+    string          func = __FUNCTION__
+
+    ) {
+
+    return vk.createFramebuffers(
+        out_buffers, render_pass, width, height, 1, first_image_views, dynamic_image_views, last_image_views, file, line, func );
 }
