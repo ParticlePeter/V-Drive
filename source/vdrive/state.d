@@ -395,6 +395,7 @@ template is_non_dispatch_handle( T ) {
     ||  is( T == VkDisplayModeKHR )
     ||  is( T == VkDescriptorUpdateTemplateKHR )
     ||  is( T == VkDebugReportCallbackEXT )
+    ||  is( T == VkDebugUtilsMessengerEXT )
     ||  is( T == VkObjectTableNVX )
     ||  is( T == VkIndirectCommandsLayoutNVX )
     ) {
@@ -403,6 +404,9 @@ template is_non_dispatch_handle( T ) {
         enum bool is_non_dispatch_handle = false;
     }
 }
+
+
+template is_handle( T ) { enum bool is_handle = is_dispatch_handle!T || is_non_dispatch_handle!T; }
 
 
 alias is_null = is_null_handle;
