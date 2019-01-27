@@ -6,8 +6,7 @@ import vdrive.util;
 import vdrive.state;
 
 import core.stdc.stdio : printf;
-
-
+import core.stdc.string : strlen;
 
 
 
@@ -23,47 +22,46 @@ import core.stdc.stdio : printf;
 /// Returns: VkShaderModule
 auto createShaderModule(
     ref Vulkan  vk,
-    string      shader_path,            // Todo(pp): turn this into a const( char )*
+    stringz     shader_path,
     string      file = __FILE__,
     size_t      line = __LINE__,
     string      func = __FUNCTION__
     ) {
     import std.file : exists;
     import std.path : extension;
-    string ext = shader_path.extension;         // get extension of path argument, must compile non .spv extension files
-    auto shader_path_z = shader_path.toStringz; // convert to std.container.array!char, this adds '\0' as last value and must be compensated in index calculations
+
+    import std.string : fromStringz;
+    auto shader_path_s = shader_path.fromStringz;
+
+    auto ext = shader_path_s.extension;                             // get extension of path argument, must compile non .spv extension files
+    auto spir_path = Block_Array!char( vk.scratch );                // temporary to compose shader_path_s to spir_v file if no changes occured
 
     if( ext != ".spv" ) {
 
-        shader_path_z[ $ - ext.length - 1 ] = '_';                  // substitute the . of .ext with _ to _ext
-
-        // append new extension .spv
-        string spv = ".spv";                                        // string with extension for memcpy, spv.length = 4
-        shader_path_z.length = shader_path_z.length + spv.length;   // resize the shader_path_z array with the length of the new extension
-        shader_path_z[ $-1 ] = '\0';                                // set the last value to a terminating character, required for propper vkAssert
-        import core.stdc.string : memcpy;                           // import and use memcopy to copy into the char array
-        memcpy( &shader_path_z.data[ $ - 5 ], spv.ptr, 4 );         // copy the .spv extension at [ $ - spv.length - "\0".length ] = [ $ - 4 - 1 ]
-        string spir_path = shader_path_z.data[ 0 .. $-1 ].idup;     // create string from the char array
+        spir_path.reserve( strlen( shader_path ) + 5 );           // we will append the new extension ".spv" + terminationg '\0'
+        spir_path.append( shader_path_s );
+        spir_path[ $ - ext.length ] = '_';                          // substitute the . of .ext with _ to _ext
+        spir_path.append( ".spv" );                                 // append new extension .spv
 
         // assert that either the original or the newly composed path exist
-        bool glsl_path_exists = shader_path.exists;                 // check if the original file, which must be a glsl file, exists
-        bool spir_up_to_date = spir_path.exists;                    // check if the spir file exists, if not we will compile it
+        bool glsl_path_exists = shader_path_s.exists;               // check if the original file, which must be a glsl file, exists
+        bool spir_up_to_date = spir_path.data.exists;               // check if the spir file exists, if not we will compile it
         vkAssert( glsl_path_exists || spir_up_to_date,
             "Neither path to glsl code nor path to corresponding spv exist: ",
-            file, line, func, shader_path_z.ptr );
+            file, line, func, shader_path );
 
         if( glsl_path_exists && spir_up_to_date ) {                 // if both files exists, check if the spir-v is up to date with the glsl source
             import std.file : getTimes;                             // need to get the modification times of the files
             import std.datetime : SysTime;                          // stored in comparable SysTimes
             SysTime access_time, glsl_mod_time, spir_mod_time;      // access times are irrelevant
-            spir_path.getTimes( access_time, spir_mod_time );       // get spir-v file times (.spv)
-            shader_path.getTimes( access_time, glsl_mod_time );     // get glsl file times
+            spir_path.data.getTimes( access_time, spir_mod_time );  // get spir-v file times (.spv)
+            shader_path_s.getTimes( access_time, glsl_mod_time );   // get glsl file times
             spir_up_to_date = glsl_mod_time < spir_mod_time;        // set the spir_up_to_date value if glsl is newer than spir-v
         }
 
         if( !spir_up_to_date ) { // not using 'else', as spir_up_to_date might have changed in the if clause above
             import std.process : execute;                           // use process execute to call glslangValidator
-            string[6] compile_glsl_args = [ "glslangValidator", "-V", "-w", "-o", spir_path, shader_path ];
+            const(char)[][6] compile_glsl_args = [ "glslangValidator", "-V", "-w", "-o", spir_path.data, shader_path_s ];
             auto compile_glsl = compile_glsl_args.execute;          // store in status struct
             vkAssert( compile_glsl.status == 0,                     // assert that compilation went right, othervise include compilation error into assert message
                 "SPIR-V is not generated for failed compile or link : ",
@@ -72,17 +70,19 @@ auto createShaderModule(
             auto output_z = compile_glsl.output.toStringz;
             printf( "Compiled: %s", output_z.ptr );                 // print output to signal that a shader has been (re)compiled
         }
-        shader_path = spir_path;                                    // overwrite the string path parameter with the composed char array back into
+        shader_path_s = spir_path.data;                               // overwrite the string path parameter with the composed char array back into
     }
 
     // assert that the passed in or freshly compiled spir-v file exist
-    vkAssert( shader_path.exists,
+    vkAssert( shader_path_s.exists,
         "Path to Spir-V does not exist: ",
-        file, line, func, shader_path_z.ptr );
+        file, line, func, shader_path );
 
+    import std.conv : to;
     import std.stdio : File;
-    auto shader_file = File( shader_path );
-    auto read_buffer = sizedArray!char( cast( size_t )shader_file.size );
+    auto shader_file = File( shader_path_s.to!string );
+    auto read_buffer = Block_Array!char( vk.scratch );
+    read_buffer.length = shader_file.size;
     auto code = shader_file.rawRead( read_buffer.data );
 
     VkShaderModuleCreateInfo shader_module_create_info = {
@@ -91,7 +91,16 @@ auto createShaderModule(
     };
 
     VkShaderModule shader_module;
-    vk.device.vkCreateShaderModule( &shader_module_create_info, vk.allocator, &shader_module ).vkAssert( "Shader Module", file, line, func );
+    vk.device.vkCreateShaderModule( & shader_module_create_info, vk.allocator, & shader_module ).vkAssert( "Shader Module", file, line, func );
+
+    if( !vk.debug_utils_messenger.is_null ) {
+        const VkDebugUtilsObjectNameInfoEXT shader_module_name_info = {
+            objectType      : VK_OBJECT_TYPE_SHADER_MODULE,
+            objectHandle    : shader_module.toUint64_t,
+            pObjectName     : shader_path,
+        };
+        vk.device.vkSetDebugUtilsObjectNameEXT( & shader_module_name_info ).vkAssert( "Shader Module Object Name", file, line, func );
+    }
 
     return shader_module;
 }
@@ -112,12 +121,12 @@ auto createPipelineShaderStage(
     VkShaderStageFlagBits           shader_stage,
     VkShaderModule                  shader_module,
     const( VkSpecializationInfo )*  specialization_info = null,
-    const( char )*                  shader_entry_point = "main"
+    stringz                         shader_entry_point = "main"
     ) {
     VkPipelineShaderStageCreateInfo shader_stage_create_info = {
         stage               : shader_stage,
         _module             : shader_module,
-        pName               : shader_entry_point,        // shader entry point function name
+        pName               : shader_entry_point,         // shader entry point function name
         pSpecializationInfo : specialization_info,
     };
 
@@ -140,9 +149,9 @@ auto createPipelineShaderStage(
 auto createPipelineShaderStage(
     ref Vulkan                      vk,
     VkShaderStageFlagBits           shader_stage,
-    string                          shader_path,
+    stringz                         shader_path,
     const( VkSpecializationInfo )*  specialization_info = null,
-    const( char )*                  shader_entry_point = "main",
+    stringz                         shader_entry_point = "main",
     string                          file = __FILE__,
     size_t                          line = __LINE__,
     string                          func = __FUNCTION__
@@ -168,15 +177,20 @@ auto createPipelineShaderStage(
 /// Returns: VkPipelineShaderStageCreateInfo
 auto createPipelineShaderStage(
     ref Vulkan                      vk,
-    string                          shader_path,
+    stringz                         shader_path,
     const( VkSpecializationInfo )*  specialization_info = null,
-    const( char )*                  shader_entry_point = "main",
+    stringz                         shader_entry_point = "main",
     string                          file = __FILE__,
     size_t                          line = __LINE__,
     string                          func = __FUNCTION__
+
     ) {
+
+    // must convert to const(char)[] to be able to use extension function
     import std.path : extension;
-    string ext = shader_path.extension;        // get extension of path argument
+    import std.string : fromStringz;
+    auto shader_path_s = shader_path.fromStringz;
+    auto ext = shader_path_s.extension;        // get extension of path argument
     vkAssert( ext != ".spv",
         "This overload of createPiplineShaderStage cannot be used with binary Spir-V, as the shader stage cannot be deduced",
         file, line, func );

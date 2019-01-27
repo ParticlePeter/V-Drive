@@ -416,7 +416,7 @@ struct Meta_Render_Pass_T(
     /// Params:
     ///     clear_values = will be set into the meta render pass VkRenderPassBeginInfo. Storage must be managed outside
     /// Returns: this reference for function chaining
-    auto ref clearValues( Array_T )( ref Array_T clear_values ) if( is( Array_T == Array!VkClearValue ) || is( Array_T : VkClearValue[] )) {
+    auto ref clearValues( Array_T )( ref Array_T clear_values ) if( isDataArray!( Array_T, VkClearValue ) || is( Array_T : VkClearValue[] )) {
         render_pass_bi.pClearValues = clear_values.ptr;
         render_pass_bi.clearValueCount = clear_values.length.toUint;
         return this;
@@ -463,7 +463,7 @@ struct Meta_Render_Pass_T(
         }
 
 
-        // use the new Array!VkSubpassDescription to create the VkRenderPass
+        // use the new subpass_descriptions array to create the VkRenderPass
         VkRenderPassCreateInfo render_pass_create_info = {
             attachmentCount : attachment_descriptions.length.toUint,
             pAttachments    : attachment_descriptions.ptr,
@@ -850,7 +850,7 @@ private void isMultiBufferImpl( uint fb_count, uint cv_count )( Meta_Framebuffer
 
     /// construct the internal VkFramebuffer(s), internally a D_OR_S_ARRAY is used to merge passed in image views into one array
     /// with the template argument max_attachment_count the allocation strategy can be specified. This approach will be enhanced with using
-    /// a Borrowed_Array, borrowing scratch storage managed via Vulkan_State
+    /// a Block_Array, borrowing scratch storage managed via Vulkan_State
     /// Params:
     ///     max_attachment_count    = template arg to specify allocation strategy temporary D_OR_S_ARRAY (reordering passed in image views)
     ///     render_pass         = required for VkFramebufferCreateInfo to specify COMPATIBLE renderpasses

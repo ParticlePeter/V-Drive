@@ -1,302 +1,937 @@
 module vdrive.util.array;
 
-public import std.container.array;
+
+enum debug_alloc = false;
+enum debug_arena = true;
 
 
-// Todo(pp): write your own nothrow @nogc array similar to std::vector (non ref counted)
-// Requirements:
-// - optionally use external memory ( not managed - not allocated/freed )
-// - optionally move data out of function without destroying and reallocating memory
-// - underlying data should be castable
+import core.stdc.stdlib : malloc, free;
+import core.stdc.string : memcpy;
+import core.stdc.stdio  : printf;
 
-auto sizedArray( T )( size_t length ) {
-    Array!T array;
-    array.length = length;
-    return array;
-}
-
-auto ptr( T )( Array!T array )  {
-    if( array.length == 0 ) return null;
-    return & array.front();
-}
-
-auto data( T )( Array!T array )  {
-    if( array.length == 0 ) return null;
-    return array.ptr[ 0..array.length ];
-}
-
-auto ref append( T )( ref Array!T array, T value )  {
-    array.insert( value );
-    return array.data[ $-1 ];
-}
-
-auto toStringz( T )( T data ) if( is( T == enum )) {
-    import std.conv : to;
-    return data.to!string.toStringz;
-}
-
-auto toStringz( T )( T data ) if( is( T == string ) || is( T : char[] )) {
-    Array!char result;
-    result.length = data.length + 1;
-    result[ data.length ] = '\0';
-    import core.stdc.string : memcpy;
-    memcpy( result.ptr, data.ptr, data.length );    //result.data[ 0 .. data.length ] = data[];
-    return result;
-}
+import vdrive.util.util : Log_Info, logInfo, vkAssert;
 
 
-/// convert string slice into Array!const( char )* slice
-/// Todo(pp): might be broken, test it!
-/// Params:
-///     data = slice of strings
-///     terminator = optional final character in the concatenated buffer
-/// Returns: Array!const( char )*[], array of pointers into a stringz array
-auto toPtrArray( string[] data, char terminator = '\?' ) {
-    Array!char concat_buffer;                               // Todo(pp): this shouldn't work and needs testing
-    return data.toPtrArray( concat_buffer, terminator );    // concat_buffer should be destroyed when leaving this func
-}
+
+/// Dynamic Array, non-copyable to avoid unnecessary data duplication
+struct Dynamic_Array( T, ST = uint ) {
+    alias   Val_T   = T;
+    alias   Size_T  = ST;
+    private Val_T*  Data        = null;
+    private Size_T  Count       = 0;
+    private Size_T  Capacity    = 0;
+    private bool    Owns_Memory = true;
+
+    // constructor with borrowed memory
+    this( void[] borrowed ) {
+        Data = cast( Val_T* )( borrowed.ptr );
+        Capacity = cast( Size_T )( borrowed.length / T.sizeof );
+        Owns_Memory = false;
+    }
 
 
-/// copy all strings of a string slice into reference argument concat_buffer
-/// terminating each string with a '\0' character
-/// original content of concat_buffer is kept, the array is resized appropriately
-/// another dynamic array with const( char )* pointer into the concat_buffer is returned
-/// Params:
-///     data = slice of strings
-///     concat_buffer = reference to buffer for the string copy and '\0' per string append
-///     terminator = optional final character in the concatenated buffer
-/// Returns: Array!const( char )*[], array of pointers into the concat_buffer stringz array
-auto toPtrArray( string[] data, ref Array!char concat_buffer, char terminator = '\?' ) {
-    Array!( const( char )* ) pointer_buffer;
-    data.toPtrArray( pointer_buffer, concat_buffer, terminator );
-    return pointer_buffer;
-}
+    // convenience constructor, initializes array with data
+    this( Val_T[] stuff, void[] borrowed = [] ) {
+        if( borrowed != [] ) {
+            Data = cast( Val_T* )( borrowed.ptr );
+            Capacity = cast( Size_T )( borrowed.length / T.sizeof );
+            Owns_Memory = false;
+        }
+        append( stuff );
+    }
 
 
-/// copy all strings of a string slice into reference argument concat_buffer
-/// terminating each string with a '\0' character
-/// original content of concat_buffer is kept, the array is resized appropriately
-/// pointer into the concat_buffer are appended to the reference argument pointer_buffer
-/// Params:
-///     data = slice of strings
-///     concat_buffer = reference to buffer for the string copy and '\0' per string append
-///     pointer_buffer = reference to pointer buffer where pointer into concat_buffer are appended
-///     terminator = optional final character in the concatenated buffer
-/// Returns: start index of the appended pointer
-auto toPtrArray( string[] data, ref Array!( const( char )* ) pointer_buffer, ref Array!char concat_buffer, char terminator = '\?' ) {
-    // early exit if data is empty
-    if( data.length == 0 ) return pointer_buffer.length;
+    // convenience constructor, possibly sets capacity and initializes array with count of init values
+    this( Size_T count, Size_T capacity = 0, Log_Info log_info = logInfo ) {
+        if( count <= capacity )
+            reserve( capacity, log_info );
+        length( count, true, log_info );  // initialize elements
+    }
 
-    size_t new_buffer_length = 0;
-    foreach( ref s; data )
-        new_buffer_length += s.length + 1;
 
-    if( terminator != '\?' ) {
-        ++new_buffer_length;
-        if( terminator != '\0' ) {
-            ++new_buffer_length;
+    // cannot be called from outside, used to move data (release, dup)
+    private this( Val_T* data, Size_T count, Size_T capacity ) {
+        Data        = data;
+        Count       = count;
+        Capacity    = capacity;
+    }
+
+
+    // free data on destruction
+    ~this() {
+        if( Owns_Memory == true ) {
+            free( Data );
         }
     }
 
-    size_t concat_buffer_start = concat_buffer.length;
-    concat_buffer.length = concat_buffer_start + new_buffer_length;
 
-    size_t pointer_buffer_start = pointer_buffer.length;
-    pointer_buffer.length = pointer_buffer_start + data.length;
-
-    data.toPtrArray( pointer_buffer.data[ pointer_buffer_start .. $ ], concat_buffer.data[ concat_buffer_start .. $ ], terminator );
-    return pointer_buffer_start;
-}
+    // disable copying
+    @disable this( this );
 
 
-/// copy all strings of a string slice into reference argument concat_buffer
-/// terminating each string with a '\0' character
-/// concat_buffer must have sufficient space for the concatenation
-/// pointer into the concat_buffer are stored into pointer_buffer
-/// which also must have sufficient space of count of data.length
-/// Params:
-///     data = slice of strings
-///     concat_buffer = buffer for the string copy and '\0' per string append with sufficient space
-///     pointer_buffer = buffer where pointer into concat_buffer are stored with sufficient space
-///     terminator = optional final character in the concatenated buffer, concat_buffer must accommodate it
-/// Returns: start index of the appended pointer
-void toPtrArray( string[] data, const( char )*[] pointer_buffer, char[] concat_buffer, char terminator = '\?' ) {
-    // early exit if data is empty
-    if( data.length == 0 ) return;
+    // properties
+    alias   data this;
+    Val_T[] data()              { return Data[ 0 .. Count ]; }  // borrowed references, don't store resulting slice!
+    //Val_T*  ptr()               { return Data; }
+    //Size_T  length()    const   { return Count; }
+    Size_T  opDollar()  const   { return Count; }
+    Size_T  capacity()  const   { return Capacity; }
+    bool    empty()     const   { return Count == 0; }
+    void    clear()     { Count = 0; }
 
-    size_t copy_target_index = 0;
-    foreach( i, ref s; data ) {
-        pointer_buffer[i] = & concat_buffer[ copy_target_index ];
-        import core.stdc.string : memcpy;
-        memcpy( cast( void* )pointer_buffer[i], s.ptr, s.length );
-        concat_buffer[ copy_target_index + s.length ] = '\0';
-        copy_target_index += s.length + 1;
+    inout( Val_T )* ptr()       inout { return Data; }
+    inout( Size_T ) length()    inout { return Count; }
+
+
+    // reset internal state
+    void reset( void[] borrowed = [] ) {
+        if( Owns_Memory && Data !is null ) {
+            free( Data );
+            Data = null;
+        }
+
+        if( borrowed == [] ) {
+            Owns_Memory = true;
+            Capacity = 0;
+            Data = null;
+        } else {
+            Owns_Memory = false;
+            Capacity = cast( Size_T )( borrowed.length );
+            Data = cast( Val_T* )( borrowed.ptr );
+        }
+
+        Count = 0;
     }
 
-    if( terminator != '\?' ) {
-        concat_buffer[ copy_target_index ] = terminator;
-        if( terminator != '\0' ) {
-            concat_buffer[ copy_target_index + 1 ] = '\0';
+
+    // reset internal state
+    void reset( Val_T[] stuff, void[] borrowed = [] ) {
+        reset( borrowed );
+        length = stuff.length;
+        data[ 0 .. stuff.length ] = stuff[];
+    }
+
+
+    // set desired length, resulting capacity might become larger than count
+    void length( size_t count, Log_Info log_info = logInfo ) {
+        if( count > Capacity )
+            reserve( growCapacity( count ), log_info );
+        Count = cast( Size_T )count;
+
+        static if( debug_arena ) if( Max_Count < Count ) Max_Count = Count;
+    }
+
+
+    // set desired length and if data should be initialized with default value, resulting capacity might become larger than count
+    void length( size_t count, bool initialize, Log_Info log_info = logInfo ) {
+        if( initialize ) { Val_T t; length( count, t, log_info ); }
+        else                        length( count, log_info );
+    }
+
+
+    // set desired length, resulting capacity might become larger than count and initialize each element
+    void length( size_t count, ref Val_T initial, Log_Info log_info = logInfo ) {
+        auto old_count = Count;
+        length( count, log_info );
+        foreach( ref d; data[ old_count .. count ] ) {
+            d = initial;
         }
     }
-}
 
 
+    // index access
+    ref inout( Val_T ) opIndex( size_t i, Log_Info log_info = logInfo ) inout {
+        vkAssert( i < Count, log_info, "Array out of bounds!" );
+        return Data[ i ];
+    }
 
 
+    // Empty_Array opIndex can't return a reference but the array interface must be able to return
+    // an element pointer. Hence we use this work around for empty arrays to silently retun a null pointer
+    inout( Val_T )* ptr_at( size_t i, Log_Info log_info = logInfo ) inout { return & opIndex(  i, log_info ); }
+    inout( Val_T )* ptr_back( Log_Info log_info = logInfo ) inout { return & opIndex( length - 1, log_info ); }
 
-auto toPtrArray( string data, const( char )*[] pointer_buffer ) {
-    if( data.length == 0 )
-        return null;
 
-    size_t pointer_count = 1;
-    pointer_buffer[0] = & data[0];
+    // convenience first and last element access
+    ref inout( Val_T ) front()  inout   { return Data[ 0 ]; }
+    ref inout( Val_T ) back()   inout   { return Data[ Count - 1 ]; }
 
-    foreach( i, c; data ) {
-        if( c == '\0' ) {
-            if( i == data.length - 1 ) {
-                return pointer_buffer[ 0..pointer_count ];
+
+    // disable concatenation
+    @disable void opBinary( string op : "~" )( Val_T   t ) {}
+    @disable void opBinary( string op : "~" )( Val_T[] t ) {}
+
+
+    // customize appending single element
+    void opOpAssign( string op : "~" )( Val_T stuff ) {
+        return append( stuff );
+    }
+
+
+    // customize appending slice of elements
+    void opOpAssign( string op: "~" )( Val_T[] stuff ) {
+        return append( stuff );
+    }
+
+
+    // append single element, return the appended element for further manipulation
+    ref T append( S )( S stuff, Log_Info log_info = logInfo ) if( is( S : Val_T )) {
+        if( Capacity == Count )
+            reserve( growCapacity( Count + 1 ), log_info );
+        Data[ Count ] = stuff;
+        Count += 1;
+        return Data[ Count - 1 ];
+    }
+
+
+    // append slice of elements, return the append result for further manipulation
+    T[] append( S )( S[] stuff, Log_Info log_info = logInfo ) if( is( S : T )) {
+        if( Capacity < Count + cast( Size_T )( stuff.length ))
+            reserve( growCapacity( Count + stuff.length ), log_info );
+        auto start = Count;
+        Count += stuff.length;
+        Data[ start .. Count ] = stuff[];
+        return Data[ start .. Count ];
+    }
+
+
+    // move data out of struct without copying the struct itself, works in tandem with private constructor
+    Dynamic_Array release() {
+        Val_T* data = Data;
+        Data = null;
+        return Dynamic_Array( data, Count, Capacity );
+    }
+
+
+    // duplicate the struct
+    Dynamic_Array dup( Log_Info log_info = logInfo ) {
+        if( Data is null )
+            return Dynamic_Array();
+        T* new_data = cast( T* )malloc( Capacity * T.sizeof );
+        static if( debug_alloc ) printf( "\n--------\nmalloc : %s : %u, %s\n--------\n\n", log_info.file.ptr, log_info.line, log_info.func.ptr );
+
+        memcpy( new_data, Data, Capacity * T.sizeof );
+        return Dynamic_Array( new_data, Count, Capacity );
+    }
+
+
+    // compute new capacity
+    private size_t growCapacity( size_t count ) {
+        size_t capacity = Capacity > 0 ? ( Capacity + Capacity / 2 ) : 8;
+        return capacity > count ? capacity : count;
+    }
+
+
+    // reserve memory
+    void reserve( size_t capacity, Log_Info log_info = logInfo ) {
+        if( capacity <= Capacity ) return;
+        T* new_data = cast( T* )malloc( capacity * T.sizeof );          // mGui::MemAlloc( ... );
+        static if( debug_alloc ) printf( "\n--------\nmalloc : %s : %u, %s\n--------\n\n", log_info.file.ptr, log_info.line, log_info.func.ptr );
+
+        if( Data !is null ) {
+            memcpy( new_data, Data, Count * T.sizeof );
+            if( Owns_Memory ) {
+                free( Data );                                           // mGui::MemFree( Data );
+            } else {
+                Owns_Memory = true;
             }
-            pointer_buffer[ pointer_count ] = & data[ i + 1 ];
-            ++pointer_count;
+        }
+        Data = new_data;
+        Capacity = cast( Size_T )capacity;
+
+        static if( debug_arena ) if( Max_Capacity < Capacity ) Max_Capacity = Capacity;
+    }
+
+
+    static if( debug_arena ) {
+        private   Size_T  Max_Count       = 0;
+        private   Size_T  Max_Capacity    = 0;
+
+        Size_T max_count()      { return Max_Count; }
+        Size_T max_capacity()   { return Max_Capacity; }
+    }
+}
+
+alias DArray = Dynamic_Array;
+
+
+
+// structure defines a memory block of the source array specified by Offset and Count in bytes
+// it can be single linked or bidirectional, linking to its previous or next block
+// The size of the block is the Capacity of the borrowing array
+struct Block_Link( ST = uint /*, bool bidirectional = false*/ ) {
+    alias                   Size_T  = ST;
+    //static if( bidirectional ) private BLink* Prev = null;
+    private BLink!Size_T*   Prev    = null;
+    private BLink!Size_T*   Next    = null;
+    private Size_T          Offset  = 0;
+    private Size_T          Size    = 0;
+}
+
+alias BLink = Block_Link;
+
+
+struct Arena_Array_T( ST = uint ) {   //, bool biderectional = false ) {
+    alias                       Size_T = ST;
+    DArray!( ubyte, Size_T )    Source;
+    alias                       Source this;
+    alias                       BLink_T = BLink!Size_T;
+    private BLink_T*            Head = null;
+    private BLink_T*            Tail = null;
+    //Block_Link                  List = { Offset : Size_T.max };
+
+
+    private void attach( BLink_T* link, Log_Info log_info = logInfo ) {
+        if( Head is null ) {
+            vkAssert( Tail is null, log_info, "If Head is null, Tail must be null as well!" );
+            //vkAssert( List.Prev is null, log_info, "If Next of the linked list is null, Prev must be null as well!" );
+            Head = link;        // if no blocks were registered so far
+            Tail = link;        // attach this block link as head and as tail
+
+            //List.Next = List.Prev = link;
+            //link.Next = link.Prev = & List;
+
+        } else {
+            link.Prev = Tail;
+            Tail.Next = link;
+            Tail = link;
+
+            //link.Prev = List.
+        }
+
+        link.Offset = length;
+
+        static if( debug_arena ) {
+            ++Num_Links;
+            if( Max_Links < Num_Links ) Max_Links = Num_Links;
         }
     }
-    import core.stdc.stdio : printf;
-    printf( "WARNING: last token is not terminated! Skipping\n" );
-    return pointer_buffer[ 0..pointer_count - 1 ];
+
+
+    private void detach( BLink_T* link, Log_Info log_info = logInfo ) {
+        /*
+        vkAssert( Head !is null, log_info, "No Block_Array registered!" );
+        BLink_T* prev = null;
+        BLink_T* curr = Head;
+
+        // search the passed in link in the linked list
+        while( link !is curr ) {
+            vkAssert( curr.Next !is null, log_info, "Borrowed link not found in linked list!" );
+            prev = curr;
+            curr = curr.Next;
+        }
+
+        // arriving here link == current, now we let prev.Next point to curr.Next
+        if( prev is null )      Head = link.Next;           // -> found link is the first in the list -> link.next becomes first in list
+        else                    prev.Next = link.Next;      // -> othervise link had a predcessor (prev) -> prev.Next points to link.Next
+        if( link is Tail )      Tail = prev;                // -> if link was at the end -> Tail becomes its predcessor (prev), which might be null
+        link.Next = null;                                   // remove invalid reference, which would be reachable outside this function
+        */
+
+        if( link is Head )      Head = link.Next;
+        else                    link.Prev.Next = link.Next;
+        if( link is Tail )      Tail = link.Prev;
+        else                    link.Next.Prev = link.Prev;
+
+        // adjust the length of the source array
+        if( Tail is null )      Source.length( 0, log_info );
+        else                    Source.length( Tail.Offset + Tail.Size, log_info );
+
+        static if( debug_arena ) {
+            --Num_Links;
+        }
+    }
+
+
+    private void replace( BLink_T* old_link, BLink_T* new_link, Log_Info log_info = logInfo ) {
+        vkAssert( Head !is null, log_info, "No Block_Array registered!" );
+
+        if( Head is old_link ) {
+            Head =  new_link;
+            Tail =  new_link;
+            return;
+        }
+
+        BLink_T* curr = Head;
+
+        // search the passed in link in the linked list
+        while( old_link !is curr.Next ) {
+            vkAssert( curr.Next !is null, log_info, "Borrowed link not found in linked list!" );
+            curr = curr.Next;
+        }
+
+        curr.Next = new_link;
+
+    }
+
+    // disable copying
+    @disable this( this );
+
+
+    // disable default constructor
+    //@disable this();
+
+
+
+    static if( debug_arena ) {
+        private Size_T Num_Links = 0;   Size_T num_links() { return Num_Links; }
+        private Size_T Max_Links = 0;   Size_T max_links() { return Max_Links; }
+
+
+        void printLinkInfo() {
+            uint link_index = 0;
+            auto link = Head;
+            while( link !is null ) {
+                link = link.Next;
+                link_index++;
+            }
+        }
+    }
 }
 
+alias Arena_Array = Arena_Array_T!();
+alias AArray = Arena_Array;
 
-auto toPtrArray( string data ) {
-    size_t pointer_count = 0;       // count '\0'
-    foreach( c; data )
-        if( c == '\0' )
-            ++pointer_count;
 
-    Array!( const( char )* ) pointer_buffer;
-    pointer_buffer.length = pointer_count;
-    data.toPtrArray( pointer_buffer.data );
-    return pointer_buffer;
+
+/// Dynamic Array, non-copyable to avoid unnecessary data duplication
+struct Block_Array( T, ST = uint ) {
+    alias                   Val_T   = T;
+    alias                   Size_T  = ST;
+    alias                   Arena_T = Arena_Array_T!Size_T;
+    alias                   BLink_T =  BLink!Size_T;
+
+    private BLink_T         Link;
+    private Arena_T*        Arena   = null;
+    private Size_T          Count   = 0;
+    private Size_T          Capacity() const { return Link.Size / Val_T.sizeof; }
+
+    Arena_T*                arena() { return Arena; }
+
+    // properties
+    alias   data        this;
+    Val_T[] data()      { return ptr()[ 0 .. Count ]; }       // borrowed references, don't store resulting slice!
+    void    clear()     { Count = 0; }
+    bool    empty()     const { return Count == 0; }
+    Size_T  capacity()  const { return Capacity(); }
+    Size_T  opDollar()  const { return Count; }
+    //Size_T  length()    const { return Count; }
+
+    inout( Val_T )*  ptr()      inout { return cast( inout( Val_T )* )( Arena.ptr + Link.Offset ); }
+    inout( Size_T ) length()    inout { return Count; }
+
+
+    // we are sub-allocating from the arena array, we must make sure that we have enough room for this allocation
+    // if we don't have then assert ... for now. Later we can try to move the data to some internal chunk or to the back of the arena array
+    void length( size_t count, Log_Info log_info = logInfo ) {
+        if( count > Capacity )
+            reserve( growCapacity( count ), log_info );
+        vkAssert( count * T.sizeof <= Link.Size, log_info, "Borrowed Link has not enough size!" );
+        Count = cast( Size_T )count;
+    }
+
+
+    // set desired length and if data should be initialized with default value, resulting capacity might become larger than count
+    void length( size_t count, bool initialize, Log_Info log_info = logInfo ) {
+        if( initialize ) { T t; length( count, t, log_info ); }
+        else                    length( count,    log_info );
+    }
+
+
+    // set desired length, resulting capacity might become larger than count and initialize each element
+    void length( size_t count, ref T initial, Log_Info log_info = logInfo ) {
+        auto old_count = Count;
+        length( count, log_info );
+        foreach( ref d; data[ old_count .. count ] ) {
+            d = initial;
+        }
+    }
+
+
+    // index access
+    ref inout( Val_T ) opIndex( size_t i, Log_Info log_info = logInfo ) inout {
+    //ref T opIndex( size_t i, Log_Info log_info = logInfo ) {
+        vkAssert( i < Count, log_info, "Array out of bounds!" );
+        return ptr()[ i ];
+    }
+
+
+    // Empty_Array opIndex can't return a reference but the array interface must be able to return
+    // an element pointer. Hence we use this work around for empty arrays to silently retun a null pointer
+    inout( Val_T )* ptr_at( size_t i, Log_Info log_info = logInfo ) inout  { return & opIndex( i, log_info ); }
+    inout( Val_T )* ptr_back( Log_Info log_info = logInfo ) inout { return & opIndex( length - 1, log_info ); }
+
+
+
+    // convenience first and last element access
+    ref T front()   { return ptr()[ 0 ]; }
+    ref T back()    { return ptr()[ Count - 1 ]; }
+
+
+    // disable concatenation
+    @disable void opBinary( string op : "~" )( T   t ) {}
+    @disable void opBinary( string op : "~" )( T[] t ) {}
+
+
+    // customize appending single element
+    void opOpAssign( string op : "~" )( T stuff ) {
+        return append( stuff );
+    }
+
+
+    // customize appending slice of elements
+    void opOpAssign( string op: "~" )( T[] stuff ) {
+        return append( stuff );
+    }
+
+
+    // append single element, return the appended element for further manipulation
+    ref T append( S )( S stuff, Log_Info log_info = logInfo ) if( is( S : T )) {
+        if( Capacity <= Count )
+            reserve( growCapacity( Count + 1 ), log_info );
+        Count += 1;
+        data[ Count - 1 ] = stuff;
+        return data[ Count - 1 ];
+    }
+
+
+    // append slice of elements, return the append result for further manipulation
+    T[] append( S )( S[] stuff, Log_Info log_info = logInfo ) if( is( S : T )) {
+        foreach( s; stuff[ 1 .. $ ] )
+
+        // we prepare the following vars in case of appending this to this
+        auto stuff_length = stuff.length;
+
+        // stuff might be part of the memory range of the Arena array
+        // if we reallocate the memory of the array the stuff slice is points to garbage
+        // in this case we must recreate the slice based on its relative offset of
+        // the Arena's array data pointer before the reallocation
+        auto stuff_ptr  = cast( size_t )stuff.ptr;
+        auto stuff_end  = stuff_ptr + S.sizeof * stuff.length;
+        auto source_ptr = cast( size_t )Arena.ptr;
+
+        // figure out if the stuff is within the mem range of Arena and store the offset in stuff_ptr
+        if( source_ptr <= stuff_ptr && stuff_end <= ( source_ptr + Arena.length ))
+            stuff_ptr = stuff_ptr - source_ptr;
+
+        auto old_count = Count;                     // cache the Count member, next operatin will update it
+        length( Count + stuff.length, log_info );   // extend length possibly reserving memory
+
+        // if stuff_ptr != stuff.ptr we know that we need to patch the stuff slice with stuff_ptr as offset
+        if( stuff_ptr != cast( size_t )stuff.ptr )
+            stuff = ( cast( S* )( cast( size_t )Arena.ptr + stuff_ptr ))[ 0 .. stuff.length ];
+
+        ptr[ old_count .. Count ] = stuff;          // copy stuff
+        return data[ old_count .. Count ];          // return slice with copied data
+    }
+
+
+    // compute new capacity
+    private size_t growCapacity( size_t count ) {
+        size_t capacity = Capacity > 0 ? ( Capacity + Capacity / 2 ) : 8;
+        return capacity > count ? capacity : count;
+    }
+
+
+    // reserve memory
+    void reserve( size_t capacity, Log_Info log_info = logInfo ) {
+        if( capacity <= Capacity ) return;                              // return if we have more capacity than requested
+        Size_T new_block_size = cast( Size_T )( capacity * T.sizeof );  // compute new block size
+
+        // if our Link is at the end of the linked Link list, simply resize the length of the borrowing array, this might re-allocate
+        if( Link.Next is null ) {
+            Arena.length( Link.Offset + new_block_size, log_info );
+            Link.Size = new_block_size;
+        }
+
+        // else check if there is some space left to the next Link ... for now!
+        else {
+            if( Link.Offset + new_block_size <= Link.Next.Offset ) {
+                Link.Size = new_block_size;
+            }   // Todo(pp): else figure out if there is enough room in between blocks, if so move data there, else move to the back
+        }
+    }
+
+
+    // reset internal state
+    void reset( T[] stuff = [], Log_Info log_info = logInfo ) {
+        reset( Arena, stuff, log_info );
+    }
+
+    // reset internal state
+    void reset( ref Arena_T arena, T[] stuff = [], Log_Info log_info = logInfo ) {
+        reset( & arena, stuff, log_info );
+    }
+
+    // reset internal state
+    void reset( Arena_T* arena, T[] stuff = [], Log_Info log_info = logInfo ) {
+        length( 0, log_info );
+        Arena.detach( & Link, logInfo );
+        Arena = arena;
+        Arena.attach( & Link, logInfo );
+        if( stuff.length > 0 ) append( stuff );
+    }
+
+
+
+
+    // duplicate the struct
+    Block_Array dup( Arena_T* arena = null ) {
+        auto duplicate = Block_Array( arena !is null ? *arena : *Arena, data );
+        return duplicate;
+        //T* new_data = cast( T* )malloc( Capacity * T.sizeof );
+        //memcpy( new_data, Data, Capacity * T.sizeof );
+        //return Block_Array( new_data, Count, Capacity );
+    }
+
+
+    // disable copying
+    @disable this( this );
+    //this( this ) {
+    //    printf( "Postblit!\n" );
+    //}
+
+
+    // disable default constructor
+    @disable this();
+
+
+    // must have an array to borrow from
+    this( ref Arena_T arena, Log_Info log_info = logInfo ) {
+        Arena = & arena;
+        Arena.attach( & Link, logInfo );
+    }
+
+
+    // convenience constructors
+    this( ref Arena_T arena, T   stuff, Log_Info log_info = logInfo ) { this( arena, logInfo ); append( stuff, logInfo ); }
+    this( ref Arena_T arena, T[] stuff, Log_Info log_info = logInfo ) { this( arena, logInfo ); append( stuff, logInfo ); }
+
+
+    // cannot be called from outside
+    private this( Arena_T* arena, BLink_T* link, Size_T count ) {
+        Arena           = arena;
+        Link.Prev       = link.Prev;
+        Link.Next       = link.Next;
+        Link.Offset     = link.Offset;
+        Link.Size       = link.Size;
+        Count           = count;
+
+        if( Link.Prev !is null )
+            Link.Prev.Next = & Link;
+
+        if( Link.Next !is null )
+            Link.Next.Prev = & Link;
+
+        /*
+        // mark for not being detached from Arena
+        link.Offset = link.Size = Size_T.max;
+
+        // replace link in linked link list
+        Arena.replace( link, & Link );
+        */
+    }
+
+
+    Block_Array release() {
+        return Block_Array( Arena, & Link, Count );
+    }
+
+
+
+    // free data on destruction
+    ~this() {
+        if( Link.Offset != Size_T.max && Link.Size != Size_T.max )
+            Arena.detach( & Link, logInfo );
+    }
 }
 
-
-
-unittest {
-
-    // Testing string of terminated strings toPtrArray buffer
-    string strings = "test\0t1\0TEST2\0T3\0";
-    const( char )*[8] stringPtr;
-    auto stringPoi = strings.toPtrArray( stringPtr );
-    printf( "Count: %d\n%s %s %s\n", stringPtr.length, stringPtr[0], stringPtr[2], stringPtr[1] );
-    printf( "Count: %d\n%s %s %s\n", stringPoi.length, stringPoi[0], stringPoi[2], stringPoi[1] );
-
-    // Testing array of strings to string of terminated strings toPtrArray
-    auto array_of_strings = [ "test", "t1", "TEST2" ];
-    Array!char pointer_buffer;
-    auto String = array_of_strings.toPtrArray( pointer_buffer );
-    printf( "%s\n%s\n%s\n", String[0], String[2], String[1] );
-    foreach( s; String ) writeln( * ( cast( ubyte * )s ) );
-    writeln( cast( ubyte[] )pointer_buffer.data() );
-
-}
+alias BArray = Block_Array;
 
 
 
-nothrow @nogc:
-import vdrive.util.util : vkAssert;
 
 /// Static array mimicking a dynamic one. Data ends up on stack, and can not be reallocated
 /// the array has still a capacity and length of how many elements are in use
-struct Static_Array( uint size, T ) {
-    alias Size_T = typeof( size );
-    private Size_T count = 0;
-    private T[ size ] m_data;
+struct Static_Array( uint Capacity, T, ST = uint ) {
+    alias   Val_T   = T;
+    alias   Size_T  = ST;
+    private Val_T[ Capacity ]   Data;
+    private Size_T Count        = 0;
 
-    alias data this;
-    T[] data() { return m_data[ 0 .. count ]; }
 
-    // set desired length, which must not be greater then the array size
-    void length( Size_T l, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__  ) {
-        import vdrive.util.util : vkAssert;
-        vkAssert( count <= size, "Memory not sufficient to set requested length!", file, line, func );
-        count = l;
+    // borrowed references, don't store resulting slice!
+    alias   data this;
+    Val_T[] data()      { return Data[ 0 .. Count ]; }
+
+
+    // set desired length, which must not be greater then the array capacity
+    void length( size_t count, Log_Info log_info = logInfo ) {
+        vkAssert( count <= Capacity, log_info, "Memory not sufficient to set requested length!" );
+        Count = cast( Size_T )count;
     }
 
-    Size_T length()     { return count; }
-    Size_T opDollar()   { return count; }
-    Size_T capacity()   { return size; }
-    bool empty()        { return count == 0; }
-    @property T* ptr()  { return count == 0 ? null : m_data.ptr; }
 
-    ref inout( T ) opIndex( size_t i, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__  ) inout {
-        vkAssert( i < size, "Array out of bounds!", file, line, func );
-        return m_data[ i ];
+    // properties
+    //Size_T  length()    { return Count; }
+    Size_T  opDollar()  { return Count; }
+    Size_T  capacity()  { return Capacity; }
+    bool    empty()     { return Count == 0; }
+    Val_T*  ptr()       { return Count == 0 ? null : Data.ptr; }
+    void    clear()     { Count = 0; }
+
+    inout( Val_T )* ptr()       inout { return Count == 0 ? null : Data.ptr; }
+    inout( Size_T ) length()    inout { return Count; }
+
+
+
+    // index access
+    ref inout( Val_T ) opIndex( size_t i, Log_Info log_info = logInfo ) inout {
+        vkAssert( i < Count, log_info, "Array out of bounds!" );
+        return Data[ i ];
     }
 
-    inout @property ref inout( T ) front()  { return m_data[ 0 ]; }
-    inout @property ref inout( T ) back()   { return m_data[ count - 1 ]; }
 
-    void append( S )( S stuff, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) if( is( S : T )) {
-        vkAssert( count < size, "Memory not sufficient to append additional data!", file, line, func );
-        m_data[ count ] = stuff;
-        ++count;
+    // Empty_Array opIndex can't return a reference but the array interface must be able to return
+    // an element pointer. Hence we use this work around for empty arrays to silently retun a null pointer
+    inout( Val_T )* ptr_at( size_t i, Log_Info log_info = logInfo ) inout  { return & opIndex( i, log_info ); }
+    inout( Val_T )* ptr_back( Log_Info log_info = logInfo ) inout { return & opIndex( length - 1, log_info ); }
+
+
+    // convenience first and last element access
+    inout @property ref inout( Val_T ) front()  { return Data[ 0 ]; }
+    inout @property ref inout( Val_T ) back()   { return Data[ Count - 1 ]; }
+
+
+    // disable concatenation
+    @disable void opBinary( string op : "~" )( Val_T   stuff ) {}
+    @disable void opBinary( string op : "~" )( Val_T[] stuff ) {}
+
+
+    // customize appending single element
+    void opOpAssign( string op : "~" )( Val_T stuff, Log_Info log_info = logInfo ) {
+        return append( stuff, log_info );
     }
 
-    void clear() { count = 0; }
+
+    // customize appending slice of elements
+    void opOpAssign( string op: "~" )( Val_T[] stuff, Log_Info log_info = logInfo ) {
+        return append( stuff, log_info );
+    }
+
+
+    // append single element, return the appended element for further manipulation
+    ref Val_T append( S )( S stuff, Log_Info log_info = logInfo ) if( is( S : Val_T )) {
+        vkAssert( Count < Capacity, log_info, "Memory not sufficient to append additional data!" );
+        Data[ Count ] = stuff;
+        Count += 1;
+        return Data[ $-1 ];
+    }
+
+
+    // append slice of elements, return the append result for further manipulation
+    Val_T[] append( S )( S[] stuff, Log_Info log_info = logInfo ) if( is( S : Val_T )) {
+        vkAssert( Count + stuff.length <= Capacity, log_info, "Memory not sufficient to append additional data!" );
+        auto start = Count;
+        Count += stuff.length;
+        Data[ start .. Count ] = stuff[];
+        return Data[ start .. Count ];
+    }
+
+
+    // convenience constructors
+    this( Val_T   stuff ) { append( stuff ); }
+    this( Val_T[] stuff ) { append( stuff ); }
 }
 
 alias SArray = Static_Array;
 
 
+/*
+/// array with only one element but functions same as Dynamic and static Arrays
+/// it is useful in place where one element data is required in meta structs
+/// length is always 1 and append operations always set that element
+private struct One_Array( T, ST = uint ) {
+    alias   Val_T   = T;
+    alias   Size_T  = ST;
+    private T       Data;
+//  private Size_T  Count       = 0;
+//  private Size_T  Capacity    = 0;
+
+
+    // borrowed references, don't store resulting slice!
+    alias   data this;
+    T[]     data()      { return ( & Data )[ 0 .. 1 ]; }
+
+
+    // set length, which must always be 1
+    void length( size_t count, Log_Info log_info = logInfo ) {
+        vkAssert( count == 1, log_info, "One_Array.length can be set only to 1 !" );
+    }
+
+
+    // properties
+    Size_T  length()    const { return 1; }
+    Size_T  capacity()  const { return 1; }
+    Size_T  opDollar()  const { return 1; }
+    bool    empty()     const { return false; }
+    T*      ptr()       { return & Data; }
+    void    clear()     {}
+
+
+    // index access
+    ref inout( T ) opIndex( size_t i, Log_Info log_info = logInfo ) inout {
+        vkAssert( i == 0, log_info, "One_Array has only one element, index must always be 0 !" );
+        return Data;
+    }
+
+
+    // convenience first and last element access
+    inout @property ref inout( T ) front()  { return Data; }
+    inout @property ref inout( T ) back()   { return Data; }
+
+
+    // assert on append single element
+    void append( S )( S stuff, Log_Info log_info = logInfo ) if( is( S : T )) {
+        vkAssert( false, log_info, "One_Array cannot accept additional elements beyond 1 !" );
+    }
+
+
+    // assert on append single element
+    void append( S )( S[] stuff, Log_Info log_info = logInfo ) if( is( S : T )) {
+        vkAssert( false, log_info, "One_Array cannot accept additional elements beyond 1 !" );
+    }
+}
+
+alias OArray = One_Array;
+*/
+
+
+
 /// empty array has no data but functions same as Dynamic and static Arrays
 /// it is useful in place where no data is required in meta structs
 /// but when (dummy) methods are required for static validation
-private struct Empty_Array( T ) {
-    alias Size_T = uint;
-//  alias data this;
-//  T[] data() { return m_data[ 0 .. count ]; }
+private struct Empty_Array( T, ST = uint ) {
+    alias   Val_T   = T;
+    alias   Size_T  = ST;
+    //T[] data() { return null[0..0]; }
 
-    // set desired length, which must not be greater then the array size
-    //void length( Size_T l, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__  ) {}
-    void length( Size_T l ) {}
-    Size_T length()     { return 0; }
-    Size_T capacity()   { return 0; }
-//  Size_T opDollar()   { return 0; }
-    bool empty()        { return true; }
-    @property T* ptr()  { return null; }
+    // set length, which must always be 1
+    void length( size_t count, Log_Info log_info = logInfo ) {
+        vkAssert( count == 0, log_info, "One_Array.length can be set only to 0!" );
+    }
 
-    inout( T ) opIndex( size_t i, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__  ) inout {
-        vkAssert( false, "Empty_Struct has no data!", file, line, func );
+
+    // properties
+//  Size_T  length()    const { return 0; }
+    Size_T  capacity()  const { return 0; }
+//  Size_T  opDollar()  const { return 0; }
+    bool    empty()     const { return true; }
+//  Val_T*  ptr()       { return null; }
+    void    clear()     {}
+
+
+    inout( Val_T )* ptr()       inout { return null; }
+    inout( Size_T ) length()    inout { return 0; }
+
+
+    inout( Val_T ) opIndex( size_t i, Log_Info log_info = logInfo ) inout {
+        vkAssert( false, log_info, "Empty_Array has no data!" );
         return T();
     }
 
-    //auto opSlice( size_t i, size_t j ) { return T[];}
-    //inout @property inout( T ) front()  { vkAssert( false, "Empty_Struct has no data!"; return T(); }
-    //inout @property inout( T ) back()   { vkAssert( false, "Empty_Struct has no data!"; return T(); }
 
-    void append( S )( S stuff, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) if( is( S : T )) {
-        vkAssert( false, "Empty_Struct has no memory, no data can be appended or set!", file, line, func );
+    // Empty_Array opIndex can't return a reference but the array interface must be able to return
+    // an element pointer. Hence we use this work around for empty arrays to silently retun a null pointer
+    inout( Val_T )* ptr_at( size_t i, Log_Info log_info = logInfo ) inout  { return null; }
+    inout( Val_T )* ptr_back( Log_Info log_info = logInfo ) inout { return null; }
+
+    //auto opSlice( size_t i, size_t j ) { return T[];}
+    //inout @property inout( T ) front() { vkAssert( false, "Empty_Struct has no data!"; return T(); }
+    //inout @property inout( T ) back()  { vkAssert( false, "Empty_Struct has no data!"; return T(); }
+
+
+    // assert on single element append
+    void append( S )( S stuff, Log_Info log_info = logInfo ) if( is( S : Val_T )) {
+        vkAssert( false, log_info, "Empty_Array has no memory, no data can be appended or set!" );
     }
 
-    void clear() {}
+
+    // assert on multi element append
+    void append( S )( S[] stuff, Log_Info log_info = logInfo ) if( is( S : Val_T )) {
+        vkAssert( false, log_info, "Empty_Array has no memory, no data can be appended or set!" );
+    }
 }
 
 alias EArray = Empty_Array;
 
 
+
 /// sized array overload forwarding to D_OR_S_ARRAY template
-auto sizedArray( int max_length, T )( size_t length ) {
+auto sizedArray( int max_length, T, ST = uint )( size_t length ) {
+    alias   Size_T = ST;
     D_OR_S_ARRAY!( max_length, T ) array;
     static if( max_length > 0 )
-        array.length = cast( uint )length;
+        array.length = cast( Size_T )length;
     return array;
 }
 
 
+
+
+
+
+private void isDynamicArrayImpl(           T, ST )( Dynamic_Array!(      T, ST ) array ) {}
+private void isArenaArrayImpl(             T, ST )( Arena_Array!(        T, ST ) array ) {}
+private void isBlockArrayImpl(             T, ST )( Block_Array!(        T, ST ) array ) {}
+private void isEmptyArrayImpl(             T, ST )( Empty_Array!(        T, ST ) array ) {}
+private void isStaticArrayImpl( uint size, T, ST )( Static_Array!( size, T, ST ) array ) {}
+
+template isDynamicArray(    A ) { enum isDynamicArray = is( typeof( isDynamicArrayImpl( A.init ))); }
+template isArenaArray(      A ) { enum isArenaArray   = is( typeof( isArenaArrayImpl(   A.init ))); }
+template isBlockArray(      A ) { enum isBlockArray   = is( typeof( isBlockArrayImpl(   A.init ))); }
+template isEmptyArray(      A ) { enum isEmptyArray   = is( typeof( isEmptyArrayImpl(   A.init ))); }
+template isStaticArray(     A ) { enum isStaticArray  = is( typeof( isStaticArrayImpl(  A.init ))); }
+
+template isDataArray(       A ) { enum isDataArray    = isDynamicArray!A || isStaticArray!A || isBlockArray!A; }
+template isSomeArray(       A ) { enum isSomeArray    = isDataArray!A || isEmptyArray!A; }
+
+
+template isDynamicArray( A, E ) { enum isDynamicArray = isDynamicArray!A && is( A.Val_T == E ); }
+template isArenaArray(   A, E ) { enum isArenaArray   = isArenaArray!A   && is( A.Val_T == E ); }
+template isBlockArray(   A, E ) { enum isBlockArray   = isBlockArray!A   && is( A.Val_T == E ); }
+template isEmptyArray(   A, E ) { enum isEmptyArray   = isEmptyArray!A   && is( A.Val_T == E ); }
+template isStaticArray(  A, E ) { enum isStaticArray  = isStaticArray!A  && is( A.Val_T == E ); }
+
+template isDataArray(    A, E ) { enum isDataArray    = isDataArray!A    && is( A.Val_T == E ); }
+template isSomeArray(    A, E ) { enum isSomeArray    = isSomeArray!A    && is( A.Val_T == E ); }
+
+template is_D_or_S_array(   A ) { enum is_D_or_S_array= isDynamicArray!A || isStaticArray!A; }
+
+
+
+
+
+
+
+
 /// template that creates a Dynamic, Static (mimicking dynamic), Empty, or DLang Static Array
-template D_OR_S_ARRAY( int count, T ) {
-         static if( count == int.max )  alias D_OR_S_ARRAY = Array!T;               // resize-able array
-    else static if( count > 0 )         alias D_OR_S_ARRAY = SArray!( count, T );   // static array mimicking resize-able array
-    else static if( count < 0 )         alias D_OR_S_ARRAY = T[ - count ];          // static array
-    else                                alias D_OR_S_ARRAY = EArray!T;
+template D_OR_S_ARRAY( int count, T, ST = uint ) {
+    alias   Size_T  = ST;
+    //pragma( msg, "File: ", __FILE__, " Line: ", __LINE__ );
+         static if( count == int.max )  alias D_OR_S_ARRAY = DArray!( T, Size_T );              // resize-able, non-copyable array
+    else static if( count == int.min )  alias D_OR_S_ARRAY = BArray!( T, Size_T );              // resize-able, non-copyable array, suballocating from memory arena
+//  else static if( count == -1 )       alias D_OR_S_ARRAY = OArray!( T, Size_T );              // array with one element
+    else static if( count >   0 )       alias D_OR_S_ARRAY = SArray!( count, T, Size_T );       // static array mimicking resize-able array
+    else static if( count <   0 )       alias D_OR_S_ARRAY = T[ - count ];                      // static array
+    else                                alias D_OR_S_ARRAY = EArray!( T, Size_T );              // array with no element/memory
+}
+
+
+
+auto sizedArray( T )( size_t size, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+    DArray!T array;
+    T initial = T.init;
+    array.length( size, initial, logInfo( file, line, func ));
+    return array;
 }

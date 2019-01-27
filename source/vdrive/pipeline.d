@@ -167,43 +167,69 @@ private template isPipeline( T ) {
 /// meta struct to configure a graphics VkPipeline and allocate a
 /// dynamic arrays exist to add several related config structs
 /// must be initialized with a Vulkan state struct
-struct Meta_Graphics {
-    mixin                                       Vulkan_State_Pointer;
+alias  Meta_Graphics = Meta_Graphics_T!();
+struct Meta_Graphics_T(
+    int32_t shader_stage_count          = int32_t.max,
+    int32_t binding_description_count   = int32_t.max,
+    int32_t attribute_description_count = int32_t.max,
+    int32_t viewport_count              = int32_t.max,
+    int32_t scissor_count               = int32_t.max,
+    int32_t color_blend_state_count     = int32_t.max,
+    int32_t dynamic_state_count         = int32_t.max,
+    int32_t descriptor_set_layout_count = int32_t.max,
+    int32_t push_constant_range_count   = int32_t.max,
 
+    ) {
+
+    mixin                                       Vulkan_State_Pointer;
     VkPipeline                                  pipeline;
     VkPipelineCreateFlags                       pipeline_create_flags;
-    Array!VkPipelineShaderStageCreateInfo       shader_stages;
+    D_OR_S_ARRAY!( shader_stage_count,          VkPipelineShaderStageCreateInfo )       shader_stages;
 
-    //VkPipelineVertexInputStateCreateInfo      vertex_input_state_create_info;
-    Array!VkVertexInputBindingDescription       vertex_input_binding_descriptions;
-    Array!VkVertexInputAttributeDescription     vertex_input_attribute_descriptions;
+    D_OR_S_ARRAY!( binding_description_count,   VkVertexInputBindingDescription )       vertex_input_binding_descriptions;
+    D_OR_S_ARRAY!( attribute_description_count, VkVertexInputAttributeDescription )     vertex_input_attribute_descriptions;
     VkPipelineInputAssemblyStateCreateInfo      input_assembly_state_ci;
 
-    //VkPipelineTessellationStateCreateInfo     tessellation_state_create_info;
     uint32_t                                    tesselation_patch_control_points;
 
-    //VkPipelineViewportStateCreateInfo         viewport_state_create_info;
-    Array!VkViewport                            viewports;
-    Array!VkRect2D                              scissors;
+    D_OR_S_ARRAY!( viewport_count,              VkViewport )                            viewports;
+    D_OR_S_ARRAY!( scissor_count,               VkRect2D )                              scissors;
 
     VkPipelineRasterizationStateCreateInfo      rasterization_state_ci = { frontFace : VK_FRONT_FACE_CLOCKWISE, depthBiasConstantFactor : 0, depthBiasClamp : 0, depthBiasSlopeFactor : 0, lineWidth : 1 };
     VkPipelineMultisampleStateCreateInfo        multisample_state_ci   = { rasterizationSamples : VK_SAMPLE_COUNT_1_BIT, minSampleShading : 0 };
     VkPipelineDepthStencilStateCreateInfo       depth_stencil_state_ci = { minDepthBounds : 0, maxDepthBounds : 0 };
     VkPipelineColorBlendStateCreateInfo         color_blend_state_ci   = { blendConstants : [ 0, 0, 0, 0 ] };
-    Array!VkPipelineColorBlendAttachmentState   color_blend_states;
+    D_OR_S_ARRAY!( color_blend_state_count,     VkPipelineColorBlendAttachmentState )   color_blend_states;
 
     //VkPipelineDynamicStateCreateInfo          dynamic_state_create_info;
-    Array!VkDynamicState                        dynamic_states;
+    D_OR_S_ARRAY!( dynamic_state_count,         VkDynamicState )                        dynamic_states;
 
     //VkPipelineLayoutCreateInfo                pipeline_layout_create_info
     VkPipelineLayout                            pipeline_layout;
-    Array!VkDescriptorSetLayout                 descriptor_set_layouts;
-    Array!VkPushConstantRange                   push_constant_ranges;
+    D_OR_S_ARRAY!( descriptor_set_layout_count, VkDescriptorSetLayout )                 descriptor_set_layouts;
+    D_OR_S_ARRAY!( push_constant_range_count,   VkPushConstantRange )                   push_constant_ranges;
 
     VkRenderPass                                render_pass;
     uint32_t                                    subpass;
     VkPipeline                                  base_pipeline_handle = VK_NULL_HANDLE;
     //int32_t                                   base_pipeline_index  = -1;  // Todo(pp): this is only meaningfull for multi-pipeline construction. Implement!
+
+
+    /// get minimal config for internal D_OR_S_ARRAY
+    auto static_config() {
+        size_t[9] result;
+        result[0] = shader_stages.length;
+        result[1] = vertex_input_binding_descriptions.length;
+        result[2] = vertex_input_attribute_descriptions.length;
+        result[3] = viewports.length;
+        result[4] = scissors.length;
+        result[5] = color_blend_states.length;
+        result[6] = dynamic_states.length;
+        result[7] = descriptor_set_layouts.length;
+        result[8] = push_constant_ranges.length;
+        return result;
+    }
+
 
     void destroyResources() {
         vdrive.state.destroy( vk, pipeline );          // no nice syntax, vdrive.state.destroy overloads
@@ -723,19 +749,35 @@ struct Meta_Graphics {
 /// meta struct to configure a graphics VkPipeline and allocate a
 /// dynamic arrays exist to add VkDescriptorSetLayout and VkPushConstantRange
 /// must be initialized with a Vulkan state struct
-struct Meta_Compute {
-    mixin                                       Vulkan_State_Pointer;
+alias Meta_Compute = Meta_Compute_T!();
+struct Meta_Compute_T(
+    int32_t descriptor_set_layout_count = int32_t.max,
+    int32_t push_constant_range_count   = int32_t.max,
 
+    ) {
+
+    mixin                                       Vulkan_State_Pointer;
     VkPipeline                                  pipeline;
     VkComputePipelineCreateInfo                 pipeline_ci;
 
-    Array!VkDescriptorSetLayout                 descriptor_set_layouts;
-    Array!VkPushConstantRange                   push_constant_ranges;
+    D_OR_S_ARRAY!( descriptor_set_layout_count, VkDescriptorSetLayout )                 descriptor_set_layouts;
+    D_OR_S_ARRAY!( push_constant_range_count,   VkPushConstantRange )                   push_constant_ranges;
 
     VkPipelineLayout                            pipeline_layout() { return pipeline_ci.layout; }
 
+
+
+    /// get minimal config for internal D_OR_S_ARRAY
+    auto static_config() {
+        size_t[2] result;
+        result[0] = descriptor_set_layouts.length;
+        result[1] = push_constant_ranges.length;
+        return result;
+    }
+
+
     void destroyResources() {
-        vdrive.state.destroy( vk, pipeline );                               // no nice syntax, vdrive.state.destroy overloads
+        vdrive.state.destroy( vk, pipeline );              // no nice syntax, vdrive.state.destroy overloads
         vdrive.state.destroy( vk, pipeline_ci.layout );    // get confused with this one in the module scope
     }
 

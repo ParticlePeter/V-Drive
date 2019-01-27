@@ -1,7 +1,5 @@
 module vdrive.state;
 
-import std.array : replicate;
-//import std.stdio : writeln, writefln, stderr;
 import core.stdc.stdio : printf;
 import std.string : fromStringz;
 
@@ -12,7 +10,7 @@ import vdrive.util;
 // Todo(pp): enable
 //nothrow @nogc:
 
-bool verbose = false;
+bool verbose = true;
 
 
 mixin template Vulkan_State_Pointer() {
@@ -20,21 +18,59 @@ mixin template Vulkan_State_Pointer() {
     alias                   vk this;
 
     nothrow @nogc:
-    this( ref Vulkan vk )               { vk_ptr = &vk; }
+    this( ref Vulkan vk )               { vk_ptr = & vk; }
     ref Vulkan vk()                     { return * vk_ptr; }
-    void vk( ref Vulkan vk )            { vk_ptr = &vk; }
-    auto ref opCall( ref Vulkan vk )    { vk_ptr = &vk; return this; }
+    void vk( ref Vulkan vk )            { vk_ptr = & vk; }
+    auto ref opCall( ref Vulkan vk )    { vk_ptr = & vk; return this; }
     bool isValid()                      { return vk_ptr !is null; }
 }
 
 
+// Todo(pp): rename to Vulkan_State, rename as well occurrences of: ///     vk = reference to a VulkanState struct
 struct Vulkan {
     const( VkAllocationCallbacks )*     allocator = null;
     VkInstance                          instance = VK_NULL_HANDLE;
     VkDevice                            device = VK_NULL_HANDLE;
     VkPhysicalDevice                    gpu = VK_NULL_HANDLE;
     VkPhysicalDeviceMemoryProperties    memory_properties;
+
+    VkDebugReportCallbackEXT            debug_report_callback = VK_NULL_HANDLE;
+    VkDebugUtilsMessengerEXT            debug_utils_messenger = VK_NULL_HANDLE;
+
+    import vdrive.util.array;
+    Arena_Array                         scratch;
 }
+
+template isVulkan( T ) { enum isVulkan = is( T == Vulkan ); }
+
+
+struct Scratch_Result( Result_T ) {
+    private Vulkan* vk_ptr;
+    alias           array this;
+    alias           Array_T = Block_Array!Result_T;
+
+
+    nothrow @nogc:
+    Array_T         array;
+    @disable        this();
+    @disable        this( this );
+
+    ref Vulkan vk()         { return * vk_ptr; }
+    bool isValid()          { return vk_ptr !is null; }
+
+    this( ref Vulkan vk, size_t count = 0 )   {
+        vk_ptr = & vk;
+        array = Array_T( vk.scratch );
+        if( count > 0 ) {
+            array.reserve( count );
+            array.length(  count, true );
+        }
+    }
+}
+
+template isScratchResult( T ) { enum isScratchResult = is( typeof( isScratchResultImpl( T.init ))); }
+private void isScratchResultImpl( R )( Scratch_Result!R result ) {}
+
 
 void initInstance( T )(
     ref Vulkan          vk,
@@ -44,7 +80,8 @@ void initInstance( T )(
     string              file = __FILE__,
     size_t              line = __LINE__,
     string              func = __FUNCTION__
-    ) if( is( T == string ) | is( T == string[] ) | is( T == Array!( const( char )* )) | is( T : const( char* )[] )) {
+
+    ) if( is( T == string ) || is( T == string[] ) || isDataArray!( T, stringz ) || is( T : const( char* )[] )) {
 
     // Default information about the application, in case none was passed in by the user
     VkApplicationInfo application_info = {
@@ -59,22 +96,26 @@ void initInstance( T )(
     if( application_info_ptr is null )
         application_info_ptr = & application_info;
 
-    // Preprocess arguments if passed as string or string[] at compile time
+    // Pre-process arguments if passed as string or string[] at compile time
     static if( is( T == string )) {
-        Array!( const( char )* ) ppExtensionNames;
-        ppExtensionNames = extension_names.toPtrArray;
+        auto ppExtensionNames = Block_Array!stringz( vk.scratch );
+        if( extension_names.length > 0 )
+            extension_names.toPtrArray( ppExtensionNames );
 
-        Array!( const( char )* ) ppLayerNames;
-        if( layer_names.length > 0 )   ppLayerNames = layer_names.toPtrArray;
+        auto ppLayerNames = Block_Array!stringz( vk.scratch );
+        if( layer_names.length > 0 )
+            layer_names.toPtrArray( ppLayerNames );
 
     } else static if( is( T == string[] )) {
-        Array!char extension_concat_buffer;
-        Array!( const( char )* ) ppExtensionNames;
-        ppExtensionNames = extension_names.toPtrArray( extension_concat_buffer );
+        auto extension_concat_buffer = Block_Array!char( vk.scratch );
+        auto ppExtensionNames = Block_Array!stringz( vk.scratch );
+        if( extension_names.length > 0 )
+            extension_names.toPtrArray( ppExtensionNames, extension_concat_buffer );
 
-        Array!char layer_concat_buffer;
-        Array!( const( char )* ) ppLayerNames;
-        if( layer_names.length > 0 )   ppLayerNames = layer_names.toPtrArray( layer_concat_buffer );
+        auto layer_concat_buffer = Block_Array!char( vk.scratch );
+        auto ppLayerNames = Block_Array!stringz( vk.scratch );
+        if( layer_names.length > 0 )
+            layer_names.toPtrArray( ppLayerNames, layer_concat_buffer );
 
     } else {
         alias ppExtensionNames = extension_names;
@@ -145,6 +186,7 @@ void destroyInstance( ref Vulkan vk ) {
 }
 
 
+
 auto initDevice( T )(
     ref Vulkan                  vk,
     Queue_Family[]              queue_families,
@@ -154,7 +196,7 @@ auto initDevice( T )(
     string                      file = __FILE__,
     size_t                      line = __LINE__,
     string                      func = __FUNCTION__
-    ) if( is( T == string ) | is( T == string[] ) | is( T == Array!( const( char )* )) | is( T : const( char* )[] )) {
+    ) if( is( T == string ) || is( T == string[] ) || isDataArray!( T, stringz ) || is( T : const( char* )[] )) {
 
     // check if Vulkan state has a gpu set properly
     vkAssert( vk.gpu != VK_NULL_HANDLE,
@@ -167,30 +209,36 @@ auto initDevice( T )(
     );
 
 
-    // Preprocess arguments if passed as string or string[] at compile time
+    // Pre-process arguments if passed as string or string[] at compile time
     static if( is( T == string )) {
-        Array!( const( char )* ) ppExtensionNames;
-        ppExtensionNames = extension_names.toPtrArray;
+        auto ppExtensionNames = Block_Array!stringz( vk.scratch );
+        if( extension_names.length > 0 )
+            extension_names.toPtrArray( ppExtensionNames );
 
-        Array!( const( char )* ) ppLayerNames;
-        if( layer_names.length > 0 )   ppLayerNames = layer_names.toPtrArray;
+        auto ppLayerNames = Block_Array!stringz( vk.scratch );
+        if( layer_names.length > 0 )
+            layer_names.toPtrArray( ppLayerNames );
 
     } else static if( is( T == string[] )) {
-        Array!char extension_concat_buffer;
-        Array!( const( char )* ) ppExtensionNames;
-        ppExtensionNames = extension_names.toPtrArray( extension_concat_buffer );
+        auto extension_concat_buffer = Block_Array!char( vk.scratch );
+        auto ppExtensionNames = Block_Array!stringz( vk.scratch );
+        if( layer_names.length > 0 )
+            extension_names.toPtrArray( ppExtensionNames, extension_concat_buffer );
 
-        Array!char layer_concat_buffer;
-        Array!( const( char )* ) ppLayerNames;
-        if( layer_names.length > 0 )   ppLayerNames = layer_names.toPtrArray( layer_concat_buffer );
+        auto layer_concat_buffer = Block_Array!char( vk.scratch );
+        auto ppLayerNames = Block_Array!stringz( vk.scratch );
+        if( layer_names.length > 0 )
+            layer_names.toPtrArray( ppLayerNames, layer_concat_buffer );
 
     } else {
+
         alias ppExtensionNames = extension_names;
         alias ppLayerNames = layer_names;
+
     }
 
-    // arange queue_families into VkdeviceQueueCreateInfos
-    auto queue_create_infos = sizedArray!VkDeviceQueueCreateInfo( queue_families.length );
+    // arrange queue_families into VkdeviceQueueCreateInfos
+    auto queue_create_infos = Scratch_Result!VkDeviceQueueCreateInfo( vk, queue_families.length );
     foreach( i, ref queue_family; queue_families ) {
         queue_create_infos[i].queueFamilyIndex  = queue_family.family_index;
         queue_create_infos[i].queueCount        = queue_family.queueCount;

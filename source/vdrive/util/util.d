@@ -1,10 +1,62 @@
 module vdrive.util.util;
 
 import erupted.types;
-import std.container.array;
+import vdrive.util.array;
+
+import core.stdc.stdio : printf;
+import core.stdc.string : memcpy;
+
+
+enum LOG_CHAR_SIZE = 256;
+
+/// capture __FILE__, __LINE__, __FUNCTION__ into one struct converting it to printf friendly cstrings
+struct Log_Info {
+    char[LOG_CHAR_SIZE] file;
+    char[LOG_CHAR_SIZE] func;
+    size_t              line;
+    this( string FUNC, string FILE = __FILE__, size_t LINE = __LINE__ ) nothrow @nogc {
+        file[ 0 .. FILE.length ] = FILE[];  file[ FILE.length ] = '\0';
+        func[ 0 .. FUNC.length ] = FUNC[];  func[ FUNC.length ] = '\0';
+        line = LINE;
+    }
+
+    ref Log_Info opCall( string FUNC, string FILE = __FILE__, size_t LINE = __LINE__ ) nothrow @nogc {
+        file[ 0 .. FILE.length ] = FILE[];  file[ FILE.length ] = '\0';
+        func[ 0 .. FUNC.length ] = FUNC[];  func[ FUNC.length ] = '\0';
+        line = LINE;
+        return this;
+    }
+}
+
+
+private Log_Info g_log_info;
 
 
 
+ref Log_Info logInfo( string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) nothrow @nogc {
+    //char[64] buffer;
+    //buffer[ 0 .. func.length ] = func[];
+    //buffer[ func.length ] = '\0';
+    //printf( "%s\n", buffer.ptr );
+    return g_log_info( func, file, line );
+}
+
+
+/// check bool condition
+void vkAssert(
+    bool            assert_value,
+    ref Log_Info    log_info,
+    const( char )*  message = null,
+    const( char )*  msg_end = null
+    ) nothrow @nogc {
+    // Todo(pp): print to stderr
+    // Todo(pp): print to custom logger
+    if( !assert_value ) {
+        printf( "\n! ERROR !\n==============\n" );
+        printHelper( message, log_info, msg_end );
+    }
+    assert( assert_value );
+}
 
 
 /// check bool condition
@@ -19,7 +71,6 @@ void vkAssert(
     // Todo(pp): print to stderr
     // Todo(pp): print to custom logger
     if( !assert_value ) {
-        import core.stdc.stdio : printf;
         printf( "\n! ERROR !\n==============\n" );
         printHelper( message, file, line, func, msg_end );
     }
@@ -51,7 +102,6 @@ void vkAssert(
     // Todo(pp): print to stderr
     // Todo(pp): print to custom logger
     if( vkResult != VK_SUCCESS ) {
-        import core.stdc.stdio : printf;
         printf( "\n! ERROR !\n==============\n" );
         printf( "    VkResult : %s\n", vkResult.toCharPtr );
         printHelper( message, file, line, func, msg_end );
@@ -61,18 +111,16 @@ void vkAssert(
 
 /// print helper for vkAssert
 private char[256] buffer;
-private void printHelper(
+void printHelper(
     const( char )* message,
     string file,
     size_t line,
     string func,
     const( char )* msg_end
     ) nothrow @nogc {
-    import core.stdc.string : memcpy;
     memcpy( buffer.ptr, file.ptr, file.length );
     buffer[ file.length ] = '\0';
 
-    import core.stdc.stdio : printf;
     printf( "    File     : %s\n", buffer.ptr );
     printf( "    Line     : %d\n", line );
 
@@ -80,6 +128,24 @@ private void printHelper(
     buffer[ func.length ] = '\0';
 
     printf( "    Func     : %s\n", buffer.ptr );
+    if( message ) {
+        printf(  "    Message  : %s", message );
+        if( msg_end ) printf( "%s", msg_end );
+        printf(  "\n" );
+    }
+
+    printf( "==============\n\n" );
+}
+
+
+void printHelper(
+    const( char )*  message,
+    ref Log_Info    log_info,
+    const( char )*  msg_end
+    ) nothrow @nogc {
+    printf( "    File     : %s\n", log_info.file.ptr );
+    printf( "    Line     : %d\n", log_info.line );
+    printf( "    Func     : %s\n", log_info.func.ptr );
     if( message ) {
         printf(  "    Message  : %s", message );
         if( msg_end ) printf( "%s", msg_end );
@@ -124,72 +190,147 @@ const( char )* toCharPtr( VkResult vkResult ) nothrow @nogc {
     }
 }
 
-/// this is a general templated function to enumarate any vulkan property
+
+
+/// general templated function to enumarate any vulkan property
 /// see usage in module surface or module util.info
-auto listVulkanProperty( int32_t size, ReturnType, alias vkFunc, Args... )( string file, size_t line, string func, Args args ) {
-    static assert( size > 0, "Size greate zero mandatory" );
-    import vdrive.util.array : D_OR_S_ARRAY, ptr;
-    D_OR_S_ARRAY!( size, ReturnType ) result;
+/// this overload uses a static (stack) stack memory, size passed in as template argument, as result
+void listVulkanProperty( Result_AT, alias vkFunc, Args... )( ref Result_AT result, string file, size_t line, string func, Args args ) {
     VkResult vkResult;
     uint32_t count;
 
-    /*
-    * It's possible, though very rare, that the number of
-    * instance layers could change. For example, installing something
-    * could include new layers that the loader would pick up
-    * between the initial query for the count and the
-    * request for VkLayerProperties. If that happens,
-    * the number of VkLayerProperties could exceed the count
-    * previously given. To alert the app to this change
-    * vkEnumerateInstanceExtensionProperties will return a VK_INCOMPLETE
-    * status.
-    * The count parameter will be updated with the number of
-    * entries actually loaded into the data pointer.
-    */
+    // consider two types of function return types
+    // 1.) void, e.g. vkGetPhysicalDeviceQueueFamilyProperties
+    // 2.) VkResult, e.g. vkEnumerateInstanceLayerProperties
 
-    do {
-        vkFunc( args, & count, null ).vkAssert( file, line, func );
-        if( count == 0 )  break;
-        result.length = count;
-        vkResult = vkFunc( args, & count, result.ptr );
-    } while( vkResult == VK_INCOMPLETE );
+    import std.traits : ReturnType;
+    static if( is( ReturnType!vkFunc == void )) {
+        auto log_info = logInfo( file, line, func );
+        vkFunc( args, & count, null );
+        vkAssert( count >  0, log_info );
+        result.length( count, log_info );
+        vkFunc( args, & count, result.ptr );
 
-    vkResult.vkAssert( file, line, func ); // check if everything went right
+    } else {
 
+        /*
+        * It's possible, though very rare, that the number of
+        * instance layers could change. For example, installing something
+        * could include new layers that the loader would pick up
+        * between the initial query for the count and the
+        * request for VkLayerProperties. If that happens,
+        * the number of VkLayerProperties could exceed the count
+        * previously given. To alert the app to this change
+        * vkEnumerateInstanceExtensionProperties will return a VK_INCOMPLETE
+        * status.
+        * The count parameter will be updated with the number of
+        * entries actually loaded into the data pointer.
+        */
+
+        do {
+            vkFunc( args, & count, null ).vkAssert( file, line, func );
+            if( count == 0 ) break;
+            result.length( count, logInfo( file, line, func ));
+            vkResult = vkFunc( args, & count, result.ptr );
+        } while( vkResult == VK_INCOMPLETE );
+
+        vkResult.vkAssert( file, line, func ); // check if everything went right
+    }
+}
+
+
+
+/// general templated function to enumarate any vulkan property
+/// see usage in module surface or module util.info
+/// this overload uses a static (stack) stack memory, size passed in as template argument, as result
+auto listVulkanProperty( int32_t size, Result_T, alias vkFunc, Args... )( string file, size_t line, string func, Args args ) {
+    static assert( size > 0, "Size greate zero mandatory" );
+    static if( size == int32_t.max )    alias Result_AT = Dynamic_Array!( Result_T );
+    else                                alias Result_AT = Static_Array!( size, Result_T );
+    Result_AT result;
+    listVulkanProperty!( Result_AT, vkFunc, Args )( result, file, line, func, args );
     return result;
 }
 
 
-
-/// this is a general templated function to enumarate any vulkan property
+/// general templated function to enumarate any vulkan property
 /// see usage in module surface or module util.info
-auto listVulkanProperty( ReturnType, alias vkFunc, Args... )( string file, size_t line, string func, Args args ) {
-    return listVulkanProperty!( int32_t.max, ReturnType, vkFunc, Args )( file, line, func, args );
+auto listVulkanProperty( Result_T, alias vkFunc, Args... )( string file, size_t line, string func, Args args ) {
+    alias Result_AT = Dynamic_Array!( Result_T );
+    Result_AT result;
+    listVulkanProperty!( Result_AT, vkFunc, Args )( result, file, line, func, args );
+    return result;
 }
 
 
+/// general templated function to enumarate any vulkan property
+/// see usage in module surface or module util.info
+/// this overload takes a void[] scratch space as first arg and alloctes if the space is not sufficient
+/// if scratch memory is large enough, result will be cast to a Dynamic_Array and returned in that borrowed memory block
+//auto listVulkanProperty( Result_T, alias vkFunc, Args... )( void[] scratch, string file, size_t line, string func, Args args ) {
+//    alias Result_AT = Dynamic_Array!( Result_T );
+//    auto result = Result_AT( scratch );
+//    listVulkanProperty!( Result_AT, vkFunc, Args )( result, file, line, func, args );
+//    return result;
+//}
 
-/// this is a general templated function to enumarate any vulkan property
+
+/// general templated function to enumarate any vulkan property
 /// see usage in module surface or module util.info
 /// this overload takes a void* scratch space as first arg and does not allocate
 /// scratch memory needs to be sufficiently large, result will be cast and returned in this memory
-auto listVulkanProperty( ReturnType, alias vkFunc, Args... )( void* scratch, Args args ) {
-    import vdrive.util.array : ptr;
-    auto result = ( cast( ReturnType* )scratch )[ 0 .. 1 ];
-    VkResult vkResult;
-    uint32_t count;
+//void listVulkanProperty( Result_T, alias vkFunc, Args... )( ref Result_T result, string file, size_t line, string func, Args args ) {
+//    listVulkanProperty!( Result_T.Array_T, vkFunc, Args )( result.array, file, line, func, args );
+//}
 
-    do {
-        vkFunc( args, &count, null ).vkAssert;
-        if( count == 0 )  break;
-        result = ( cast( ReturnType* )scratch )[ 0 .. count ];
-        vkResult = vkFunc( args, &count, &result[0] );
-    } while( vkResult == VK_INCOMPLETE );
 
-    vkResult.vkAssert; // check if everything went right
 
-    return result;
+struct Dynamic_Result( Result_T, QT ) {
+    alias   Query_T = QT;
+    alias   Array_T = Dynamic_Array!Result_T;
+    alias   array this;
+    Query_T query;
+    Array_T array;
 }
+
+template isDynamicResult( T ) { enum isDynamicResult = is( typeof( isDynamicResultImpl( T.init ))); }
+private void isDynamicResultImpl( R, Q )( Dynamic_Result!( R, Q ) result ) {}
+
+
+
+
+//auto listVulkanProperty( Result_T, alias vkFunc, Args... )( ref Arena_Array arena, string file, size_t line, string func, Args args ) {
+//    alias Result_AT = Block_Array!( Result_T );
+//    auto result = Result_AT( arena );
+//    VkResult vkResult;
+//    uint32_t count;
+//
+//    /*
+//    * instance layers could change. For example, installing something
+//    * could include new layers that the loader would pick up
+//    * between the initial query for the count and the
+//    * request for VkLayerProperties. If that happens,
+//    * the number of VkLayerProperties could exceed the count
+//    * previously given. To alert the app to this change
+//    * vkEnumerateInstanceExtensionProperties will return a VK_INCOMPLETE
+//    * status.
+//    * The count parameter will be updated with the number of
+//    * entries actually loaded into the data pointer.
+//    */
+//
+//    do {
+//        vkFunc( args, & count, null ).vkAssert( file, line, func );
+//        if( count == 0 )  break;
+//        result.length( count, logInfo( file, line, func ));
+//        vkResult = vkFunc( args, & count, result.ptr );
+//    } while( vkResult == VK_INCOMPLETE );
+//
+//    vkResult.vkAssert( file, line, func ); // check if everything went right
+//
+//    return result.release;
+//}
+
+
 
 
 nothrow:
@@ -205,9 +346,15 @@ uint32_t toUint32_t( T )( T value ) if( __traits( isScalar, T )) {
 }
 
 alias toInt = toInt32_t;
-uint32_t toInt32_t( T )( T value ) if( __traits( isScalar, T )) {
+int32_t toInt32_t( T )( T value ) if( __traits( isScalar, T )) {
     return cast( int32_t )value;
 }
+
+alias toUlong = toUint64_t;
+uint64_t toUint64_t( T )( T value ) if( __traits( isScalar, T )) {
+    return cast( uint64_t )value;
+}
+
 
 
 mixin template Dispatch_To_Inner_Struct( alias inner_struct ) {
@@ -300,6 +447,28 @@ auto Forward_To_Inner_Struct( inner, string path, ignore... )() {
 
 
 
+//
+// Enum utils
+//
+
 template EnumMemberCount( E ) if ( is( E == enum )) {
     enum EnumMemberCount = [ __traits(allMembers, E) ].length;
+}
+
+
+uint32_t to_index( E )( E value ) if( is( E == enum )) {
+    import std.traits : EnumMembers;
+    static foreach( i, enum_member; EnumMembers!E )
+        if( layout == enum_member )
+            return i;
+    return 0;
+}
+
+
+E to_enum( E )( uint32_t index ) if( is( E == enum )) {
+    import std.traits : EnumMembers;
+    foreach( i, enum_member; EnumMembers!E )
+        if( i == index )
+            return enum_member;
+    return E.init;
 }

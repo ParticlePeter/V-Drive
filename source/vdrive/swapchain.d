@@ -15,35 +15,69 @@ import std.stdio;
 // utility info functions //
 ////////////////////////////
 
-/// list surface formats
-alias listSurfaceFormats = listSurfaceFormats_t!( int32_t.max );
-auto  listSurfaceFormats_t( int32_t max_formats )(
-    VkPhysicalDevice    gpu,
-    VkSurfaceKHR        surface,
-    bool                printInfo = true,
-    string              file = __FILE__,
-    size_t              line = __LINE__,
-    string              func = __FUNCTION__
-    ) {
-    auto surface_formats = listVulkanProperty!(
-        max_formats, VkSurfaceFormatKHR, vkGetPhysicalDeviceSurfaceFormatsKHR, VkPhysicalDevice, VkSurfaceKHR )
-            ( file, line, func, gpu, surface );
 
-    if( surface_formats.length == 0 ) {
-        printf( "No Surface Formats available for the passed in physical device!" );
-    } else if( printInfo ) {
-        foreach( surface_format; surface_formats )
+
+/// Result type to list surface formats using Vulkan_State scratch memory
+alias List_Surface_Formats_Result = Scratch_Result!VkSurfaceFormatKHR;
+
+
+
+/// list surface formats, using scratch memory
+auto ref listSurfaceFormats( Result_T )(
+    ref Result_T    result,
+    VkSurfaceKHR    surface,
+    bool            print_info = true,
+    string          file = __FILE__,
+    size_t          line = __LINE__,
+    string          func = __FUNCTION__
+    ) if( isScratchResult!Result_T || isDynamicResult!Result_T ) {
+
+    // extract gpu member based on template argument
+    static if( isScratchResult!Result_T )   auto gpu = result.vk.gpu;
+    else                                    auto gpu = result.query;
+
+    // Enumerate surface formats
+    listVulkanProperty!( Result_T.Array_T, vkGetPhysicalDeviceSurfaceFormatsKHR, VkPhysicalDevice, VkSurfaceKHR )( result.array, file, line, func, gpu, surface );
+
+    if( result.length == 0 ) {
+        printf( "No Surface Formats available for the passed in physical device!\n" );
+    } else if( print_info ) {
+        foreach( surface_format; result )
             surface_format.printTypeInfo;
         println;
     }
-    return surface_formats;
+    return result.array;
 }
+
+
+
+/// list surface formats, alocates heap memory
+auto listSurfaceFormats(
+    VkPhysicalDevice    gpu,
+    VkSurfaceKHR        surface,
+    bool                print_info = true,
+    string              file = __FILE__,
+    size_t              line = __LINE__,
+    string              func = __FUNCTION__
+
+    ) {
+
+    auto result = Dynamic_Result!( VkSurfaceFormatKHR, VkPhysicalDevice )( gpu );
+    listSurfaceFormats!( typeof( result ))( result, surface, print_info, file, line, func );
+    return result.array.release;
+}
+
 
 
 /// filter surface formats
 alias filter = filterSurfaceFormats;
-auto filterSurfaceFormats( Array_T )( Array_T surface_formats, VkFormat[] include_formats, bool first_available_as_fallback = true )
-if( is( Array_T == Array!VkSurfaceFormatKHR ) || is( Array_T : VkSurfaceFormatKHR[] )) {
+auto filterSurfaceFormats( Array_T )(
+    ref Array_T surface_formats,
+    VkFormat[]  include_formats,
+    bool        first_available_as_fallback = true
+
+    ) if( isDataArray!( Array_T, VkSurfaceFormatKHR ) || is( Array_T : VkSurfaceFormatKHR[] )) {
+
     // if this function returns surfac_format.format == VK_FORMAT_MAX_ENUM this means that no requested format could be found
     auto result_format = first_available_as_fallback && surface_formats.length > 0 ?
         surface_formats[0] :
@@ -69,40 +103,79 @@ if( is( Array_T == Array!VkSurfaceFormatKHR ) || is( Array_T : VkSurfaceFormatKH
 }
 
 
-/// list presentation modes
-alias listPresentModes = listPresentModes_t!( int32_t.max );
-auto  listPresentModes_t( int32_t max_modes )(
-    VkPhysicalDevice    gpu,
-    VkSurfaceKHR        surface,
-    bool                printInfo = true,
-    string              file = __FILE__,
-    size_t              line = __LINE__,
-    string              func = __FUNCTION__
-    ) {
-    auto present_modes = listVulkanProperty!(
-        max_modes, VkPresentModeKHR, vkGetPhysicalDeviceSurfacePresentModesKHR, VkPhysicalDevice, VkSurfaceKHR )
-            ( file, line, func, gpu, surface );
 
-    if( printInfo ) {
+/// Result type to list presentation modes using Vulkan_State scratch memory
+alias List_Present_Modes_Result = Scratch_Result!VkPresentModeKHR;
+
+
+
+/// list presentation modes, using scratch memory
+auto ref listPresentModes( Result_T )(
+    ref Result_T    present_modes,
+    VkSurfaceKHR    surface,
+    bool            print_info = true,
+    string          file = __FILE__,
+    size_t          line = __LINE__,
+    string          func = __FUNCTION__
+
+    ) if( isScratchResult!Result_T || isDynamicResult!Result_T ) {
+
+    // extract gpu member based on template argument
+    static if( isScratchResult!Result_T )   auto gpu = present_modes.vk.gpu;
+    else                                    auto gpu = present_modes.query;
+
+    listVulkanProperty!( Result_T.Array_T, vkGetPhysicalDeviceSurfacePresentModesKHR, VkPhysicalDevice, VkSurfaceKHR )( present_modes.array, file, line, func, gpu, surface );
+    //auto present_modes = listVulkanProperty!(
+    //    max_modes, VkPresentModeKHR, vkGetPhysicalDeviceSurfacePresentModesKHR, VkPhysicalDevice, VkSurfaceKHR )( file, line, func, gpu, surface );
+
+    if( print_info ) {
         if( present_modes.length == 0 )  {
             printf( "Present Modes: None\n" );
         } else {
+            // if we have passed Vulkan_State instead of just the VkPhysicalDevice, we can use the scratch array to sub-allocate string z conversion
+            static if( isScratchResult!Result_T )   auto present_mode_z = Block_Array!char( present_modes.vk.scratch );
+            else                                    auto present_mode_z = Dynamic_Array!char();         // allocates
             printf( "VkPresentModeKHR\n=================\n" );
             foreach( present_mode; present_modes ) {
-                printf( "\tPresent Mode: %s\n", present_mode.toStringz.ptr );
+                present_mode.toStringz( present_mode_z );
+                printf( "\tPresent Mode: %s\n", present_mode_z.ptr );
 
             }
         }
         writeln;
     }
-    return present_modes;
+    return present_modes.array;
 }
 
 
-/// list presentation modes
+
+/// list presentation modes, allocates heap memory
+auto listPresentModes(
+    VkPhysicalDevice    gpu,
+    VkSurfaceKHR        surface,
+    bool                print_info = true,
+    string              file = __FILE__,
+    size_t              line = __LINE__,
+    string              func = __FUNCTION__
+
+    ) {
+
+    auto present_modes = Dynamic_Result!( VkPresentModeKHR, VkPhysicalDevice )( gpu );
+    listPresentModes!( typeof( present_modes ))( present_modes, surface, print_info, file, line, func );
+    return present_modes.array.release;
+}
+
+
+
+/// filter presentation modes
 alias filter = filterPresentModes;
-auto  filterPresentModes( Array_T )( Array_T present_modes, VkPresentModeKHR[] include_modes, bool first_available_as_fallback = true )
-if( is( Array_T == Array!VkPresentModeKHR ) || is( Array_T : VkPresentModeKHR[] )) {
+auto  filterPresentModes( Array_T )(
+    ref Array_T present_modes,
+    VkPresentModeKHR[] include_modes,
+    bool first_available_as_fallback = true
+
+    ) if( isDataArray!( Array_T, VkPresentModeKHR ) || is( Array_T : VkPresentModeKHR[] )) {
+
     // if first_available_as_fallback is false and no present mode can be filtered this returns an non existing present mode
     auto result_mode = first_available_as_fallback && present_modes.length > 0 ? present_modes[0] : VK_PRESENT_MODE_MAX_ENUM_KHR;
 
@@ -198,14 +271,16 @@ struct Meta_Swapchain_T( int32_t max_image_count ) {
 
     auto ref selectSurfaceFormat( VkFormat[] include_formats, bool first_available_as_fallback = true ) {
         // store available surface formats temporarily in an util.array : Static_Array with max length of count of all VkFormat and filter with the requested include_formats
-        surfaceFormat = gpu.listSurfaceFormats_t!( EnumMemberCount!VkFormat - 4 )( surface, false ).filter( include_formats );
+        auto surface_formats = List_Surface_Formats_Result( vk );
+        surfaceFormat = listSurfaceFormats( surface_formats, surface, false ).filter( include_formats );
         return this;
     }
 
 
     auto ref selectPresentMode( VkPresentModeKHR[] include_modes, bool first_available_as_fallback = true ) {
         // store available present modes temporarily in an util.array : Static_Array with max length of count of all VkPresentModeKHR and filter with the requested include_modes
-        presentMode = gpu.listPresentModes_t!( EnumMemberCount!VkPresentModeKHR - 4 )( surface, false ).filter( include_modes );
+        auto prsent_modes = List_Present_Modes_Result( vk );
+        presentMode = listPresentModes( prsent_modes, surface, false ).filter( include_modes );
         return this;
     }
 

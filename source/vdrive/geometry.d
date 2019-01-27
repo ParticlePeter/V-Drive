@@ -19,24 +19,39 @@ mixin template Meta_Geometry_Alias_This() {
 
 private alias RecordCommands = void function( VkCommandBuffer command_buffer, ref Meta_Geometry meta_geometry ) nothrow;
 
-struct Meta_Geometry {
+alias  Meta_Geometry = Meta_Geometry_T!();
+struct Meta_Geometry_T(
+    int32_t vertex_offset_count = int32_t.max,
+    int32_t vertex_buffer_count = int32_t.max
+
+    ) {
+
     this( ref Vulkan vk )   {  this.meta_buffer.vk = vk;  }
-    alias                           meta_buffer this;
-    Meta_Buffer                     meta_buffer;
+    alias                                               meta_buffer this;
+    Meta_Buffer                                         meta_buffer;
 
-    VkIndexType                     index_type = VK_INDEX_TYPE_UINT32;
-    uint32_t                        index_count;
-    VkDeviceSize                    index_offset;
+    VkIndexType                                         index_type = VK_INDEX_TYPE_UINT32;
+    uint32_t                                            index_count;
+    VkDeviceSize                                        index_offset;
 
-    uint32_t                        vertex_count;
-    Array!VkDeviceSize              vertex_offsets;
-    Array!VkBuffer                  vertex_buffers;
+    uint32_t                                            vertex_count;
+    D_OR_S_ARRAY!( vertex_offset_count, VkDeviceSize )  vertex_offsets;
+    D_OR_S_ARRAY!( vertex_buffer_count, VkBuffer )      vertex_buffers;
 
-    RecordCommands                  recordCommands;
+    RecordCommands                                      recordCommands;
 
     void recordDrawCommands( VkCommandBuffer command_buffer ) nothrow {
         recordCommands( command_buffer, this );
-    }   
+    }
+
+
+    /// get minimal config for internal D_OR_S_ARRAY
+    auto static_config() {
+        size_t[2] result;
+        result[0] = vertex_offsets.length;
+        result[1] = vertex_buffers.length;
+        return result;
+    }
 }
 
 
