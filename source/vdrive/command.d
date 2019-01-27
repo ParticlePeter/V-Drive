@@ -100,9 +100,15 @@ auto queueSubmitInfo(
 }
 
 
-auto createCmdBufferBI( VkCommandBufferUsageFlags command_buffer_usage_flags = 0 ) {
-    VkCommandBufferBeginInfo result = { flags : command_buffer_usage_flags };
+auto createCmdBufferBI( VkCommandBufferUsageFlags command_buffer_usage_flags = 0, const( void )* pNext = null ) {
+    VkCommandBufferBeginInfo result = { flags : command_buffer_usage_flags, pNext : pNext };
     return result;
+}
+
+
+void vdBeginCommandBuffer( ref VkCommandBuffer cmd_buffer, VkCommandBufferUsageFlags command_buffer_usage_flags = 0, const( void )* pNext = null ) {
+    VkCommandBufferBeginInfo cmd_buffer_bi = { flags : command_buffer_usage_flags, pNext : pNext };
+    cmd_buffer.vkBeginCommandBuffer( & cmd_buffer_bi );
 }
 
 
