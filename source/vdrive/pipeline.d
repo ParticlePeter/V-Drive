@@ -12,27 +12,6 @@ import erupted;
 // Meta_Graphics and Meta_Compute related //
 ////////////////////////////////////////////
 
-private mixin template Meta_Pipeline_Common() {
-
-    /// add VkDescriptorSetLayout to either Meta_Graphics or Meta_Pipeline, use alias addDescriptorSetLayout instead
-    auto ref addDescriptorSetLayout( VkDescriptorSetLayout descriptor_set_layout ) {
-        descriptor_set_layouts.append = descriptor_set_layout;
-        return this;
-    }
-
-    /// add VkPushConstantRange to either Meta_Graphics or Meta_Pipeline, use alias addPushConstantRangeImpl instead
-    auto ref addPushConstantRange( VkPushConstantRange push_constant_range ) {
-        push_constant_ranges.append = push_constant_range;
-        return this;
-    }
-
-    /// add VkPushConstantRange to either Meta_Graphics or Meta_Pipeline, use alias addPushConstantRangeImpl instead
-    auto ref addPushConstantRange( VkShaderStageFlags stage_flags, size_t offset, size_t size ) {
-        return addPushConstantRange( VkPushConstantRange( stage_flags, offset.toUint, size.toUint ));
-    }
-}
-
-
 /// overload to simplify VkPipelineLayout construction
 VkPipelineLayout createPipelineLayout(
     ref Vulkan              vk,
@@ -120,9 +99,9 @@ VkPipelineCache createPipelineCache(
 
     VkPipelineCache pipeline_cache;
     vk.device.vkCreatePipelineCache(
-        &pipeline_cache_ci,
+        & pipeline_cache_ci,
         vk.allocator,
-        &pipeline_cache
+        & pipeline_cache
         ).vkAssert( "Pipeline Cache", file, line, func );
 
     return pipeline_cache;
@@ -136,7 +115,6 @@ VkPipelineCache createPipelineCache(
 struct Core_Pipeline {
     VkPipeline          pipeline;
     VkPipelineLayout    pipeline_layout;
-
     mixin Is_Null_Constructed!pipeline;
 }
 
@@ -152,11 +130,27 @@ void destroy( ref Vulkan vk, ref Core_Pipeline core ) {
 }
 
 
+/// mixin methods common Meta_Graphics and Meta_Compute
+private mixin template Meta_Pipeline_Common() {
 
-/// private template to constraint template arg to Meta_Graphics or Meta_Compute
-private template isPipeline( T ) {
-    enum isPipeline = is( T == Meta_Graphics ) || is( T == Meta_Compute );
+    /// add VkDescriptorSetLayout to either Meta_Graphics or Meta_Pipeline, use alias addDescriptorSetLayout instead
+    auto ref addDescriptorSetLayout( VkDescriptorSetLayout descriptor_set_layout ) {
+        descriptor_set_layouts.append = descriptor_set_layout;
+        return this;
+    }
+
+    /// add VkPushConstantRange to either Meta_Graphics or Meta_Pipeline, use alias addPushConstantRangeImpl instead
+    auto ref addPushConstantRange( VkPushConstantRange push_constant_range ) {
+        push_constant_ranges.append = push_constant_range;
+        return this;
+    }
+
+    /// add VkPushConstantRange to either Meta_Graphics or Meta_Pipeline, use alias addPushConstantRangeImpl instead
+    auto ref addPushConstantRange( VkShaderStageFlags stage_flags, size_t offset, size_t size ) {
+        return addPushConstantRange( VkPushConstantRange( stage_flags, offset.toUint, size.toUint ));
+    }
 }
+
 
 
 
@@ -261,9 +255,8 @@ struct Meta_Graphics_T(
     }
 
 
-
+    /// adds properties is_null and is_constructed
     mixin Is_Null_Constructed!pipeline;
-
 
 
     ///////////////////////////
@@ -293,7 +286,8 @@ struct Meta_Graphics_T(
     /// destroy shader modules, can happen immediatelly after PSO construction, if modules are not shared
     auto ref destroyShaderModules() {
         foreach( ref shader_stage; shader_stages )
-            vdrive.state.destroy( vk, shader_stage._module );
+            if( !shader_stage._module.is_null )
+                vdrive.state.destroy( vk, shader_stage._module );
         shader_stages.clear;
         return this;
     }
@@ -656,7 +650,7 @@ struct Meta_Graphics_T(
         string              func    = __FUNCTION__
         ) {
         // assert that meta struct is initialized with a valid vulkan state pointer
-        isValid.vkAssert( "Meta Struct not initialized", file, line, func );
+        vkAssert( isValid, "Meta_Struct not initialized with a vulkan state pointer", file, line, func );
 
         VkPipelineVertexInputStateCreateInfo vertex_input_state_create_info = {
             vertexBindingDescriptionCount   : vertex_input_binding_descriptions.length.toUint,
@@ -793,7 +787,14 @@ struct Meta_Compute_T(
     }
 
 
+    /// extract core pipeline elements VkPipeline and VkPipelineLayout
+    /// without resetting the internal data structures
+    auto extractCore() {
+        return Core_Pipeline( pipeline, pipeline_ci.layout );
+    }
 
+
+    /// adds properties is_null and is_constructed
     mixin Is_Null_Constructed!pipeline;
 
 
@@ -808,7 +809,8 @@ struct Meta_Compute_T(
 
     /// destroy shader module, can happen immediatelly after PSO construction
     auto ref destroyShaderModule() {
-        vdrive.state.destroy( vk, pipeline_ci.stage._module ); // Todo(pp): simplify syntax
+        if( !pipeline_ci.stage._module.is_null )
+            vdrive.state.destroy( vk, pipeline_ci.stage._module );
         return this;
     }
 
@@ -870,7 +872,7 @@ struct Meta_Compute_T(
         string              func    = __FUNCTION__
         ) {
         // assert that meta struct is initialized with a valid vulkan state pointer
-        isValid.vkAssert( "Meta Struct not initialized", file, line, func );
+        vkAssert( isValid, "Meta_Struct not initialized with a vulkan state pointer", file, line, func );
 
         if( pipeline_layout )
             pipeline_ci.layout = pipeline_layout;
@@ -891,7 +893,6 @@ struct Meta_Compute_T(
 
 
     auto ref construct(
-        ref Meta_Compute    meta,
         VkPipelineLayout    pipeline_layout,
         string              file    = __FILE__,
         size_t              line    = __LINE__,

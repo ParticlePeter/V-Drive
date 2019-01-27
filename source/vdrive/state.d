@@ -134,7 +134,7 @@ void initInstance( T )(
     // Create the vulkan instance
     vkCreateInstance( &instance_create_info, vk.allocator, &vk.instance ).vkAssert( "Instance Initialization", file, line, func );
 
-    // load all functions from the instance - useful for prototyping
+    // load all instance based functions from the instance
     loadInstanceLevelFunctions( vk.instance );
 
     if( verbose ) {
@@ -260,7 +260,7 @@ auto initDevice( T )(
     loadDeviceLevelFunctions( vk.device );
 
     // get and store the memory properties of the current gpu
-    // Todo(pp): the memory properties print uints instaed of enum flags, fix this
+    // Todo(pp): the memory properties print uints instead of enum flags, fix this
     vk.memory_properties = vk.gpu.listMemoryProperties( false );
 
     return vk.device;
@@ -349,6 +349,7 @@ void destroy( ref Vulkan vk, ref VkSwapchainKHR         handle )    { vkDestroyS
 //VkDisplayModeKHR
 //VkDescriptorUpdateTemplateKHR
 void destroy( ref Vulkan vk, ref VkDebugReportCallbackEXT handle )  { vkDestroyDebugReportCallbackEXT( vk.instance, handle, vk.allocator ); handle = VK_NULL_HANDLE; }
+void destroy( ref Vulkan vk, ref VkDebugUtilsMessengerEXT handle )  { vkDestroyDebugUtilsMessengerEXT( vk.instance, handle, vk.allocator ); handle = VK_NULL_HANDLE; }
 //VkObjectTableNVX
 //VkIndirectCommandsLayoutNVX
 
@@ -410,7 +411,7 @@ template is_handle( T ) { enum bool is_handle = is_dispatch_handle!T || is_non_d
 
 
 alias is_null = is_null_handle;
-bool is_null_handle( T )( T handle ) if( is_non_dispatch_handle!T ) {
+bool is_null_handle( T )( T handle ) if( is_handle!T ) {
     return handle == VK_NULL_HANDLE;
 }
 

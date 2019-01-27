@@ -298,7 +298,7 @@ auto ref bind( META )(
     string          file = __FILE__,
     size_t          line = __LINE__,
     string          func = __FUNCTION__,
-     ) if( hasMemReqs!META ) {
+    ) if( hasMemReqs!META ) {
     vkAssert( meta.device_memory != VK_NULL_HANDLE, "Must allocate() before bind()ing a buffer or image" );        // meta struct must be initialized with a valid vulkan state pointer
     meta_resource.bindMemory( meta.device_memory, meta_resource.device_memory_offset, file, line, func );
     return meta;
@@ -311,7 +311,7 @@ auto ref bind( META )(
     string          file = __FILE__,
     size_t          line = __LINE__,
     string          func = __FUNCTION__,
-     ) if( hasMemReqs!META ) {
+    ) if( hasMemReqs!META ) {
     foreach( ref resource; meta_resources ) meta.bind( resource, file, line, func );
     return meta;
 }
@@ -561,7 +561,7 @@ auto ref unmapMemory( META )( ref META meta ) if( hasMemReqs!META || is( META ==
 
 /// create a mapped memory range with given size and offset for the (backing) memory object
 /// the offset into the buffer or image backing VkMemory will be added to the passed in offset
-/// and the size will be determined from buffer/image.memSize in case of VK_WHOLE_SIZE 
+/// and the size will be determined from buffer/image.memSize in case of VK_WHOLE_SIZE
 auto createMappedMemoryRange( META )(
     ref META            meta,
     VkDeviceSize        size    = VK_WHOLE_SIZE,
@@ -658,7 +658,7 @@ struct Meta_Buffer {
             vk.destroy( device_memory );
         resetMemoryMember;
     }
-    
+
 }
 
 
@@ -865,7 +865,7 @@ alias create = initImage;
 
 
 
-
+/*
 /// init a simple VkImage with one level and one layer, sharing_family_queue_indices controls the sharing mode
 /// store vulkan data in argument Meta_Image container, return container for chaining
 auto createImage(
@@ -934,7 +934,7 @@ auto createImage(
     meta.create( image_create_info, file, line, func );
     return meta;
 }
-
+*/
 
 // TODO(pp): assert that valid memory was bound already to the VkBuffer or VkImage
 

@@ -9,9 +9,9 @@ import erupted;
 
 
 
-//////////////////////////////////////
+///////////////////////////////////////
 // Meta_Subpass and Meta_Render_Pass //
-//////////////////////////////////////
+///////////////////////////////////////
 
 /// struct to collect subpass relevant data
 private struct Meta_Subpass_T(
@@ -45,7 +45,7 @@ private struct Meta_Subpass_T(
     }
 }
 
-alias Meta_Subpass  = Meta_Subpass_T!( int32_t.max, int32_t.max, int32_t.max, int32_t.max );
+//alias Meta_Subpass = Meta_Subpass_T!( int32_t.max, int32_t.max, int32_t.max, int32_t.max );
 
 enum Subpass_Ref_Type : uint32_t { input, color, resolve, preserve, depth_stencil };
 
@@ -72,8 +72,8 @@ struct Core_Render_Pass {
 
 /// destroy all wrapped Vulkan objects
 /// Params:
-///     vk = Vulkan state struct holding the device through which these resources were created
-///     core = the wrapped VkDescriptorPool ( with it the VkDescriptorSet ) and the VkDescriptorSetLayout to destroy
+///     vk      = Vulkan state struct holding the device through which these resources were created
+///     core    = the wrapped VkDescriptorPool ( with it the VkDescriptorSet ) and the VkDescriptorSetLayout to destroy
 /// Returns: this reference for function chaining
 void destroy( ref Vulkan vk, ref Core_Render_Pass core ) {
     vdrive.state.destroy( vk, core.render_pass );          // no nice syntax, vdrive.state.destroy overloads
@@ -92,18 +92,18 @@ struct Meta_Render_Pass_T(
     mixin                           Vulkan_State_Pointer;
     ref VkRenderPass                render_pass() { return render_pass_bi.renderPass; }
     VkRenderPassBeginInfo           render_pass_bi;     // the actual render pass is stored in a member of this struct
-    alias Meta_Subpass = Meta_Subpass_T!(
+    alias Subpass_T = Meta_Subpass_T!(
         max_input_ref_count,
         max_color_ref_count,
         max_resolve_ref_count,
         max_preserve_ref_count );
 
-    private Meta_Subpass*           subpass;
+    private Subpass_T*              subpass;
     private VkSubpassDependency*    subpass_dependency;
 
     D_OR_S_ARRAY!( attachment_count, VkAttachmentDescription )  attachment_descriptions;
     D_OR_S_ARRAY!( dependency_count, VkSubpassDependency )      subpass_dependencies;
-    D_OR_S_ARRAY!( subpass_count, Meta_Subpass )                subpasses;
+    D_OR_S_ARRAY!( subpass_count, Subpass_T )                   subpasses;
 
 
     /// get minimal config for internal D_OR_S_ARRAY
@@ -491,22 +491,6 @@ struct Meta_Render_Pass_T(
         return this;
     }
 
-    /*
-    /// set members of this.render_pass_bi with the corresponding members of a Meta_Framebuffer (single) structure
-    /// this should be called once if the framebuffer related members of the VkRenderPassBeginInfo are not changing later on
-    /// or before vkCmdBeginRenderPass to switch framebuffer, render area (hint, see renderAreaOffset/Extent) and clear values
-    /// Params:
-    ///     meta_framebuffer = the Meta_Framebuffer structure whose framebuffer and resources will be attached
-    /// Returns: this reference for function chaining
-    auto ref attachFramebuffer( META_FB )( ref META_FB meta_framebuffer ) if( isSingleBuffer!META_FB ) {
-        with( meta_render_pass.render_pass_bi ) {
-            framebuffer     = meta_framebuffer( 0 );
-            renderArea      = meta_framebuffer.render_area;
-            pClearValues    = meta_framebuffer.clear_values.ptr;
-            clearValueCount = meta_framebuffer.clear_values.length.toUint;
-        } return this;
-    }
-    */
 
 
     /// set framebuffer member of a Meta_Render_Pass.VkRenderPassBeginInfo with a framebuffer not changing its framebuffer related resources
@@ -519,8 +503,9 @@ struct Meta_Render_Pass_T(
     }
 }
 
-alias Meta_Render_Pass  = Meta_Render_Pass_T!( int32_t.max, int32_t.max, int32_t.max, int32_t.max, int32_t.max, int32_t.max, int32_t.max );
-
+// Todo(pp): investigate error when the last 4 entries are also set to int32_t.max we get errors about Meta_Subpass not being copyable
+// the alias bellow should not be able to trigger any kind of copy operation which we, nonetheless, get informed about
+alias Meta_Render_Pass = Meta_Render_Pass_T!( int32_t.max, int32_t.max, int32_t.max, 16, 16, 16, 16 );
 
 
 //////////////////////
@@ -568,7 +553,8 @@ struct Meta_Framebuffer_T( int32_t framebuffer_count = 1, int32_t clear_value_co
         render_area = VkRect2D( VkOffset2D( 0, 0 ), VkExtent2D( 0, 0 ));
 
         // destroy framebuffers
-        foreach( fb; framebuffers )  vk.destroy( fb );
+        foreach( fb; framebuffers )
+            vdrive.state.destroy( vk, fb );
         framebuffers.clear;
 
         // optionally destroy clear values, default is destroy them
@@ -813,7 +799,9 @@ struct Meta_Framebuffer_T( int32_t framebuffer_count = 1, int32_t clear_value_co
         string                  file = __FILE__,
         size_t                  line = __LINE__,
         string                  func = __FUNCTION__
+
         ) {
+
         // assert that meta struct is initialized with a valid vulkan state pointer
         vkAssert( isValid, "Meta_Struct not initialized with a vulkan state pointer", file, line, func );
 

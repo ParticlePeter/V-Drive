@@ -189,6 +189,7 @@ auto  filterPresentModes( Array_T )(
 }
 
 
+
 /// get swapchain images using a VkDevice and its VkSwapchainKHR
 alias getSwapchainImages = getSwapchainImages_t!( int32_t.max );
 auto  getSwapchainImages_t( int32_t max_image_count )(
@@ -200,6 +201,7 @@ auto  getSwapchainImages_t( int32_t max_image_count )(
     ) {
     return listVulkanProperty!( max_image_count, VkImage, vkGetSwapchainImagesKHR, VkDevice, VkSwapchainKHR )( file, line, func, device, swapchain );
 }
+
 
 
 /// get swapchain image view using a VkDevice and its VkSwapchainKHR
@@ -227,7 +229,6 @@ auto  getSwapchainImageViews_t( int32_t max_image_count )(
 
 
 
-
 /// struct to capture buffer and memory creation as well as binding
 /// the struct can travel through several methods and can be filled with necessary data
 /// first thing after creation of this struct must be the assignment of the address of a valid vulkan state struct
@@ -239,7 +240,7 @@ struct Meta_Swapchain_T( int32_t max_image_count ) {
     D_OR_S_ARRAY!( max_image_count, VkImageView )   swapchain_image_views;
     alias present_image_views = swapchain_image_views;  // Todo(pp): rename to all project wide occurrences present_image_views to swapchain_image_views
 
-    // convenience function to get the pointer to the VkSurface of swapchain_ci
+    // convenience function to get the refernce or pointer to the VkSurface of swapchain_ci
     auto surface_ptr()      { return & swapchain_ci.surface; }
 
     // convenience to get the swapchain image count

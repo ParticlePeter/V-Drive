@@ -37,7 +37,9 @@ auto createSampler(
     string                  file                = __FILE__,
     size_t                  line                = __LINE__,
     string                  func                = __FUNCTION__
+
     ) {
+
     VkSamplerCreateInfo sampler_ci = {
     //  flags                   : 0,
         magFilter               : mag_filter,
@@ -173,7 +175,9 @@ auto createBufferView(
     string          file = __FILE__,
     size_t          line = __LINE__,
     string          func = __FUNCTION__
+
     ) {
+
     VkBufferViewCreateInfo buffer_view_ci = {
     //  flags   : flags,
         buffer  : buffer,
@@ -214,7 +218,9 @@ auto createDescriptorPool(
     string              file = __FILE__,
     size_t              line = __LINE__,
     string              func = __FUNCTION__
+
     ) {
+
     VkDescriptorPoolSize[1] pool_size_descriptor_counts = [ VkDescriptorPoolSize( descriptor_type, descriptor_count ) ];
     return vk.createDescriptorPool( pool_size_descriptor_counts, max_descriptor_sets, create_flags, file, line, func );
 }
@@ -237,7 +243,9 @@ auto createDescriptorPool(
     string                  file = __FILE__,
     size_t                  line = __LINE__,
     string                  func = __FUNCTION__
+
     ) {
+
     VkDescriptorPoolCreateInfo pool_create_info = {
         flags           : create_flags,
         maxSets         : max_sets,
@@ -278,7 +286,9 @@ auto createSetLayout(
     string              file = __FILE__,
     size_t              line = __LINE__,
     string              func = __FUNCTION__
+
     ) {
+
     const VkDescriptorSetLayoutBinding[1] set_layout_bindings = [
         VkDescriptorSetLayoutBinding( binding, descriptor_type, descriptor_count, shader_stage_flags, immutable_samplers )
     ];
@@ -309,7 +319,9 @@ auto createSetLayout(
     string              file = __FILE__,
     size_t              line = __LINE__,
     string              func = __FUNCTION__
+
     ) {
+
     const VkDescriptorSetLayoutBinding[1] set_layout_bindings = [
         VkDescriptorSetLayoutBinding( binding, descriptor_type, descriptor_count, shader_stage_flags, null ) ];
     return vk.createSetLayout( set_layout_bindings, set_layout_create_flags, file, line, func );
@@ -329,7 +341,9 @@ auto createSetLayout(
     string                                  file = __FILE__,
     size_t                                  line = __LINE__,
     string                                  func = __FUNCTION__
+
     ) {
+
     VkDescriptorSetLayoutCreateInfo descriptor_set_layout_create_info = {
         flags           : set_layout_create_flags,
         bindingCount    : set_layout_bindings.length.toUint,
@@ -357,7 +371,9 @@ auto allocateSet(
     string                  file = __FILE__,
     size_t                  line = __LINE__,
     string                  func = __FUNCTION__
+
     ) {
+
     VkDescriptorSetAllocateInfo descriptor_allocate_info = {
         descriptorPool      : descriptor_pool,
         descriptorSetCount  : 1,
@@ -385,7 +401,9 @@ auto allocateSet(
     string                  file = __FILE__,
     size_t                  line = __LINE__,
     string                  func = __FUNCTION__
+
     ) {
+
     VkDescriptorSetAllocateInfo descriptor_allocate_info = {
         descriptorPool      : descriptor_pool,
         descriptorSetCount  : descriptor_sets_layouts.length.toUint,
@@ -503,7 +521,9 @@ struct Meta_Descriptor_Layout_T(
         string              file = __FILE__,
         size_t              line = __LINE__,
         string              func = __FUNCTION__
+
         ) {
+
         VkDescriptorSetLayoutBinding layout_binding = {
             binding             : binding,
             descriptorType      : descriptor_type,
@@ -590,7 +610,9 @@ struct Meta_Descriptor_Layout_T(
         string              file = __FILE__,
         size_t              line = __LINE__,
         string              func = __FUNCTION__
+
         ) {
+
         vkAssert( descriptor_type == VK_DESCRIPTOR_TYPE_SAMPLER || descriptor_type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
             "param descriptor_type of addImmutableBinding() must VK_DESCRIPTOR_TYPE_SAMPLER or VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER",
             file, line, func );
@@ -625,7 +647,9 @@ struct Meta_Descriptor_Layout_T(
         string              file = __FILE__,
         size_t              line = __LINE__,
         string              func = __FUNCTION__
+
         ) {
+
         return addImmutableBinding( binding, VK_DESCRIPTOR_TYPE_SAMPLER, shader_stage_flags, file, line, func );
     }
 
@@ -639,7 +663,9 @@ struct Meta_Descriptor_Layout_T(
         string                      file = __FILE__,
         size_t                      line = __LINE__,
         string                      func = __FUNCTION__
+
         ) {
+
         // enforce that a layout binding has been added so far
         vkAssert( !set_layout_bindings.empty,
             "addLayoutBinding() must have been called first",
@@ -687,7 +713,9 @@ struct Meta_Descriptor_Layout_T(
         string                              file = __FILE__,
         size_t                              line = __LINE__,
         string                              func = __FUNCTION__
+
         ) {
+
         // the dynamic array immutable_samplers might have reallocated during append operations
         // this means that the layout_binding.pImmutableSamplers might be invalid and must be patched
         // for that purpose we stored the starting index of immutable_samplers array
@@ -771,7 +799,9 @@ struct Meta_Descriptor_Layout_T(
         string                      file = __FILE__,
         size_t                      line = __LINE__,
         string                      func = __FUNCTION__
+
         ) {
+
         // call createSetLayout() if the descriptor_set_layout has not been called so far
         // if it is necessary to pass a VkDescriptorSetLayoutCreateFlags to the corresponding create info
         // createSetLayout must be called manually beforehand
@@ -806,7 +836,9 @@ struct Meta_Descriptor_Update_T(
     int32_t image_info_count        = int32_t.max,
     int32_t buffer_info_count       = int32_t.max,
     int32_t texel_buffer_view_count = int32_t.max,
+
     ) {
+
     mixin                               Vulkan_State_Pointer;
     D_OR_S_ARRAY!( write_set_count,     VkWriteDescriptorSet )      write_descriptor_sets;          // write descriptor sets in case we want to update the set
     D_OR_S_ARRAY!( image_info_count,    VkDescriptorImageInfo )     image_infos;                    // slices of these three members ...
@@ -851,7 +883,9 @@ struct Meta_Descriptor_Update_T(
         string                      file = __FILE__,
         size_t                      line = __LINE__,
         string                      func = __FUNCTION__
+
         ) {
+
         VkWriteDescriptorSet write_set = {
         //  dstSet              : descriptor_set,
             dstBinding          : binding,
@@ -939,7 +973,9 @@ struct Meta_Descriptor_Update_T(
         string                      file = __FILE__,
         size_t                      line = __LINE__,
         string                      func = __FUNCTION__
+
         ) if( isDescriptor!Descriptor_T ) {
+
         //pragma( inline, true ); // this function should be inlined
 
         // shortcut to the last write_descriptor_sets
@@ -1343,7 +1379,9 @@ struct Meta_Descriptor_T(
         string              file = __FILE__,
         size_t              line = __LINE__,
         string              func = __FUNCTION__
+
         ) {
+
         // Todo(pp): fix comments bellow, they are not valid for Immutable version as we do not have a descriptor_count param
         // descriptor_count in this case is a starting value which will increase when using
         // Meta_Descriptor to create and update the descriptor set
@@ -1480,7 +1518,9 @@ struct Meta_Descriptor_T(
         string              file = __FILE__,
         size_t              line = __LINE__,
         string              func = __FUNCTION__
+
         ) {
+
         //pragma( inline, true ); // functions in this body should be be inlined
 
         // We need to catch the special case of VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER
@@ -1521,7 +1561,9 @@ struct Meta_Descriptor_T(
         string              file = __FILE__,
         size_t              line = __LINE__,
         string              func = __FUNCTION__
+
         ) {
+
         //pragma( inline, true ); // functions in this body should be be inlined. Former additional tempalte args: "buffer_infos", "pBufferInfo" )
         addDescriptorType( VkDescriptorBufferInfo( buffer, offset, range ), file, line, func );
         return this;
@@ -1544,7 +1586,9 @@ struct Meta_Descriptor_T(
         string              file = __FILE__,
         size_t              line = __LINE__,
         string              func = __FUNCTION__
+
         ) {
+
         //pragma( inline, true ); // functions in this body should be be inlined. Former additional template args: "buffer_infos", "pBufferInfo" )
         foreach( ref buffer; buffers )
             addDescriptorType( VkDescriptorBufferInfo( buffer, offset, range ), file, line, func );
@@ -1562,7 +1606,9 @@ struct Meta_Descriptor_T(
         string              file = __FILE__,
         size_t              line = __LINE__,
         string              func = __FUNCTION__
+
         ) {
+
         //pragma( inline, true ); // functions in this body should be be inlined. Former additional tempalte args: "texel_buffer_views", "pTexelBufferView" )
         addDescriptorType( buffer_view, file, line, func );
         return this;
@@ -1579,7 +1625,9 @@ struct Meta_Descriptor_T(
         string              file = __FILE__,
         size_t              line = __LINE__,
         string              func = __FUNCTION__
+
         ) {
+
         //pragma( inline, true ); // functions in this body should be be inlined. Former additional tempalte args: "texel_buffer_views", "pTexelBufferView" )
         foreach( ref buffer_view; buffer_views )
             addDescriptorType( buffer_view, file, line,func );
@@ -1598,7 +1646,9 @@ struct Meta_Descriptor_T(
         string                      file = __FILE__,
         size_t                      line = __LINE__,
         string                      func = __FUNCTION__
+
         ) {
+
         meta_descriptor_layout.allocateSet( descriptor_pool_create_flags, file, line, func );
         meta_descriptor_update.attachSet( descriptor_set ).update;
         return this;
@@ -1619,7 +1669,9 @@ struct Meta_Descriptor_T(
         string                              file = __FILE__,
         size_t                              line = __LINE__,
         string                              func = __FUNCTION__
+
         ) {
+
         meta_descriptor_layout
             .createSetLayout( set_layout_create_flags, file, line, func )
             .allocateSet( descriptor_pool_create_flags, file, line, func );
@@ -1642,7 +1694,9 @@ struct Meta_Descriptor_T(
         string                              file = __FILE__,
         size_t                              line = __LINE__,
         string                              func = __FUNCTION__
+
         ) {
+
         meta_descriptor_layout
             .createSetLayout( set_layout_create_flags, file, line, func )
             .allocateSet( descriptor_pool, file, line, func );
