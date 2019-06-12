@@ -573,8 +573,8 @@ mixin template Memory_Member() {
 struct Meta_Buffer {
     mixin                   Vulkan_State_Pointer;
     VkBuffer                buffer;
-    VkBufferCreateInfo      buffer_create_info;
-    VkDeviceSize            bufferSize() { return buffer_create_info.size; }
+    VkBufferCreateInfo      buffer_ci;
+    VkDeviceSize            bufferSize() { return buffer_ci.size; }
     mixin                   Memory_Member;
     mixin                   Memory_Buffer_Image_Common;
     version( DEBUG_NAME )   string name;
@@ -588,45 +588,121 @@ struct Meta_Buffer {
         resetMemoryMember;
     }
 
+
+    /// Specify buffer usage
+    auto ref usage( VkBufferUsageFlags buffer_usage_flags ) {
+        buffer_ci.usage = buffer_usage_flags;
+        return this;
+    }
+
+
+    /// Add buffer usage. The added usage will be or-ed with the existing one.
+    auto ref addUsage( VkBufferUsageFlags buffer_usage_flags ) {
+        buffer_ci.usage |= buffer_usage_flags;
+        return this;
+    }
+
+
+    /// Specify buffer size.
+    auto ref bufferSize( VkBufferUsageFlags buffer_size ) {
+        buffer_ci.size = buffer_size;
+        return this;
+    }
+
+
+    /// Specify the sharing queue families and implicitly the sharing mode, which defaults to VK_SHARING_MODE_EXCLUSIVE.
+    auto ref sharingQueueFamilyIndices( uint32_t[] sharing_family_queue_indices ) {
+        buffer_ci.sharingMode           = VK_SHARING_MODE_CONCURRENT;
+        buffer_ci.queueFamilyIndexCount = sharing_family_queue_indices.length.toUint;
+        buffer_ci.pQueueFamilyIndices   = sharing_family_queue_indices.ptr;
+    }
+
+
+    /// Construct the Image from specified data.
+    auto ref construct( string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+        // assert that meta struct is initialized with a valid vulkan state pointer
+        vkAssert( isValid, "Vulkan state not assigned", file, line, func );
+
+        vk.device.vkCreateBuffer( & buffer_ci, allocator, & buffer ).vkAssert( "Construct Buffer", file, line, func );
+        vk.device.vkGetBufferMemoryRequirements( buffer, & memory_requirements );
+
+        return this;
+    }
+
+
+    /// initialize a VkBuffer object, this function or createBuffer must be called first, further operations require the buffer
+    /// the resulting buffer and its create info are stored in the Meta_Buffer struct
+    /// the Meta_Buffer struct is returned for function chaining
+    auto ref construct(
+        VkBufferUsageFlags  buffer_usage_flags,
+        VkDeviceSize        buffer_size,
+        uint32_t[]          sharing_family_queue_indices = [],
+        string              file = __FILE__,
+        size_t              line = __LINE__,
+        string              func = __FUNCTION__
+
+        ) {
+
+        // assert that meta struct is initialized with a valid vulkan state pointer
+        vkAssert( isValid, "Vulkan state not assigned", file, line, func );
+
+        // buffer create info from arguments
+        buffer_ci.size                  = buffer_size; // size in Bytes
+        buffer_ci.usage                 = buffer_usage_flags;
+        buffer_ci.sharingMode           = sharing_family_queue_indices == [] ? VK_SHARING_MODE_EXCLUSIVE : VK_SHARING_MODE_CONCURRENT;
+        buffer_ci.queueFamilyIndexCount = sharing_family_queue_indices.length.toUint;
+        buffer_ci.pQueueFamilyIndices   = sharing_family_queue_indices.ptr;
+
+        vk.device.vkCreateBuffer( & buffer_ci, allocator, & buffer ).vkAssert( "Construct Buffer", file, line, func );
+        vk.device.vkGetBufferMemoryRequirements( buffer, & memory_requirements );
+
+        return this;
+    }
 }
 
 
-/// initialize a VkBuffer object, this function or createBuffer must be called first, further operations require the buffer
-/// the resulting buffer and its create info are stored in the Meta_Buffer struct
-/// the Meta_Buffer struct is returned for function chaining
-auto ref initBuffer(
-    ref Meta_Buffer     meta,
-    VkBufferUsageFlags  usage,
-    VkDeviceSize        size,
-    VkSharingMode       sharing_mode = VK_SHARING_MODE_EXCLUSIVE,
-    string              file = __FILE__,
-    size_t              line = __LINE__,
-    string              func = __FUNCTION__
-    ) {
-    // assert that meta struct is initialized with a valid vulkan state pointer
-    vkAssert( meta.isValid, "Vulkan state not assigned", file, line, func );
 
-    // buffer create info from arguments
-    meta.buffer_create_info.size        = size; // size in Bytes
-    meta.buffer_create_info.usage       = usage;
-    meta.buffer_create_info.sharingMode = sharing_mode;
+deprecated( "Use member methods to edit and/or Meta_Buffer.construct instead" ) {
 
-    meta.device.vkCreateBuffer( &meta.buffer_create_info, meta.allocator, &meta.buffer ).vkAssert( "Init Buffer", file, line, func );
-    meta.device.vkGetBufferMemoryRequirements( meta.buffer, &meta.memory_requirements );
+    /// initialize a VkBuffer object, this function or createBuffer must be called first, further operations require the buffer
+    /// the resulting buffer and its create info are stored in the Meta_Buffer struct
+    /// the Meta_Buffer struct is returned for function chaining
+    auto ref initBuffer(
+        ref Meta_Buffer     meta,
+        VkBufferUsageFlags  usage,
+        VkDeviceSize        size,
+        uint32_t[]          sharing_family_queue_indices = [],
+        string              file = __FILE__,
+        size_t              line = __LINE__,
+        string              func = __FUNCTION__
+        ) {
+        // assert that meta struct is initialized with a valid vulkan state pointer
+        vkAssert( meta.isValid, "Vulkan state not assigned", file, line, func );
 
-    return meta;
-}
+        // buffer create info from arguments
+        meta.buffer_ci.size                  = size; // size in Bytes
+        meta.buffer_ci.usage                 = usage;
+        meta.buffer_ci.sharingMode           = sharing_family_queue_indices == [] ? VK_SHARING_MODE_EXCLUSIVE : VK_SHARING_MODE_CONCURRENT;
+        meta.buffer_ci.queueFamilyIndexCount = sharing_family_queue_indices.length.toUint;
+        meta.buffer_ci.pQueueFamilyIndices   = sharing_family_queue_indices.ptr;
 
-alias create = initBuffer;
+        meta.device.vkCreateBuffer( & meta.buffer_ci, meta.allocator, & meta.buffer ).vkAssert( "Init Buffer", file, line, func );
+        meta.device.vkGetBufferMemoryRequirements( meta.buffer, & meta.memory_requirements );
+
+        return meta;
+    }
+
+    //alias create = initBuffer;
 
 
-/// create a VkBuffer object, this function or initBuffer (or its alias create) must be called first, further operations require the buffer
-/// the resulting buffer and its create info are stored in the Meta_Buffer struct
-/// the Meta_Buffer struct is returned for function chaining
-auto createBuffer( ref Vulkan vk, VkBufferUsageFlags usage, VkDeviceSize size, VkSharingMode sharing_mode = VK_SHARING_MODE_EXCLUSIVE ) {
-    Meta_Buffer meta = vk;
-    meta.create( usage, size, sharing_mode );
-    return meta;
+    /// create a VkBuffer object, this function or initBuffer (or its alias create) must be called first, further operations require the buffer
+    /// the resulting buffer and its create info are stored in the Meta_Buffer struct
+    /// the Meta_Buffer struct is returned for function chaining
+    auto createBuffer( ref Vulkan vk, VkBufferUsageFlags usage, VkDeviceSize size, uint32_t[] sharing_family_queue_indices = [] ) {
+        Meta_Buffer meta = vk;
+        meta.construct( usage, size, sharing_family_queue_indices );
+        return meta;
+    }
 }
 
 
@@ -646,7 +722,9 @@ auto imageFormatProperties(
     string              file = __FILE__,
     size_t              line = __LINE__,
     string              func = __FUNCTION__
+
     ) {
+
     VkImageFormatProperties image_format_properties;
     vk.gpu.vkGetPhysicalDeviceImageFormatProperties(
         format, type, tiling, usage, flags, & image_format_properties ).vkAssert( "Image Format Properties", file, line, func );
