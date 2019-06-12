@@ -375,87 +375,106 @@ auto createMemory( ref Vulkan vk, uint32_t memory_type_index, VkDeviceSize alloc
     meta.create( memory_type_index, allocation_size );
     return meta;
 }
-
-
-
-auto ref memoryType( ref Meta_Memory meta, VkMemoryPropertyFlags memory_property_flags ) {
-    meta.memory_property_flags = memory_property_flags;
-    return meta;
-}
-
-
-/// Here we use a trick, we set a very memory type with the lowest index
-/// but set the (same or higher) index manually, the index can be only increased but not decreased
-auto ref memoryTypeIndex( ref Meta_Memory meta, uint32_t minimum_index ) {
-    if( meta.memory_property_flags == 0 ) meta.memory_property_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-    meta.memory_type_index = minimum_index;
-    return meta;
-}
-
-
-auto ref addRange( META )( ref Meta_Memory meta, ref META meta_resource, VkDeviceSize* memory_size = null ) if( hasMemReqs!META ) {
-    // confirm that VkMemoryPropertyFlags have been specified with memoryType;
-    vkAssert( meta.memory_property_flags > 0, "Call memoryType( VkMemoryPropertyFlags ) before adding a range" );
-
-    // get the resource dependent memory type index
-    // the lower memory type indices are subsets of the higher type indices regarding the memory properties
-    auto resource_type_index = meta_resource.memoryTypeIndex( meta.memory_property_flags );
-    if( meta.memory_type_index < resource_type_index ) meta.memory_type_index = resource_type_index;
-
-    // register the require memory size range, either internally in the meta struct
-    // or in the optionally passed in pointer to an external memory_size
-    if( memory_size is null ) {
-        meta_resource.device_memory_offset = meta_resource.alignedOffset( meta.device_memory_size );
-        meta.device_memory_size = meta_resource.device_memory_offset + meta_resource.requiredMemorySize;
-    } else {
-        *memory_size = meta_resource.alignedOffset( *memory_size ) + meta_resource.requiredMemorySize;
+    /// Raw allocate function passing in a known memory_type_index (which encodes VkMemoryPropertyFlags and VkMemoryHeapFlags)
+    /// and an allocation size
+    auto ref allocate( uint32_t memory_type_index, VkDeviceSize allocation_size, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+        vkAssert( isValid, "Vulkan state not assigned", file, line, func );     // assert that meta struct is initialized with a valid vulkan state pointer
+        this.device_memory = vk.allocateMemory( allocation_size, memory_type_index, file, line, func );
+        this.device_memory_size = allocation_size;
+        this.memory_type_index = memory_type_index;
+        return this;
     }
 
-    return meta;
-}
+
+    /// Parametrize a future allocations VkMemoryPropertyFlags
+    auto ref memoryType( VkMemoryPropertyFlags property_flags ) {
+        memory_property_flags = property_flags;
+        return this;
+    }
 
 
-auto ref addRanges( META )( ref Meta_Memory meta, META[] meta_resource, VkDeviceSize* memory_size = null ) if( hasMemReqs!META ) {
-    foreach( ref resource; meta_resources ) meta.addRange( resource, memory_size );
-    return meta;
-}
+    /// Specify a minimum Memory Type index (the lower the index the higher performance the memory is)
+    auto ref minMemoryTypeIndex( uint32_t minimum_index ) {
+        /// Here we use a trick, we set a memory type with the lowest index
+        /// but set the (same or higher) index manually, the index can be only increased but not decreased
+        if( memory_property_flags == 0 )
+            memory_property_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+        memory_type_index = minimum_index;
+        return this;
+    }
 
 
-auto ref allocate(
-    ref Meta_Memory meta,
-    string          file = __FILE__,
-    size_t          line = __LINE__,
-    string          func = __FUNCTION__
-    ) {
-    vkAssert( meta.isValid, "Vulkan state not assigned", file, line, func );     // meta struct must be initialized with a valid vulkan state pointer
-    vkAssert( meta.device_memory_size > 0, "Must call addRange() at least onece before calling allocate()", file, line, func );
-    meta.device_memory = allocateMemory( meta, meta.device_memory_size, meta.memory_type_index );
-    return meta;
-}
+    /// Register one multiple memory ranges for one future allocation derived from Meta_Buffer, Meta_Image or Array/Slice of the two.
+    /// Memory Offsets including alignment are stored in the corresponding Meta structs. Can be called multiple times with any of the above types.
+    auto ref addRange( META )( ref META meta_resource, VkDeviceSize* out_memory_size = null, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+        static if( isDataArrayOrSlice!META ) {
+            foreach( ref resource; meta_resources ) {
+                addRange( resource, memory_size, file, line, func );
+            }
+        } else static if( hasMemReqs!META ) {
+            // confirm that VkMemoryPropertyFlags have been specified with memoryType;
+            vkAssert( memory_property_flags > 0, "No memoryType (VkMemoryPropertyFlags) specified.", file, line, func, "Call memoryType( VkMemoryPropertyFlags ) before adding a range." );
+
+            // get the resource dependent memory type index
+            // the lower memory type indexes are subsets of the higher type indexes regarding the memory properties
+            auto resource_type_index = meta_resource.memoryTypeIndex( memory_property_flags );
+            if( memory_type_index < resource_type_index ) memory_type_index = resource_type_index;
+
+            // register the required memory size range, either internally in the meta struct
+            // or in the optionally passed in pointer to an external out_memory_size
+            if( out_memory_size is null ) {
+                meta_resource.device_memory_offset = meta_resource.alignedOffset( device_memory_size );
+                device_memory_size = meta_resource.device_memory_offset + meta_resource.requiredMemorySize;
+            } else {
+                *out_memory_size = meta_resource.alignedOffset( *out_memory_size ) + meta_resource.requiredMemorySize;
+            }
+        } else {
+            static assert(0);   // types not matching
+        }
+
+        return this;
+    }
 
 
-auto ref bind( META )(
-    ref Meta_Memory meta,
-    ref META        meta_resource,
-    string          file = __FILE__,
-    size_t          line = __LINE__,
-    string          func = __FUNCTION__,
-    ) if( hasMemReqs!META ) {
-    vkAssert( meta.device_memory != VK_NULL_HANDLE, "Must allocate() before bind()ing a buffer or image" );        // meta struct must be initialized with a valid vulkan state pointer
-    meta_resource.bindMemory( meta.device_memory, meta_resource.device_memory_offset, file, line, func );
-    return meta;
-}
+    /// Allocate one memory object for all registered memory ranges in one go.
+    auto ref allocate( string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+        vkAssert( isValid, "Vulkan state not assigned", file, line, func );     // meta struct must be initialized with a valid vulkan state pointer
+        vkAssert( device_memory_size > 0, "Must call addRange() at least once before calling allocate()", file, line, func );
+        device_memory = vk.allocateMemory( device_memory_size, memory_type_index );
+        return this;
+    }
 
 
-auto ref bind( META )(
-    ref Meta_Memory meta,
-    ref META[]      meta_resource,
-    string          file = __FILE__,
-    size_t          line = __LINE__,
-    string          func = __FUNCTION__,
-    ) if( hasMemReqs!META ) {
-    foreach( ref resource; meta_resources ) meta.bind( resource, file, line, func );
-    return meta;
+    /// Bind the corresponding range of allocated memory to its client Meta_Buffer(s) or Meta_Image(s). The memory object and and its range is stored in each Meta struct.
+    auto ref bind( META )( ref META meta_resource, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__, ) if( hasMemReqs!META ) {
+        static if( isDataArrayOrSlice!META ) {
+            vkAssert( device_memory != VK_NULL_HANDLE, "No memory allocated for resources.", file, line, func, "Must call allocate() before bind()ing a buffers or images." );
+            foreach( ref resource; meta_resources ) {
+                resource.bindMemory( device_memory, resource.device_memory_offset, file, line, func );
+            }
+        } else static if( hasMemReqs!META ) {
+            // confirm that memory for this resource has been allocated
+            vkAssert( device_memory != VK_NULL_HANDLE, "No memory allocated for resource.", file, line, func, "Must call allocate() before bind()ing a buffer or image." );
+            meta_resource.bindMemory( device_memory, meta_resource.device_memory_offset, file, line, func );
+        }
+        return this;
+    }
+
+
+    /// Add ranges, allocate one memory chunk and bind the memory ranges in one go. Ranges are tightly packed
+    /// but obey alignment constraints. Method accepts var args of Meta_Buffer, Meta_Image or Slices/Arrays of the same.
+    auto ref allocateAndBind( Args... )( ref Args args, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+
+        static foreach( arg; args )
+            addRange( arg, null, file, line, func );
+
+        allocate;
+
+        foreach( ref arg; args )
+            bind( arg, file, line, func );
+
+        return this;
+    }
 }
 
 
