@@ -184,6 +184,142 @@ private template hasMemReqs( T ) {
 
 
 
+/// Mixin template for common decelerations of Meta_Memory, _Buffer, _Image
+package mixin template Memory_Buffer_Image_Common() {
+
+    /// map the underlying memory object and return the mapped memory pointer
+    auto mapMemory(
+        VkDeviceSize        size    = 0,        // if 0, the device_memory_size will be used
+        VkDeviceSize        offset  = 0,
+    //  VkMemoryMapFlags    flags   = 0,        // for future use
+        string              file    = __FILE__,
+        size_t              line    = __LINE__,
+        string              func    = __FUNCTION__
+
+        ) {
+
+        // if we want to map the memory of an underlying buffer or image,
+        // we need to account for the buffer or image offset into its VkDeviceMemory
+        static if( is( typeof( this ) == Meta_Memory )) VkDeviceSize combined_offset = offset;
+        else                                            VkDeviceSize combined_offset = offset + device_memory_offset;
+        if( size == 0 ) size = memSize;    // use the attached memory size in this case
+        void* mapped_memory;
+        vk.device
+            .vkMapMemory( device_memory, combined_offset, size, 0, & mapped_memory )
+            .vkAssert( "Map Memory", file, line, func );
+        return mapped_memory;
+    }
+
+
+    /// map the underlying memory object, copy the provided data into it and return the mapped memory pointer
+    auto mapMemory(
+        void[]              data,
+        VkDeviceSize        offset  = 0,
+    //  VkMemoryMapFlags    flags   = 0,        // for future use
+        string              file    = __FILE__,
+        size_t              line    = __LINE__,
+        string              func    = __FUNCTION__
+        ) {
+        // if we want to map the memory of an underlying buffer or image,
+        // we need to account for the buffer or image offset into its VkDeviceMemory
+        static if( is( typeof( this ) == Meta_Memory )) VkDeviceSize combined_offset = offset;
+        else                                            VkDeviceSize combined_offset = offset + device_memory_offset;
+
+        // the same combined_offset logic is applied in the function bellow, so we must pass
+        // the original offset to not apply the Meta_Buffer or Meta_Image.device_memory_offset twice
+        auto mapped_memory = vk.mapMemory( device_memory, data.length, combined_offset, file, line, func );
+        mapped_memory[ 0 .. data.length ] = data[];
+
+        // required for the mapped memory flush
+        VkMappedMemoryRange mapped_memory_range =
+            vk.createMappedMemoryRange( device_memory, data.length, combined_offset, file, line, func );
+
+        // flush the mapped memory range so that its visible to the device memory space
+        vk.device
+            .vkFlushMappedMemoryRanges( 1, & mapped_memory_range )
+            .vkAssert( "Map Memory", file, line, func );
+        return mapped_memory;
+    }
+
+
+    /// unmap map the underlying memory object
+    auto ref unmapMemory() {
+        vk.device.vkUnmapMemory( device_memory );
+        return this;
+    }
+
+
+    /// create a mapped memory range with given size and offset for the (backing) memory object
+    /// the offset into the buffer or image backing VkMemory will be added to the passed in offset
+    /// and the size will be determined from buffer/image.memSize in case of VK_WHOLE_SIZE
+    auto createMappedMemoryRange(
+        VkDeviceSize        size    = VK_WHOLE_SIZE,
+        VkDeviceSize        offset  = 0,
+        string              file    = __FILE__,
+        size_t              line    = __LINE__,
+        string              func    = __FUNCTION__
+        ) {
+        // if we want to create a mapped memory range for the memory of an underlying buffer or image,
+        // we need to account for the buffer or image offset into its VkDeviceMemory
+        static if( !is( typeof( this ) == Meta_Memory )) {
+            offset += memOffset;
+            if( size == VK_WHOLE_SIZE ) {
+                size = memSize;
+            }
+        }
+        return vk.createMappedMemoryRange( device_memory, size, offset, file, line, func );
+    }
+
+
+    /// flush the memory object, either whole size or with offset and size
+    /// memory must have been mapped beforehand
+    auto ref flushMappedMemoryRange(
+        VkDeviceSize        size    = VK_WHOLE_SIZE,
+        VkDeviceSize        offset  = 0,
+        string              file    = __FILE__,
+        size_t              line    = __LINE__,
+        string              func    = __FUNCTION__
+        ) {
+        vkAssert( isValid, "Vulkan state not assigned", file, line, func );       // meta struct must be initialized with a valid vulkan state pointer
+        auto mapped_memory_range = this.createMappedMemoryRange( size, offset, file, line, func );
+        vk.device.vkFlushMappedMemoryRanges( 1, & mapped_memory_range ).vkAssert( "Flush Mapped Memory Range", file, line, func );
+        return this;
+    }
+
+
+    /// invalidate the memory object, either whole size or with offset and size
+    /// memory must have been mapped beforehand
+    auto ref invalidateMappedMemoryRange(
+        VkDeviceSize        size    = VK_WHOLE_SIZE,
+        VkDeviceSize        offset  = 0,
+        string              file    = __FILE__,
+        size_t              line    = __LINE__,
+        string              func    = __FUNCTION__
+        ) {
+        vkAssert( isValid, "Vulkan state not assigned", file, line, func );       // meta struct must be initialized with a valid vulkan state pointer
+        auto mapped_memory_range = createMappedMemoryRange( size, offset, file, line, func );
+        vk.device.vkInvalidateMappedMemoryRanges( 1, & mapped_memory_range ).vkAssert( "Invalidate Mapped Memory Range", file, line, func );
+        return this;
+    }
+
+
+    /// upload data to the VkDeviceMemory object of the corresponding buffer or image through memory mapping
+    auto ref copyData(
+        void[]              data,
+        VkDeviceSize        offset  = 0,
+    //  VkMemoryMapFlags    flags   = 0,        // for future use
+        string              file    = __FILE__,
+        size_t              line    = __LINE__,
+        string              func    = __FUNCTION__
+        ) {
+        mapMemory( data, offset, file, line, func );   // this returns the memory pointer, and not the Meta_Struct
+        return unmapMemory;
+    }
+}
+
+
+
+
 ///////////////////////////////////////
 // Meta_Memory and related functions //
 ///////////////////////////////////////
