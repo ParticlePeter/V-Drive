@@ -177,6 +177,13 @@ void invalidateMappedMemoryRanges( ref Vulkan vk, VkMappedMemoryRange[] mapped_m
 
 
 
+/// Template to detect Meta_Memory, _Buffer, _Image
+private template hasMemReqs( T ) {
+    enum hasMemReqs = __traits( hasMember, T, "memory_requirements" );
+}
+
+
+
 ///////////////////////////////////////
 // Meta_Memory and related functions //
 ///////////////////////////////////////
