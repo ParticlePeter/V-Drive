@@ -344,7 +344,7 @@ struct Meta_Memory {
 
     // bulk destroy the resources belonging to this meta struct
     void destroyResources() {
-        vk.destroy( device_memory );
+        vk.destroyHandle( device_memory );
         device_memory_size      = 0;
         memory_property_flags   = 0;
         memory_type_index       = 0;
@@ -532,7 +532,7 @@ mixin template Memory_Member() {
         vkAssert( isValid, "Vulkan state not assigned", file, line, func );     // meta struct must be initialized with a valid vulkan state pointer
 
         if( device_memory != VK_NULL_HANDLE && owns_device_memory )             // if device memory is owned and was created already ...
-            destroy( device_memory );                                           // ... we destroy it here
+            vk.destroyHandle( device_memory );                                  // ... we destroy it here
 
         owns_device_memory = true;                                              // using this method the resource always owns the memory
         device_memory = vk.allocateMemory( memory_requirements.size, memoryTypeIndex( memory_property_flags ));
@@ -582,9 +582,9 @@ struct Meta_Buffer {
 
     // bulk destroy the resources belonging to this meta struct
     void destroyResources() {
-        vk.destroy( buffer );
+        vk.destroyHandle( buffer );
         if( owns_device_memory )
-            vk.destroy( device_memory );
+            vk.destroyHandle( device_memory );
         resetMemoryMember;
     }
 
@@ -771,7 +771,7 @@ mixin template IView_Memeber( uint view_count ) if( view_count > 0 ) {
         /// Destroy the image view
         void destroyImageView() {
             if( image_view != VK_NULL_HANDLE )
-                vk.destroy( image_view );
+                vk.destroyHandle( image_view );
         }
 
 
@@ -805,7 +805,7 @@ mixin template IView_Memeber( uint view_count ) if( view_count > 0 ) {
         void destroyImageView() {
             foreach( ref view; image_view )
                 if( view != VK_NULL_HANDLE )
-                    vk.destroy( view );
+                    vk.destroyHandle( view );
         } alias destroyImageViews = destroyImageView;
 
 

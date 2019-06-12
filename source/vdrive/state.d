@@ -322,37 +322,38 @@ void destroyDevice( VkDevice device, const( VkAllocationCallbacks )* allocator =
 
 
 // overloads forward to specific vkDestroy(Handle) functions
-void destroy( ref Vulkan vk, ref VkSemaphore            handle )    { vkDestroySemaphore(           vk.device, handle, vk.allocator ); handle = VK_NULL_HANDLE; }
-void destroy( ref Vulkan vk, ref VkFence                handle )    { vkDestroyFence(               vk.device, handle, vk.allocator ); handle = VK_NULL_HANDLE; }
-void destroy( ref Vulkan vk, ref VkDeviceMemory         handle )    { vkFreeMemory(                 vk.device, handle, vk.allocator ); handle = VK_NULL_HANDLE; }
-void destroy( ref Vulkan vk, ref VkBuffer               handle )    { vkDestroyBuffer(              vk.device, handle, vk.allocator ); handle = VK_NULL_HANDLE; }
-void destroy( ref Vulkan vk, ref VkImage                handle )    { vkDestroyImage(               vk.device, handle, vk.allocator ); handle = VK_NULL_HANDLE; }
-void destroy( ref Vulkan vk, ref VkEvent                handle )    { vkDestroyEvent(               vk.device, handle, vk.allocator ); handle = VK_NULL_HANDLE; }
-void destroy( ref Vulkan vk, ref VkQueryPool            handle )    { vkDestroyQueryPool(           vk.device, handle, vk.allocator ); handle = VK_NULL_HANDLE; }
-void destroy( ref Vulkan vk, ref VkBufferView           handle )    { vkDestroyBufferView(          vk.device, handle, vk.allocator ); handle = VK_NULL_HANDLE; }
-void destroy( ref Vulkan vk, ref VkImageView            handle )    { vkDestroyImageView(           vk.device, handle, vk.allocator ); handle = VK_NULL_HANDLE; }
-void destroy( ref Vulkan vk, ref VkShaderModule         handle )    { vkDestroyShaderModule(        vk.device, handle, vk.allocator ); handle = VK_NULL_HANDLE; }
-void destroy( ref Vulkan vk, ref VkPipelineCache        handle )    { vkDestroyPipelineCache(       vk.device, handle, vk.allocator ); handle = VK_NULL_HANDLE; }
-void destroy( ref Vulkan vk, ref VkPipelineLayout       handle )    { vkDestroyPipelineLayout(      vk.device, handle, vk.allocator ); handle = VK_NULL_HANDLE; }
-void destroy( ref Vulkan vk, ref VkRenderPass           handle )    { vkDestroyRenderPass(          vk.device, handle, vk.allocator ); handle = VK_NULL_HANDLE; }
-void destroy( ref Vulkan vk, ref VkPipeline             handle )    { vkDestroyPipeline(            vk.device, handle, vk.allocator ); handle = VK_NULL_HANDLE; }
-void destroy( ref Vulkan vk, ref VkDescriptorSetLayout  handle )    { vkDestroyDescriptorSetLayout( vk.device, handle, vk.allocator ); handle = VK_NULL_HANDLE; }
-void destroy( ref Vulkan vk, ref VkSampler              handle )    { vkDestroySampler(             vk.device, handle, vk.allocator ); handle = VK_NULL_HANDLE; }
-void destroy( ref Vulkan vk, ref VkDescriptorPool       handle )    { vkDestroyDescriptorPool(      vk.device, handle, vk.allocator ); handle = VK_NULL_HANDLE; }
-void destroy( ref Vulkan vk, ref VkFramebuffer          handle )    { vkDestroyFramebuffer(         vk.device, handle, vk.allocator ); handle = VK_NULL_HANDLE; }
-void destroy( ref Vulkan vk, ref VkCommandPool          handle )    { vkDestroyCommandPool(         vk.device, handle, vk.allocator ); handle = VK_NULL_HANDLE; }
+void destroyHandle( ref Vulkan vk, ref VkSemaphore            handle )    { vkDestroySemaphore(           vk.device, handle, vk.allocator ); handle = VK_NULL_HANDLE; }
+void destroyHandle( ref Vulkan vk, ref VkFence                handle )    { vkDestroyFence(               vk.device, handle, vk.allocator ); handle = VK_NULL_HANDLE; }
+void destroyHandle( ref Vulkan vk, ref VkDeviceMemory         handle )    { vkFreeMemory(                 vk.device, handle, vk.allocator ); handle = VK_NULL_HANDLE; }
+void destroyHandle( ref Vulkan vk, ref VkBuffer               handle )    { vkDestroyBuffer(              vk.device, handle, vk.allocator ); handle = VK_NULL_HANDLE; }
+void destroyHandle( ref Vulkan vk, ref VkImage                handle )    { vkDestroyImage(               vk.device, handle, vk.allocator ); handle = VK_NULL_HANDLE; }
+void destroyHandle( ref Vulkan vk, ref VkEvent                handle )    { vkDestroyEvent(               vk.device, handle, vk.allocator ); handle = VK_NULL_HANDLE; }
+void destroyHandle( ref Vulkan vk, ref VkQueryPool            handle )    { vkDestroyQueryPool(           vk.device, handle, vk.allocator ); handle = VK_NULL_HANDLE; }
+void destroyHandle( ref Vulkan vk, ref VkBufferView           handle )    { vkDestroyBufferView(          vk.device, handle, vk.allocator ); handle = VK_NULL_HANDLE; }
+void destroyHandle( ref Vulkan vk, ref VkImageView            handle )    { vkDestroyImageView(           vk.device, handle, vk.allocator ); handle = VK_NULL_HANDLE; }
+void destroyHandle( ref Vulkan vk, ref VkShaderModule         handle )    { vkDestroyShaderModule(        vk.device, handle, vk.allocator ); handle = VK_NULL_HANDLE; }
+void destroyHandle( ref Vulkan vk, ref VkPipelineCache        handle )    { vkDestroyPipelineCache(       vk.device, handle, vk.allocator ); handle = VK_NULL_HANDLE; }
+void destroyHandle( ref Vulkan vk, ref VkPipelineLayout       handle )    { vkDestroyPipelineLayout(      vk.device, handle, vk.allocator ); handle = VK_NULL_HANDLE; }
+void destroyHandle( ref Vulkan vk, ref VkRenderPass           handle )    { vkDestroyRenderPass(          vk.device, handle, vk.allocator ); handle = VK_NULL_HANDLE; }
+void destroyHandle( ref Vulkan vk, ref VkPipeline             handle )    { vkDestroyPipeline(            vk.device, handle, vk.allocator ); handle = VK_NULL_HANDLE; }
+void destroyHandle( ref Vulkan vk, ref VkDescriptorSetLayout  handle )    { vkDestroyDescriptorSetLayout( vk.device, handle, vk.allocator ); handle = VK_NULL_HANDLE; }
+void destroyHandle( ref Vulkan vk, ref VkSampler              handle )    { vkDestroySampler(             vk.device, handle, vk.allocator ); handle = VK_NULL_HANDLE; }
+void destroyHandle( ref Vulkan vk, ref VkDescriptorPool       handle )    { vkDestroyDescriptorPool(      vk.device, handle, vk.allocator ); handle = VK_NULL_HANDLE; }
+void destroyHandle( ref Vulkan vk, ref VkFramebuffer          handle )    { vkDestroyFramebuffer(         vk.device, handle, vk.allocator ); handle = VK_NULL_HANDLE; }
+void destroyHandle( ref Vulkan vk, ref VkCommandPool          handle )    { vkDestroyCommandPool(         vk.device, handle, vk.allocator ); handle = VK_NULL_HANDLE; }
 
-// extension specific destroy functions
-void destroy( ref Vulkan vk, ref VkSurfaceKHR           handle )    { vkDestroySurfaceKHR(        vk.instance, handle, vk.allocator ); handle = VK_NULL_HANDLE; }
-void destroy( ref Vulkan vk, ref VkSwapchainKHR         handle )    { vkDestroySwapchainKHR(        vk.device, handle, vk.allocator ); handle = VK_NULL_HANDLE; }
+// extension specific destroyHandle functions
+void destroyHandle( ref Vulkan vk, ref VkSurfaceKHR           handle )    { vkDestroySurfaceKHR(        vk.instance, handle, vk.allocator ); handle = VK_NULL_HANDLE; }
+void destroyHandle( ref Vulkan vk, ref VkSwapchainKHR         handle )    { vkDestroySwapchainKHR(        vk.device, handle, vk.allocator ); handle = VK_NULL_HANDLE; }
 //VkDisplayKHR
 //VkDisplayModeKHR
 //VkDescriptorUpdateTemplateKHR
-void destroy( ref Vulkan vk, ref VkDebugReportCallbackEXT handle )  { vkDestroyDebugReportCallbackEXT( vk.instance, handle, vk.allocator ); handle = VK_NULL_HANDLE; }
-void destroy( ref Vulkan vk, ref VkDebugUtilsMessengerEXT handle )  { vkDestroyDebugUtilsMessengerEXT( vk.instance, handle, vk.allocator ); handle = VK_NULL_HANDLE; }
+void destroyHandle( ref Vulkan vk, ref VkDebugReportCallbackEXT handle )  { vkDestroyDebugReportCallbackEXT( vk.instance, handle, vk.allocator ); handle = VK_NULL_HANDLE; }
+void destroyHandle( ref Vulkan vk, ref VkDebugUtilsMessengerEXT handle )  { vkDestroyDebugUtilsMessengerEXT( vk.instance, handle, vk.allocator ); handle = VK_NULL_HANDLE; }
 //VkObjectTableNVX
 //VkIndirectCommandsLayoutNVX
 
+alias destroy = destroyHandle;
 
 template is_dispatch_handle( T ) {
     static if(
