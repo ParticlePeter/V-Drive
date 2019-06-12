@@ -349,32 +349,8 @@ struct Meta_Memory {
         memory_property_flags   = 0;
         memory_type_index       = 0;
     }
-}
 
 
-auto ref initMemory(
-    ref Meta_Memory         meta,
-    uint32_t                memory_type_index,
-    VkDeviceSize            allocation_size,
-    string                  file = __FILE__,
-    size_t                  line = __LINE__,
-    string                  func = __FUNCTION__
-    ) {
-    vkAssert( meta.isValid, "Vulkan state not assigned", file, line, func );     // assert that meta struct is initialized with a valid vulkan state pointer
-    meta.device_memory = allocateMemory( meta, allocation_size, memory_type_index, file, line, func );
-    meta.device_memory_size = allocation_size;
-    meta.memory_type_index = memory_type_index;
-    return meta;
-}
-
-alias create = initMemory;
-
-
-auto createMemory( ref Vulkan vk, uint32_t memory_type_index, VkDeviceSize allocation_size ) {
-    Meta_Memory meta = vk;
-    meta.create( memory_type_index, allocation_size );
-    return meta;
-}
     /// Raw allocate function passing in a known memory_type_index (which encodes VkMemoryPropertyFlags and VkMemoryHeapFlags)
     /// and an allocation size
     auto ref allocate( uint32_t memory_type_index, VkDeviceSize allocation_size, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
@@ -478,80 +454,28 @@ auto createMemory( ref Vulkan vk, uint32_t memory_type_index, VkDeviceSize alloc
 }
 
 
+deprecated( "Use member method Meta_Memory.allocate instead" ) {
+    auto ref initMemory(
+        ref Meta_Memory         meta,
+        uint32_t                memory_type_index,
+        VkDeviceSize            allocation_size,
+        string                  file = __FILE__,
+        size_t                  line = __LINE__,
+        string                  func = __FUNCTION__
+        ) {
+        vkAssert( meta.isValid, "Vulkan state not assigned", file, line, func );     // assert that meta struct is initialized with a valid vulkan state pointer
+        meta.device_memory = allocateMemory( meta, allocation_size, memory_type_index, file, line, func );
+        meta.device_memory_size = allocation_size;
+        meta.memory_type_index = memory_type_index;
+        return meta;
+    }
 
-// Todo(pp): this and the one bellow should become one function with varargs of
-// Meta_Buffer, Meta_Image, slices of them and slices of pointers to them
-auto ref initMemoryImpl( META_BUFFER_OR_IMAGE )(
-    ref Meta_Memory         meta,
-    VkMemoryPropertyFlags   memory_property_flags,
-    META_BUFFER_OR_IMAGE[]  meta_buffers_or_images,
-    ) if( is( META_BUFFER_OR_IMAGE == Meta_Buffer ) || is( META_BUFFER_OR_IMAGE == Meta_Buffer* )
-      ||  is( META_BUFFER_OR_IMAGE == Meta_Image  ) || is( META_BUFFER_OR_IMAGE == Meta_Image*  )) {
-
-    import std.traits : isPointer;
-    meta.memory_property_flags = memory_property_flags;
-
-    foreach( ref mboi; meta_buffers_or_images )
-        static if( isPointer!META_BUFFER_OR_IMAGE ) meta.addRange( *mboi );
-        else                                        meta.addRange(  mboi );
-
-    meta.allocate;
-
-    foreach( ref mboi; meta_buffers_or_images )
-        static if( isPointer!META_BUFFER_OR_IMAGE ) meta.bind( *mboi );
-        else                                        meta.bind(  mboi );
-
-    return meta;
+    auto createMemory( ref Vulkan vk, uint32_t memory_type_index, VkDeviceSize allocation_size ) {
+        Meta_Memory meta = vk;
+        meta.allocate( memory_type_index, allocation_size );
+        return meta;
+    }
 }
-
-
-// alias buffer this (in e.g. Meta_Goemetry) does not work with the Impl functions above
-// but it does work with the aliases for that functions bellow
-alias initMemory = initMemoryImpl!( Meta_Image );
-alias initMemory = initMemoryImpl!( Meta_Image* );
-alias initMemory = initMemoryImpl!( Meta_Buffer );
-alias initMemory = initMemoryImpl!( Meta_Buffer* );
-
-
-// Todo(pp): this and the one above should become one function with varargs of
-// Meta_Buffer, Meta_Image, slices of them and slices of pointers to them
-auto ref initMemoryImpl( META_BUFFER, META_IMAGE )(
-    ref Meta_Memory         meta,
-    VkMemoryPropertyFlags   memory_property_flags,
-    META_BUFFER[]           meta_buffers,
-    META_IMAGE[]            meta_images
-    ) if(( is( META_BUFFER == Meta_Buffer ) || is( META_BUFFER == Meta_Buffer* ))
-      && ( is( META_IMAGE  == Meta_Image  ) || is( META_IMAGE  == Meta_Image*  ))) {
-
-    import std.traits : isPointer;
-    meta.memory_property_flags = memory_property_flags;
-
-    foreach( ref mb; meta_buffers )
-        static if( isPointer!META_BUFFER )  meta.addRange( *mb );
-        else                                meta.addRange(  mb );
-    foreach( ref mi; meta_images )
-        static if( isPointer!META_IMAGE )   meta.addRange( *mi );
-        else                                meta.addRange(  mi );
-
-    meta.allocate;
-
-    foreach( ref mb; meta_buffers )
-        static if( isPointer!META_BUFFER )  meta.bind( *mb );
-        else                                meta.bind(  mb );
-    foreach( ref mi; meta_images )
-        static if( isPointer!META_IMAGE )   meta.bind( *mi );
-        else                                meta.bind(  mi );
-
-    return meta;
-}
-
-
-// alias buffer this (in e.g. Meta_Goemetry) does not work with the Impl functions above
-// but it does work with the aliases for that functions bellow
-alias initMemory = initMemoryImpl!( Meta_Buffer , Meta_Image  );
-alias initMemory = initMemoryImpl!( Meta_Buffer , Meta_Image* );
-alias initMemory = initMemoryImpl!( Meta_Buffer*, Meta_Image  );
-alias initMemory = initMemoryImpl!( Meta_Buffer*, Meta_Image* );
 
 
 
