@@ -500,13 +500,6 @@ mixin template Memory_Member() {
     auto memSize()          { return memory_requirements.size; }
     auto memOffset()        { return device_memory_offset; }
     auto memRequirements()  { return memory_requirements; }
-}
-
-private template hasMemReqs( T ) {
-    enum hasMemReqs = __traits( hasMember, T, "memory_requirements" );
-}
-
-
 auto memoryTypeIndex( ref Meta_Buffer meta, VkMemoryPropertyFlags memory_property_flags ) {             // can't be a template function as another overload exists already (general function)
     return memoryTypeIndex( meta.memory_properties, meta.memory_requirements, memory_property_flags );
 }
