@@ -737,6 +737,212 @@ auto imageFormatProperties(
 // Meta_Image and related functions //
 //////////////////////////////////////
 
+mixin template IView_Memeber( uint view_count ) if( view_count > 0 ) {
+
+    alias vc = view_count;
+
+    VkImageViewCreateInfo   image_view_ci = {
+        viewType            : VK_IMAGE_VIEW_TYPE_MAX_ENUM,
+        format              : VK_FORMAT_MAX_ENUM,
+        subresourceRange    : {
+            aspectMask          : VK_IMAGE_ASPECT_COLOR_BIT,
+            levelCount          : 1,
+            layerCount          : 1
+        }
+    };
+
+    static if( vc == 1 ) {
+
+        VkImageView         image_view;
+
+
+        /// Construct the image from specified data. If format or type was not specified, the corresponding image format and/or type will be used.
+        auto ref constructView( string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+
+            // assert validity
+            assureValidView( file, line, func );
+
+            // construct the image view
+            vkCreateImageView( vk.device, & image_view_ci, vk.allocator, & image_view ).vkAssert( "Construct image view", file, line, func );
+            return this;
+        }
+
+
+        /// Destroy the image view
+        void destroyImageView() {
+            if( image_view != VK_NULL_HANDLE )
+                vk.destroy( image_view );
+        }
+
+
+        /// get image view and reset it to VK_NULL_HANDLE such that a new, different view can be created
+        auto resetImageView() {
+            auto result = image_view;
+            image_view  = VK_NULL_HANDLE;
+            initImageViewCreateInfo;
+            return result;
+        }
+    }
+
+    else {
+
+        VkImageView[vc]     image_view;
+
+
+        /// Construct the image from specified data. If format or type was not specified, the corresponding image format and/or type will be used.
+        auto ref constructView( uint32_t view_index, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+
+            // assert validity
+            assureValidView( file, line, func );
+
+            // construct the image view
+            vk.device.vkCreateImageView( & image_view_ci, vk.allocator, & image_view[ view_index ] ).vkAssert( "Construct image view", file, line, func );
+            return this;
+        }
+
+
+        /// Destroy the image views
+        void destroyImageView() {
+            foreach( ref view; image_view )
+                if( view != VK_NULL_HANDLE )
+                    vk.destroy( view );
+        } alias destroyImageViews = destroyImageView;
+
+
+        /// get one image view and reset it to VK_NULL_HANDLE such that a new, different view can be created at thta index
+        auto resetImageView( uint index ) {
+            auto result = image_view[ index ];
+            image_view[ index ] = VK_NULL_HANDLE;
+            return result;
+        }
+
+
+        /// get all image views and reset them to VK_NULL_HANDLE such that a new, different views can be created
+        auto resetImageView() {
+            auto result = image_view;
+            foreach( ref view; image_view )
+                view = VK_NULL_HANDLE;
+            initImageViewCreateInfo;
+            return result;
+        } alias resetImageViews = resetImageView;
+    }
+
+
+    private void assureValidView( string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+        // assert that meta struct is initialized with a valid vulkan state pointer
+        vkAssert( isValid, "Vulkan state not assigned", file, line, func );
+
+        // Check validity only if embedding struct has memory member and is backing an actual image (e.g. Meta_IView_T does not)
+        static if( hasMemReqs!( typeof( this ))) {
+
+            // check if memory was bound to the image
+            vkAssert( image != VK_NULL_HANDLE, "No image constructed.", file, line, func, "First construct the underlying image before creating an image view for the image." );
+
+            // check if memory was bound to the image
+            vkAssert( device_memory != VK_NULL_HANDLE, "No memory bound to image.", file, line, func, "First allocate and bind memory to the underlying image before creating an image view for the image." );
+
+            // assign the valid image to the image_view_ci.image member
+            image_view_ci.image = image;
+
+            // check if view type was specified
+            if( image_view_ci.viewType == VK_IMAGE_VIEW_TYPE_MAX_ENUM )
+                image_view_ci.viewType = cast( VkImageViewType )image_ci.imageType;
+
+            // check if view format was specified
+            if( image_view_ci.format == VK_FORMAT_MAX_ENUM )
+                image_view_ci.format = image_ci.format;
+        }
+    }
+
+
+    /// Initialize image view create info to useful defaults
+    void initImageViewCreateInfo() {
+        image_view_ci = VkImageViewCreateInfo.init;
+        image_view_ci.viewType  = VK_IMAGE_VIEW_TYPE_MAX_ENUM;
+        image_view_ci.format    = VK_FORMAT_MAX_ENUM;
+        image_view_ci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        image_view_ci.subresourceRange.levelCount = 1;
+        image_view_ci.subresourceRange.layerCount = 1;
+    }
+
+
+    /// Override image view type. If not specified, the image type will be used.
+    auto ref viewType( VkImageViewType view_type ) {
+        image_view_ci.viewType = view_type;
+        return this;
+    }
+
+
+    /// Override image view format. If not specified, the image format will be used.
+    auto ref viewFormat( VkFormat view_format ) {
+        image_view_ci.format = view_format;
+        return this;
+    }
+
+
+    /// Specify image view subresource aspect mask.
+    auto ref viewAspect( VkImageAspectFlags subresource_aspect_mask ) {
+        image_view_ci.subresourceRange.aspectMask = subresource_aspect_mask;
+        return this;
+    }
+
+
+    /// Specify image view subresource base mip level and level count.
+    auto ref viewMipLevels( uint32_t base_mip_level, uint32_t mip_level_count ) {
+        image_view_ci.subresourceRange.baseMipLevel = base_mip_level;
+        image_view_ci.subresourceRange.levelCount   = mip_level_count;
+        return this;
+    }
+
+
+    /// Specify image view subresource base array layer and array layer count.
+    auto ref viewArrayLayers( uint32_t base_array_layer, uint32_t array_layer_count ) {
+        image_view_ci.subresourceRange.baseArrayLayer   = base_array_layer;
+        image_view_ci.subresourceRange.layerCount       = array_layer_count;
+        return this;
+    }
+
+
+    /// Specify image view subresource range.
+    auto ref subresourceRange( VkImageAspectFlags subresource_aspect_mask, uint32_t base_mip_level, uint32_t mip_level_count, uint32_t base_array_layer, uint32_t array_layer_count ) {
+        image_view_ci.subresourceRange.aspectMask       = subresource_aspect_mask;
+        image_view_ci.subresourceRange.baseMipLevel     = base_mip_level;
+        image_view_ci.subresourceRange.levelCount       = mip_level_count;
+        image_view_ci.subresourceRange.baseArrayLayer   = base_array_layer;
+        image_view_ci.subresourceRange.layerCount       = array_layer_count;
+        return this;
+    }
+
+
+    /// Specify image view subresource range.
+    auto ref subresourceRange( VkImageSubresourceRange subresource_range ) {
+        image_view_ci.subresourceRange = subresource_range;
+        return this;
+    }
+
+
+    /// image_view_ci subrescourceRange shortcut
+    auto const ref subresourceRange() {
+        return image_view_ci.subresourceRange;
+    }
+
+
+    /// Specify component mapping.
+    auto ref components( VkComponentSwizzle r, VkComponentSwizzle g, VkComponentSwizzle b, VkComponentSwizzle a ) {
+        image_view_ci.components.r = r;
+        image_view_ci.components.g = g;
+        image_view_ci.components.b = b;
+        image_view_ci.components.a = a;
+        return this;
+    }
+
+
+    /// Specify component mapping.
+    auto ref components( VkComponentMapping component_mapping ) {
+        image_view_ci.components = component_mapping;
+        return this;
+    }
+}
 /// struct to capture image and memory creation as well as binding
 /// the struct can travel through several methods and can be filled with necessary data
 /// first thing after creation of this struct must be the assignment of the address of a valid vulkan state struct
