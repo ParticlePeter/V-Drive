@@ -489,11 +489,13 @@ mixin template Memory_Member() {
     VkDeviceMemory          device_memory;
     VkDeviceSize            device_memory_offset;
     bool                    owns_device_memory = false;
-    void resetMemoryMember()    {
+    VkDeviceMemory resetMemoryMember() {
         memory_requirements     = VkMemoryRequirements();
+        auto   memory           = device_memory;
         device_memory           = VK_NULL_HANDLE;
         device_memory_offset    = 0;
         owns_device_memory      = false;
+        return memory;
     }
     public:
     auto memory()           { return device_memory; }
