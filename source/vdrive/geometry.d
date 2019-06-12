@@ -4,7 +4,7 @@ import core.stdc.stdio : printf;
 
 import vdrive.util;
 import vdrive.state;
-import vdrive.memory;
+import vdrive.buffer;
 
 import erupted;
 
