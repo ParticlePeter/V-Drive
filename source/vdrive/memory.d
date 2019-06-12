@@ -334,10 +334,13 @@ struct Meta_Memory {
     version( DEBUG_NAME )   string name;
 
     public:
+
     auto memory()           { return device_memory; }
     auto memSize()          { return device_memory_size; }
     auto memPropertyFlags() { return memory_property_flags; }
     auto memTypeIndex()     { return memory_type_index; }
+
+    mixin                   Memory_Buffer_Image_Common;
 
     // bulk destroy the resources belonging to this meta struct
     void destroyResources() {
@@ -788,7 +791,9 @@ struct Meta_Buffer {
     VkBufferCreateInfo      buffer_create_info;
     VkDeviceSize            bufferSize() { return buffer_create_info.size; }
     mixin                   Memory_Member;
+    mixin                   Memory_Buffer_Image_Common;
     version( DEBUG_NAME )   string name;
+
 
     // bulk destroy the resources belonging to this meta struct
     void destroyResources() {
@@ -879,6 +884,7 @@ struct Meta_Image {
     VkImageView             image_view = VK_NULL_HANDLE;
     VkImageViewCreateInfo   image_view_create_info;
     mixin                   Memory_Member;
+    mixin                   Memory_Buffer_Image_Common;
     version( DEBUG_NAME )   string name;
 
     // get internal image view and reset it to VK_NULL_HANDLE
