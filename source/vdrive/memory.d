@@ -13,13 +13,15 @@ import erupted;
 // general memory functions //
 //////////////////////////////
 
-// memory_type_bits is a bitfield where if bit i is set, it means that the VkMemoryType i
-// of the VkPhysicalDeviceMemoryProperties structure satisfies the memory requirements
+/// memory_type_bits is a bit-field where if bit i is set, it means that the VkMemoryType i
+/// of the VkPhysicalDeviceMemoryProperties structure satisfies the memory requirements.
 auto memoryTypeIndex(
-    VkPhysicalDeviceMemoryProperties    memory_properties,
-    VkMemoryRequirements                memory_requirements,
-    VkMemoryPropertyFlags               memory_property_flags
+    const ref VkPhysicalDeviceMemoryProperties  memory_properties,
+    const ref VkMemoryRequirements              memory_requirements,
+    VkMemoryPropertyFlags                       memory_property_flags
+
     ) {
+
     uint32_t memory_type_bits = memory_requirements.memoryTypeBits;
     uint32_t memory_type_index;
     foreach( i; 0u .. memory_properties.memoryTypeCount ) {
@@ -37,16 +39,21 @@ auto memoryTypeIndex(
 }
 
 
+
+/// Search the memory heap (index) which satisfies given memory heap flags.
+/// An minimum heap index can be optionally specified. Returns uint32_t.max if heap not found.
 auto memoryHeapIndex(
     VkPhysicalDeviceMemoryProperties    memory_properties,
     VkMemoryHeapFlags                   memory_heap_flags,
-    uint32_t                            first_memory_heap_index = 0,
+    uint32_t                            min_memory_heap_index = 0,
     string                              file = __FILE__,
     size_t                              line = __LINE__,
     string                              func = __FUNCTION__
+
     ) {
-    vkAssert( first_memory_heap_index < memory_properties.memoryHeapCount, "First Memory Heap Index out of bounds", file, line, func );
-    foreach( i; first_memory_heap_index .. memory_properties.memoryHeapCount ) {
+
+    vkAssert( min_memory_heap_index < memory_properties.memoryHeapCount, "First Memory Heap Index out of bounds", file, line, func );
+    foreach( i; min_memory_heap_index .. memory_properties.memoryHeapCount ) {
         if(( memory_properties.memoryHeaps[i].flags & memory_heap_flags ) == memory_heap_flags ) {
             return i.toUint;
         }
@@ -54,26 +61,23 @@ auto memoryHeapIndex(
 }
 
 
-auto hasMemoryHeapType(
-    VkPhysicalDeviceMemoryProperties    memory_properties,
-    VkMemoryHeapFlags                   memory_heap_flags
-    ) {
+
+/// Query if a memory heap is available that satisfies given memory heap flags.
+auto hasMemoryHeapType( VkPhysicalDeviceMemoryProperties memory_properties, VkMemoryHeapFlags memory_heap_flags ) {
     return memoryHeapIndex( memory_properties, memory_heap_flags ) < uint32_t.max;
 }
 
 
-auto memoryHeapSize(
-    VkPhysicalDeviceMemoryProperties    memory_properties,
-    uint32_t                            memory_heap_index,
-    string                              file = __FILE__,
-    size_t                              line = __LINE__,
-    string                              func = __FUNCTION__
-    ) {
+
+/// Query the memory heap size of a given memory heap (index).
+auto memoryHeapSize( VkPhysicalDeviceMemoryProperties memory_properties, uint32_t memory_heap_index, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
     vkAssert( memory_heap_index < memory_properties.memoryHeapCount, "Memory Heap Index out of bounds", file, line, func );
     return memory_properties.memoryHeaps[ memory_heap_index ].size;
 }
 
 
+
+/// Allocate device memory from a given memory type (index).
 auto allocateMemory(
     ref Vulkan      vk,
     VkDeviceSize    allocation_size,
@@ -81,7 +85,9 @@ auto allocateMemory(
     string          file = __FILE__,
     size_t          line = __LINE__,
     string          func = __FUNCTION__
+
     ) {
+
     // construct a memory allocation info from arguments
     VkMemoryAllocateInfo memory_allocate_info = {
         allocationSize  : allocation_size,
@@ -90,12 +96,14 @@ auto allocateMemory(
 
     // allocate device memory
     VkDeviceMemory device_memory;
-    vkAllocateMemory( vk.device, &memory_allocate_info, vk.allocator, &device_memory ).vkAssert( "Allocate Memory", file, line, func );
+    vkAllocateMemory( vk.device, & memory_allocate_info, vk.allocator, & device_memory ).vkAssert( "Allocate Memory", file, line, func );
 
     return device_memory;
 }
 
 
+
+/// Map allocated memory.
 auto mapMemory(
     ref Vulkan          vk,
     VkDeviceMemory      memory,
@@ -108,16 +116,20 @@ auto mapMemory(
     ) {
     VkMemoryMapFlags flags;
     void* mapped_memory;
-    vk.device.vkMapMemory( memory, offset, size, flags, &mapped_memory ).vkAssert( "Map Memory", file, line, func );
+    vk.device.vkMapMemory( memory, offset, size, flags, & mapped_memory ).vkAssert( "Map Memory", file, line, func );
     return mapped_memory;
 }
 
 
+
+/// Unmap allocated memory.
 void unmapMemory( ref Vulkan vk, VkDeviceMemory memory ) {
     vk.device.vkUnmapMemory( memory );
 }
 
 
+
+/// Create a VkMappedMemoryRange and initialize struct.
 auto createMappedMemoryRange(
     ref Vulkan          vk,
     VkDeviceMemory      memory,
@@ -136,46 +148,30 @@ auto createMappedMemoryRange(
 }
 
 
-void flushMappedMemoryRange(
-    ref Vulkan              vk,
-    VkMappedMemoryRange     mapped_memory_range,
-    string                  file    = __FILE__,
-    size_t                  line    = __LINE__,
-    string                  func    = __FUNCTION__
-    ) {
+
+/// Flush a mapped memory range.
+void flushMappedMemoryRange( ref Vulkan vk, VkMappedMemoryRange mapped_memory_range, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
     vk.device.vkFlushMappedMemoryRanges( 1, & mapped_memory_range ).vkAssert( "Flush Mapped Memory Range", file, line, func );
 }
 
 
-void flushMappedMemoryRanges(
-    ref Vulkan              vk,
-    VkMappedMemoryRange[]   mapped_memory_ranges,
-    string                  file    = __FILE__,
-    size_t                  line    = __LINE__,
-    string                  func    = __FUNCTION__
-    ) {
+
+/// Flush multiple mapped memory ranges.
+void flushMappedMemoryRanges( ref Vulkan vk, VkMappedMemoryRange[] mapped_memory_ranges, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
     vk.device.vkFlushMappedMemoryRanges( mapped_memory_ranges.length.toUint, mapped_memory_ranges.ptr ).vkAssert( "Flush Mapped Memory Ranges", file, line, func );
 }
 
 
-void invalidateMappedMemoryRange(
-    ref Vulkan              vk,
-    VkMappedMemoryRange     mapped_memory_range,
-    string                  file    = __FILE__,
-    size_t                  line    = __LINE__,
-    string                  func    = __FUNCTION__
-    ) {
+
+/// Invalidate a mapped memory range.
+void invalidateMappedMemoryRange( ref Vulkan vk, VkMappedMemoryRange mapped_memory_range, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
     vk.device.vkInvalidateMappedMemoryRanges( 1, & mapped_memory_range ).vkAssert( "Flush Mapped Memory Range", file, line, func );
 }
 
 
-void invalidateMappedMemoryRanges(
-    ref Vulkan              vk,
-    VkMappedMemoryRange[]   mapped_memory_ranges,
-    string                  file    = __FILE__,
-    size_t                  line    = __LINE__,
-    string                  func    = __FUNCTION__
-    ) {
+
+/// Invalidate multiple mapped memory ranges.
+void invalidateMappedMemoryRanges( ref Vulkan vk, VkMappedMemoryRange[] mapped_memory_ranges, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
     vk.device.vkInvalidateMappedMemoryRanges( mapped_memory_ranges.length.toUint, mapped_memory_ranges.ptr ).vkAssert( "Flush Mapped Memory Ranges", file, line, func );
 }
 
@@ -1062,7 +1058,7 @@ void recordTransition(
 */
     cmd_buffer.vkCmdPipelineBarrier(
         src_stage_mask, dst_stage_mask, dependency_flags,
-        0, null, 0, null, 1, &layout_transition_barrier
+        0, null, 0, null, 1, & layout_transition_barrier
     );
 }
 
@@ -1106,7 +1102,7 @@ bool is_constructed( Meta_Image  meta ) { return !meta.is_null; }
 
 // checking format support
 //VkFormatProperties format_properties;
-//vk.gpu.vkGetPhysicalDeviceFormatProperties( VK_FORMAT_B8G8R8A8_UNORM, &format_properties );
+//vk.gpu.vkGetPhysicalDeviceFormatProperties( VK_FORMAT_B8G8R8A8_UNORM, & format_properties );
 //format_properties.printTypeInfo;
 
 // checking image format support (additional capabilities)
@@ -1117,5 +1113,5 @@ bool is_constructed( Meta_Image  meta ) { return !meta.is_null; }
 //  VK_IMAGE_TILING_OPTIMAL,
 //  VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
 //  0,
-//  &image_format_properties).vkAssert;
+//  & image_format_properties).vkAssert;
 //image_format_properties.printTypeInfo;
