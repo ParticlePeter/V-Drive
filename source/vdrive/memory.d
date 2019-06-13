@@ -839,221 +839,174 @@ struct Meta_Image {
 
 
 
-/// init a simple VkImage with one level and one layer, sharing_family_queue_indices controls the sharing mode
-/// store vulkan data in argument Meta_Image container, return container for chaining
-auto ref initImage(
-    ref Meta_Image          meta,
-    VkFormat                format,
-    uint32_t                width,
-    uint32_t                height,
-    VkImageUsageFlags       usage,
-    VkSampleCountFlagBits   samples = VK_SAMPLE_COUNT_1_BIT,
-    VkImageTiling           tiling = VK_IMAGE_TILING_OPTIMAL,
-    VkImageLayout           initial_layout = VK_IMAGE_LAYOUT_UNDEFINED,
-    uint32_t[]              sharing_family_queue_indices = [],
-    VkImageCreateFlags      flags   = 0,
-    string                  file    = __FILE__,
-    size_t                  line    = __LINE__,
-    string                  func    = __FUNCTION__
-    ) {
-    return meta.create(
-        format, width, height, 0, 1, 1, usage, samples,
-        tiling, initial_layout, sharing_family_queue_indices, flags,
-        file, line, func );
+
+
+
+
+
+
+
+
+
+
+
+
+
 }
 
+deprecated( "Use member methods to edit and Meta_Image_Sampler_T.construct instead" ) {
+    /// init a simple VkImage with one level and one layer, sharing_family_queue_indices controls the sharing mode
+    /// store vulkan data in argument Meta_Image container, return container for chaining
+    auto ref initImage(
+        ref Meta_Image          meta,
+        VkFormat                format,
+        uint32_t                width,
+        uint32_t                height,
+        VkImageUsageFlags       usage,
+        VkSampleCountFlagBits   samples = VK_SAMPLE_COUNT_1_BIT,
+        VkImageTiling           tiling = VK_IMAGE_TILING_OPTIMAL,
+        VkImageLayout           initial_layout = VK_IMAGE_LAYOUT_UNDEFINED,
+        uint32_t[]              sharing_family_queue_indices = [],
+        VkImageCreateFlags      flags   = 0,
+        string                  file    = __FILE__,
+        size_t                  line    = __LINE__,
+        string                  func    = __FUNCTION__
 
-/// init a VkImage, sharing_family_queue_indices controls the sharing mode
-/// store vulkan data in argument Meta_Image container, return container for chaining
-auto ref initImage(
-    ref Meta_Image          meta,
-    VkFormat                format,
-    uint32_t                width,
-    uint32_t                height,
-    uint32_t                depth,
-    uint32_t                mip_levels,
-    uint32_t                array_layers,
-    VkImageUsageFlags       usage,
-    VkSampleCountFlagBits   samples = VK_SAMPLE_COUNT_1_BIT,
-    VkImageTiling           tiling  = VK_IMAGE_TILING_OPTIMAL,
-    VkImageLayout           initial_layout = VK_IMAGE_LAYOUT_UNDEFINED,
-    uint32_t[]              sharing_family_queue_indices = [],
-    VkImageCreateFlags      flags   = 0,
-    string                  file    = __FILE__,
-    size_t                  line    = __LINE__,
-    string                  func    = __FUNCTION__
-    ) {
-    vkAssert( sharing_family_queue_indices.length != 1,
-        "Length of sharing_family_queue_indices must either be 0 (VK_SHARING_MODE_EXCLUSIVE) or greater 1 (VK_SHARING_MODE_CONCURRENT)",
-        file, line, func );
+        ) {
 
-    VkImageCreateInfo image_create_info = {
-        flags                   : flags,
-        imageType               : height == 0 ? VK_IMAGE_TYPE_1D : depth == 0 ? VK_IMAGE_TYPE_2D : VK_IMAGE_TYPE_3D,
-        format                  : format,
-        extent                  : { width, height == 0 ? 1 : height, depth == 0 ? 1 : depth },
-        mipLevels               : mip_levels,
-        arrayLayers             : array_layers,
-        samples                 : samples,
-        tiling                  : tiling,
-        usage                   : usage,
-        sharingMode             : sharing_family_queue_indices.length > 1 ? VK_SHARING_MODE_CONCURRENT : VK_SHARING_MODE_EXCLUSIVE,
-        queueFamilyIndexCount   : sharing_family_queue_indices.length.toUint,
-        pQueueFamilyIndices     : sharing_family_queue_indices.length > 1 ? sharing_family_queue_indices.ptr : null,
-        initialLayout           : initial_layout,
-    };
-
-    return meta.create( image_create_info, file, line, func );
-}
-
-
-/// init a VkImage, general create image function, gets a VkImageCreateInfo as argument
-/// store vulkan data in argument Meta_Image container, return container for chaining
-auto ref initImage(
-    ref Meta_Image              meta,
-    const ref VkImageCreateInfo image_create_info,
-    string                      file = __FILE__,
-    size_t                      line = __LINE__,
-    string                      func = __FUNCTION__
-    ) {
-    vkAssert( meta.isValid, "Vulkan state not assigned", file, line, func );     // meta struct must be initialized with a valid vulkan state pointer
-
-    if( meta.image != VK_NULL_HANDLE )                      // if an VkImage was created with this meta struct already
-        meta.destroy( meta.image );                         // destroy it first
-
-    meta.image_create_info = image_create_info;
-    meta.device.vkCreateImage( &meta.image_create_info, meta.allocator, &meta.image ).vkAssert( "Init Image", file, line, func );
-    meta.device.vkGetImageMemoryRequirements( meta.image, &meta.memory_requirements );
-    return meta;
-}
-
-alias create = initImage;
-
-// Todo(pp): add chained functions to edit the meta.image_create_info and finalize with construct(), see module pipeline
-
-
-
-/*
-/// init a simple VkImage with one level and one layer, sharing_family_queue_indices controls the sharing mode
-/// store vulkan data in argument Meta_Image container, return container for chaining
-auto createImage(
-    ref Vulkan              vk,
-    VkFormat                format,
-    uint32_t                width,
-    uint32_t                height,
-    VkImageUsageFlags       usage,
-    VkSampleCountFlagBits   samples = VK_SAMPLE_COUNT_1_BIT,
-    VkImageTiling           tiling = VK_IMAGE_TILING_OPTIMAL,
-    VkImageLayout           initial_layout = VK_IMAGE_LAYOUT_UNDEFINED,
-    uint32_t[]              sharing_family_queue_indices = [],
-    VkImageCreateFlags      flags   = 0,
-    string                  file    = __FILE__,
-    size_t                  line    = __LINE__,
-    string                  func    = __FUNCTION__
-    ) {
-    Meta_Image meta = vk;
-    meta.create(    // depth = 0 signals that we want an VK_IMAGE_TYPE_2D
-        format, width, height, 0, 1, 1, usage, samples,
-        tiling, initial_layout, sharing_family_queue_indices, flags,
-        file, line, func );
-    return meta;
-}
-
-
-/// init a VkImage, sharing_family_queue_indices controls the sharing mode
-/// store vulkan data in argument Meta_Image container, return container for chaining
-auto createImage(
-    ref Vulkan              vk,
-    VkFormat                format,
-    uint32_t                width,
-    uint32_t                height,
-    uint32_t                depth,
-    uint32_t                mip_levels,
-    uint32_t                array_layers,
-    VkImageUsageFlags       usage,
-    VkSampleCountFlagBits   samples = VK_SAMPLE_COUNT_1_BIT,
-    VkImageTiling           tiling = VK_IMAGE_TILING_OPTIMAL,
-    VkImageLayout           initial_layout = VK_IMAGE_LAYOUT_UNDEFINED,
-    uint32_t[]              sharing_family_queue_indices = [],
-    VkImageCreateFlags      flags   = 0,
-    string                  file    = __FILE__,
-    size_t                  line    = __LINE__,
-    string                  func    = __FUNCTION__
-    ) {
-    Meta_Image meta = vk;
-    meta.create(    // height = 0 signals we want an VK_IMAGE_TYPE_1D, else depth = 0 signals we want an VK_IMAGE_TYPE_2D, else VK_IMAGE_TYPE_3D
-        format, width, height, depth, mip_levels, array_layers, usage, samples,
-        tiling, initial_layout, sharing_family_queue_indices, flags,
-        file, line, func );
-    return meta;
-}
-
-
-/// create a VkImage, general init image function, gets a VkImageCreateInfo as argument
-/// store vulkan data in argument Meta_Image container, return container for chaining
-auto createImage(
-    ref Vulkan                  vk,
-    const ref VkImageCreateInfo image_create_info,
-    string                      file = __FILE__,
-    size_t                      line = __LINE__,
-    string                      func = __FUNCTION__
-    ) {
-    Meta_Image meta = vk;
-    meta.create( image_create_info, file, line, func );
-    return meta;
-}
-*/
-
-// TODO(pp): assert that valid memory was bound already to the VkBuffer or VkImage
-
-/// create a VkImageView which closely corresponds to the underlying VkImage type
-/// store vulkan data in argument Meta_Image container, return container for chaining
-auto ref createView( ref Meta_Image meta, VkImageAspectFlags subrecource_aspect_mask = VK_IMAGE_ASPECT_COLOR_BIT ) {
-    VkImageSubresourceRange subresource_range = {
-        aspectMask      : subrecource_aspect_mask,
-        baseMipLevel    : cast( uint32_t )0,
-        levelCount      : meta.image_create_info.mipLevels,
-        baseArrayLayer  : cast( uint32_t )0,
-        layerCount      : meta.image_create_info.arrayLayers, };
-    return meta.createView( subresource_range );
-}
-
-/// create a VkImageView which closely coresponds to the underlying VkImage type
-/// store vulkan data in argument Meta_Image container, return container for chaining
-auto ref createView( ref Meta_Image meta, VkImageSubresourceRange subresource_range ) {
-    return meta.createView( subresource_range, cast( VkImageViewType )meta.image_create_info.imageType, meta.image_create_info.format );
-}
-
-/// create a VkImageView with choosing an image view type and format for the underlying VkImage, component mapping is identity
-/// store vulkan data in argument Meta_Image container, return container for chaining
-auto ref createView( ref Meta_Image meta, VkImageSubresourceRange subresource_range, VkImageViewType view_type, VkFormat view_format ) {
-    return meta.createView( subresource_range, view_type, view_format, VkComponentMapping(
-        VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY ));
-}
-
-/// create a VkImageView with choosing an image view type, format and VkComponentMapping for the underlying VkImage
-/// store vulkan data in argument Meta_Image container, return container for chaining
-auto ref createView(
-    ref Meta_Image          meta,
-    VkImageSubresourceRange subresource_range,
-    VkImageViewType         view_type,
-    VkFormat                view_format,
-    VkComponentMapping      component_mapping,
-    string                  file = __FILE__,
-    size_t                  line = __LINE__,
-    string                  func = __FUNCTION__
-    ) {
-    if( meta.image_view != VK_NULL_HANDLE )
-        meta.destroy( meta.image_view );
-    with( meta.image_view_create_info ) {
-        image               = meta.image;
-        viewType            = view_type;
-        format              = view_format;
-        subresourceRange    = subresource_range;
-        components          = component_mapping;
+        return meta.create(
+            format, width, height, 0, 1, 1, usage, samples,
+            tiling, initial_layout, sharing_family_queue_indices, flags,
+            file, line, func );
     }
-    meta.device.vkCreateImageView( &meta.image_view_create_info, meta.allocator, &meta.image_view ).vkAssert( "Create View", file, line, func );
-    return meta;
+
+
+    /// init a VkImage, sharing_family_queue_indices controls the sharing mode
+    /// store vulkan data in argument Meta_Image container, return container for chaining
+    auto ref initImage(
+        ref Meta_Image          meta,
+        VkFormat                format,
+        uint32_t                width,
+        uint32_t                height,
+        uint32_t                depth,
+        uint32_t                mip_levels,
+        uint32_t                array_layers,
+        VkImageUsageFlags       usage,
+        VkSampleCountFlagBits   samples = VK_SAMPLE_COUNT_1_BIT,
+        VkImageTiling           tiling  = VK_IMAGE_TILING_OPTIMAL,
+        VkImageLayout           initial_layout = VK_IMAGE_LAYOUT_UNDEFINED,
+        uint32_t[]              sharing_family_queue_indices = [],
+        VkImageCreateFlags      flags   = 0,
+        string                  file    = __FILE__,
+        size_t                  line    = __LINE__,
+        string                  func    = __FUNCTION__
+
+        ) {
+
+        vkAssert( sharing_family_queue_indices.length != 1,
+            "Length of sharing_family_queue_indices must either be 0 (VK_SHARING_MODE_EXCLUSIVE) or greater 1 (VK_SHARING_MODE_CONCURRENT)",
+            file, line, func );
+
+        VkImageCreateInfo image_ci = {
+            flags                   : flags,
+            imageType               : height == 0 ? VK_IMAGE_TYPE_1D : depth == 0 ? VK_IMAGE_TYPE_2D : VK_IMAGE_TYPE_3D,
+            format                  : format,
+            extent                  : { width, height == 0 ? 1 : height, depth == 0 ? 1 : depth },
+            mipLevels               : mip_levels,
+            arrayLayers             : array_layers,
+            samples                 : samples,
+            tiling                  : tiling,
+            usage                   : usage,
+            sharingMode             : sharing_family_queue_indices.length > 1 ? VK_SHARING_MODE_CONCURRENT : VK_SHARING_MODE_EXCLUSIVE,
+            queueFamilyIndexCount   : sharing_family_queue_indices.length.toUint,
+            pQueueFamilyIndices     : sharing_family_queue_indices.length > 1 ? sharing_family_queue_indices.ptr : null,
+            initialLayout           : initial_layout,
+        };
+
+        return meta.create( image_ci, file, line, func );
+    }
+
+
+    /// init a VkImage, general create image function, gets a VkImageCreateInfo as argument
+    /// store vulkan data in argument Meta_Image container, return container for chaining
+    auto ref initImage(
+        ref Meta_Image              meta,
+        const ref VkImageCreateInfo image_ci,
+        string                      file = __FILE__,
+        size_t                      line = __LINE__,
+        string                      func = __FUNCTION__
+        ) {
+        vkAssert( meta.isValid, "Vulkan state not assigned", file, line, func );     // meta struct must be initialized with a valid vulkan state pointer
+
+        if( meta.image != VK_NULL_HANDLE )                      // if an VkImage was created with this meta struct already
+            meta.destroyHandle( meta.image );                         // destroy it first
+
+        meta.image_ci = image_ci;
+        meta.device.vkCreateImage( & meta.image_ci, meta.allocator, & meta.image ).vkAssert( "Init Image", file, line, func );
+        meta.device.vkGetImageMemoryRequirements( meta.image, & meta.memory_requirements );
+        return meta;
+    }
+
+    alias create = initImage;
+}
+
+
+
+deprecated( "Use member methods to edit and Meta_Image_Sampler_T.constructView instead" ) {
+
+    /// create a VkImageView which closely corresponds to the underlying VkImage type
+    /// store vulkan data in argument Meta_Image container, return container for chaining
+    auto ref createView( ref Meta_Image_View meta, VkImageAspectFlags subrecource_aspect_mask = VK_IMAGE_ASPECT_COLOR_BIT ) {
+        VkImageSubresourceRange subresource_range = {
+            aspectMask      : subrecource_aspect_mask,
+            baseMipLevel    : cast( uint32_t )0,
+            levelCount      : meta.image_ci.mipLevels,
+            baseArrayLayer  : cast( uint32_t )0,
+            layerCount      : meta.image_ci.arrayLayers, };
+        return meta.createView( subresource_range );
+    }
+
+    /// create a VkImageView which closely corresponds to the underlying VkImage type
+    /// store vulkan data in argument Meta_Image container, return container for chaining
+    auto ref createView( ref Meta_Image_View meta, VkImageSubresourceRange subresource_range ) {
+        return meta.createView( subresource_range, cast( VkImageViewType )meta.image_ci.imageType, meta.image_ci.format );
+    }
+
+    /// create a VkImageView with choosing an image view type and format for the underlying VkImage, component mapping is identity
+    /// store vulkan data in argument Meta_Image container, return container for chaining
+    auto ref createView( ref Meta_Image_View meta, VkImageSubresourceRange subresource_range, VkImageViewType view_type, VkFormat view_format ) {
+        return meta.createView( subresource_range, view_type, view_format, VkComponentMapping(
+            VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY ));
+    }
+
+    /// create a VkImageView with choosing an image view type, format and VkComponentMapping for the underlying VkImage
+    /// store vulkan data in argument Meta_Image container, return container for chaining
+    auto ref createView(
+        ref Meta_Image_View     meta,
+        VkImageSubresourceRange subresource_range,
+        VkImageViewType         view_type,
+        VkFormat                view_format,
+        VkComponentMapping      component_mapping,
+        string                  file = __FILE__,
+        size_t                  line = __LINE__,
+        string                  func = __FUNCTION__
+        ) {
+        if( meta.image_view != VK_NULL_HANDLE )
+            meta.destroyHandle( meta.image_view );
+        with( meta.image_view_ci ) {
+            image               = meta.image;
+            viewType            = view_type;
+            format              = view_format;
+            subresourceRange    = subresource_range;
+            components          = component_mapping;
+        }
+        meta.device.vkCreateImageView( & meta.image_view_ci, meta.allocator, & meta.image_view ).vkAssert( "Create View", file, line, func );
+        return meta;
+    }
+}
+
+
+
 }
 
 
