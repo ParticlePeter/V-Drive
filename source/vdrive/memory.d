@@ -1007,7 +1007,38 @@ deprecated( "Use member methods to edit and Meta_Image_Sampler_T.constructView i
 
 
 
+alias  Meta_IView = Meta_IView_T!1;
+struct Meta_IView_T( uint32_t view_count ) {
+    mixin Vulkan_State_Pointer;
+    mixin IView_Memeber!view_count;
+    alias construct = constructView;
+
+
+    ///
+    auto ref setImage( ref Meta_Image meta_image ) {
+        // assign the valid image to the image_view_ci.image member
+        image_view_ci.image = meta_image.image;
+
+        // check if view type was specified
+        if( image_view_ci.viewType == VK_IMAGE_VIEW_TYPE_MAX_ENUM )
+            image_view_ci.viewType = cast( VkImageViewType )meta_image.image_ci.imageType;
+
+        // check if view format was specified
+        if( image_view_ci.format == VK_FORMAT_MAX_ENUM )
+            image_view_ci.format = meta_image.image_ci.format;
+
+        return this;
+    }
+
+
+    auto ref setImage( VkImage image ) {
+        // assign the valid image to the image_view_ci.image member
+        image_view_ci.image = image;
+        return this;
+    }
 }
+
+
 
 
 // TODO(pp): create functions for VkImageSubresourceRange, VkBufferImageCopy and conversion functions between them
