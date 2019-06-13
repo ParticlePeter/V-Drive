@@ -1331,31 +1331,6 @@ void recordTransition(
 
 
 
-////////////////////////
-// Meta_Image_Sampler //
-////////////////////////
-
-/// Pack Meta_Image with some count of samplers for ease of use
-alias  Meta_Image_Sampler = Meta_Image_Sampler_T!1;
-struct Meta_Image_Sampler_T( uint32_t sampler_count ) {
-    Meta_Image meta_image;
-    alias meta_image this;
-    static assert( sampler_count > 0 );
-    static if( sampler_count == 1 )     VkSampler                   sampler;
-    else                                VkSampler[ sampler_count ]  sampler;
-
-    // bulk destroy the resources belonging to this meta struct
-    void destroyResources( bool destroy_sampler = true ) {
-        meta_image.destroyResources;
-        if( destroy_sampler ) {
-            static  if(  sampler_count == 1 )   { if( sampler != VK_NULL_HANDLE ) vk.destroy( sampler ); }
-            else    foreach( ref s; sampler )   { if( s       != VK_NULL_HANDLE ) vk.destroy( s ); }
-        }
-    }
-}
-
-
-
 
 bool is_null( Meta_Memory meta ) { return meta.memory.is_null_handle; }
 bool is_null( Meta_Buffer meta ) { return meta.buffer.is_null_handle; }
