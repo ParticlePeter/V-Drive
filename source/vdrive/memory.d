@@ -797,6 +797,52 @@ mixin template IView_Memeber( uint view_count ) if( view_count > 0 ) {
         return this;
     }
 }
+
+
+
+alias   Core_Image                  = Core_Image_T!(0, 0);
+alias   Core_Image_View             = Core_Image_T!(1, 0);
+alias   Core_Image_View_T( uint c ) = Core_Image_T!(c, 0);
+alias   Core_Image_View_Sampler     = Core_Image_T!(1, 1);
+
+/// Wraps the essential Vulkan objects created with the editing procedure
+/// of Meta_Image_T, all other internal structures are obsolete
+/// after construction so that the Meta_Image_Sampler_T can be reused
+/// after being reset.
+struct  Core_Image_T( uint view_count, uint sampler_count ) {
+    alias vc = view_count;
+    alias sc = sampler_count;
+
+    VkImage image;
+
+         static if( view_count == 1 )       VkImageView                 image_view;
+    else static if( view_count  > 1 )       VkImageView[ view_count ]   image_view;
+
+         static if( sampler_count == 1 )    VkSampler                   sampler;
+    else static if( sampler_count  > 1 )    VkSampler[ sampler_count ]  sampler;
+}
+
+
+/// Bulk destroy the resources belonging to this meta struct.
+void destroy( CORE )( ref Vulkan vk, ref CORE core, bool destroy_sampler = true ) if( isCoreImage!CORE ) {
+    vk.destroyHandle( core.image );
+
+         static if( core.vc == 1 )  { if( core.view != VK_NULL_HANDLE ) vk.destroyHandle( core.view ); }
+    else static if( core.vc  > 1 )  { foreach( ref v; core.view )  if( v != VK_NULL_HANDLE ) vk.destroyHandle( v ); }
+
+    if( destroy_sampler ) {
+             static if( core.sc == 1 )  { if( core.sampler != VK_NULL_HANDLE ) vk.destroyHandle( core.sampler ); }
+        else static if( core.sc  > 1 )  { foreach( ref s; core.sampler )  if( s != VK_NULL_HANDLE ) vk.destroyHandle( s ); }
+    }
+}
+
+
+/// Private template to identify Core_Image_T .
+private template isCoreImage( T ) { enum isCoreImage = is( typeof( isCoreImageImpl( T.init ))); }
+private void isCoreImageImpl( uint view_count, uint sampler_count )( Core_Image_T!( view_count, sampler_count ) ivs ) {}
+
+
+
 alias   Meta_Image                      = Meta_Image_T!(0, 0);
 alias   Meta_Image_View                 = Meta_Image_T!(1, 0);
 alias   Meta_Image_Sampler              = Meta_Image_T!(1, 1);
