@@ -10,6 +10,48 @@ import erupted;
 
 
 
+/////////////////
+// Descriptors //
+/////////////////
+
+
+
+/// create a VkBufferView which can be exclusively used as a descriptor
+/// Params:
+///     vk = reference to a VulkanState struct
+///     buffer = for which the view will be created
+///     format = of the view
+///     offset = optional offset into the original buffer
+///     range  = optional range of the view (starting at offset), VK_WHOLE_SIZE if not specified
+/// Returns: VkBufferView
+auto createBufferView(
+    ref Vulkan      vk,
+    VkBuffer        buffer,
+    VkFormat        format,
+    VkDeviceSize    offset = 0,
+    VkDeviceSize    range = VK_WHOLE_SIZE,
+//  VkBufferViewCreateFlags flags = 0,
+    string          file = __FILE__,
+    size_t          line = __LINE__,
+    string          func = __FUNCTION__
+
+    ) {
+
+    VkBufferViewCreateInfo buffer_view_ci = {
+    //  flags   : flags,
+        buffer  : buffer,
+        format  : format,
+        offset  : offset,
+        range   : range,
+    };
+
+    VkBufferView buffer_view;
+    vk.device.vkCreateBufferView( &buffer_view_ci, vk.allocator, & buffer_view ).vkAssert( null, file, line, func );
+    return buffer_view;
+}
+
+
+
 ///////////////////////////////////////
 // Meta_Buffer and related functions //
 ///////////////////////////////////////
@@ -111,6 +153,11 @@ struct Meta_Buffer {
 }
 
 
+/// package template to identify Meta_Image_T
+package template isMetaBuffer( T ) { enum isMetaBuffer = is( typeof( isMetaBufferImpl( T.init ))); }
+private void isMetaBufferImpl( Meta_Buffer meta_buffer ) {}
+
+
 
 deprecated( "Use member methods to edit and/or Meta_Buffer.construct instead" ) {
 
@@ -154,3 +201,8 @@ deprecated( "Use member methods to edit and/or Meta_Buffer.construct instead" ) 
         return meta;
     }
 }
+
+
+
+bool is_null(        Meta_Buffer meta ) { return meta.buffer.is_null_handle; }
+bool is_constructed( Meta_Buffer meta ) { return !meta.is_null; }

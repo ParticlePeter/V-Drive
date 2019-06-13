@@ -2,6 +2,7 @@ module vdrive;
 
 public import vdrive.util;
 public import vdrive.state;
+public import vdrive.image;
 public import vdrive.buffer;
 public import vdrive.memory;
 public import vdrive.shader;
