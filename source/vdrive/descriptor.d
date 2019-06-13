@@ -66,8 +66,10 @@ auto createSampler(
 
 
 
-struct Meta_Sampler {
-    mixin               Vulkan_State_Pointer;
+mixin template Sampler_Member( uint sampler_count ) if( sampler_count > 0 ) {
+
+    alias sc = sampler_count;
+
     VkSamplerCreateInfo sampler_ci = {
     //  flags                   : 0,
         magFilter               : VK_FILTER_LINEAR,
@@ -86,10 +88,96 @@ struct Meta_Sampler {
         borderColor             : VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK,
         unnormalizedCoordinates : VK_FALSE,
     };
-    VkSampler           sampler;
+
+    static if( sc == 1 ) {
+
+        VkSampler       sampler;
 
 
+        /// Construct the sampler from specified data.
+        auto ref constructSampler( string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+            vkAssert( isValid, "Meta Struct not initialized", file, line, func );   // assert that meta struct is initialized with a valid vulkan state pointer
+            device.vkCreateSampler( & sampler_ci, allocator, & sampler ).vkAssert( "Construct Sampler", file, line, func );
+            return this;
+        }
 
+
+        /// Destroy the sampler
+        void destroySampler() {
+            if( sampler != VK_NULL_HANDLE )
+                vk.destroyHandle( sampler );
+        }
+
+
+        /// get sampler and reset the mamber to VK_NULL_HANDLE such that a new, different sampler can be created
+        auto resetSampler() {
+            auto result = sampler;
+            sampler = VK_NULL_HANDLE;
+            return result;
+        }
+    }
+
+    else {
+
+        VkSampler[sc]   sampler;
+
+
+        /// Construct the sampler from specified data.
+        auto ref constructSampler( uint32_t sampler_index, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+            vkAssert( isValid, "Meta Struct not initialized", file, line, func );   // assert that meta struct is initialized with a valid vulkan state pointer
+        device.vkCreateSampler( & sampler_ci, allocator, & sampler[ sampler_index ] ).vkAssert( "Construct Sampler", file, line, func );
+        return this;
+        }
+
+
+        /// Destroy the samplers
+        void destroySampler() {
+            foreach( ref smp; sampler )
+                if( smp != VK_NULL_HANDLE )
+                    vk.destroyHandle( smp );
+        } alias destroySamplers = destroySampler;
+
+
+        /// get one sampler and reset it to VK_NULL_HANDLE such that a new, different dampler can be created at thta index
+        auto resetSampler( uint index ) {
+            auto result = sampler[ index ];
+            sampler[ index ] = VK_NULL_HANDLE;
+            return result;
+        }
+
+
+        /// get all samplers views and reset them to VK_NULL_HANDLE such that a new, different samplers can be created
+        auto resetSampler() {
+            auto result = sampler;
+            foreach( ref smp; sampler )
+                smp = VK_NULL_HANDLE;
+            return result;
+        } alias resetSamplers = resetSampler;
+    }
+
+
+    /// Initialize image view create info to useful defaults
+    void initSamplerCreateInfo() {
+        sampler_ci = VkSamplerCreateInfo.init;
+        sampler_ci.magFilter               = VK_FILTER_LINEAR;
+        sampler_ci.minFilter               = VK_FILTER_LINEAR;
+        sampler_ci.mipmapMode              = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+        sampler_ci.addressModeU            = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        sampler_ci.addressModeV            = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        sampler_ci.addressModeW            = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        sampler_ci.mipLodBias              = 0;
+        sampler_ci.anisotropyEnable        = VK_FALSE;
+        sampler_ci.maxAnisotropy           = 1;
+        sampler_ci.compareEnable           = VK_FALSE;
+        sampler_ci.compareOp               = VK_COMPARE_OP_NEVER;
+        sampler_ci.minLod                  = 0;
+        sampler_ci.maxLod                  = 0;
+        sampler_ci.borderColor             = VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK;
+        sampler_ci.unnormalizedCoordinates = VK_FALSE;
+    }
+
+
+    /// Specify filter settings.
     auto ref filter(
         VkFilter            mag_filter,
         VkFilter            min_filter,
@@ -102,6 +190,7 @@ struct Meta_Sampler {
     }
 
 
+    /// Specify mipmap settings.
     auto ref mipmap(
         VkSamplerMipmapMode mipmap_mode,
         float               mip_lod_bias = 0,
@@ -116,6 +205,7 @@ struct Meta_Sampler {
     }
 
 
+    /// Specify address mode aka texture border behavior.
     auto ref addressMode(
         VkSamplerAddressMode    addressModeU,
         VkSamplerAddressMode    addressModeV,
@@ -128,6 +218,7 @@ struct Meta_Sampler {
     }
 
 
+    /// Specify whether to use anisotropy with an optional maximum anisotropy parameter.
     auto ref anisotropy( VkBool32 anisotropy_enable, float max_anisotropy = 1 ) {
         sampler_ci.anisotropyEnable    = anisotropy_enable;
         sampler_ci.maxAnisotropy       = max_anisotropy;
@@ -135,6 +226,7 @@ struct Meta_Sampler {
     }
 
 
+    /// Enable and specify comparison operations.
     auto ref compare( VkBool32 compare_enable, VkCompareOp compare_op = VK_COMPARE_OP_NEVER ) {
         sampler_ci.compareEnable   = compare_enable;
         sampler_ci.compareOp       = compare_op;
@@ -142,19 +234,23 @@ struct Meta_Sampler {
     }
 
 
+    /// Specify whether to use unnormalized coordinates.
     auto ref unnormalizedCoordinates( VkBool32 unnormalized_coordinates ) {
         sampler_ci.unnormalizedCoordinates   = unnormalized_coordinates;
         return this;
     }
-
-
-    auto ref construct( string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
-        // assert that meta struct is initialized with a valid vulkan state pointer
-        vkAssert( isValid, "Meta Struct not initialized", file, line, func );
-        device.vkCreateSampler( & sampler_ci, allocator, & sampler ).vkAssert( "Construct Sampler", file, line, func );
-        return this;
-    }
 }
+
+
+alias Meta_Sampler = Meta_Sampler_T!1;
+/// Meta struct to configure and construct a VkSampler.
+/// Must be initialized with a Vulkan state struct.
+struct Meta_Sampler_T( uint32_t sampler_count ) {
+    mixin Vulkan_State_Pointer;
+    mixin Sampler_Member!sampler_count;
+    alias construct = constructSampler;
+}
+
 
 
 /// create a VkBufferView which can be exclusively used as a descriptor
