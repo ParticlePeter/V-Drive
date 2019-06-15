@@ -384,10 +384,10 @@ struct Meta_Memory {
 
     /// Register one multiple memory ranges for one future allocation derived from Meta_Buffer, Meta_Image or Array/Slice of the two.
     /// Memory Offsets including alignment are stored in the corresponding Meta structs. Can be called multiple times with any of the above types.
-    auto ref addRange( META )( ref META meta_resource, VkDeviceSize* out_memory_size = null, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+    auto ref addRange( META )( ref META meta_resource, VkDeviceSize* io_memory_size = null, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
         static if( isDataArrayOrSlice!META ) {
-            foreach( ref resource; meta_resources ) {
-                addRange( resource, memory_size, file, line, func );
+            foreach( ref resource; meta_resource ) {
+                addRange( resource, io_memory_size, file, line, func );
             }
         } else static if( hasMemReqs!META ) {
             // confirm that VkMemoryPropertyFlags have been specified with memoryType;
@@ -399,12 +399,12 @@ struct Meta_Memory {
             if( memory_type_index < resource_type_index ) memory_type_index = resource_type_index;
 
             // register the required memory size range, either internally in the meta struct
-            // or in the optionally passed in pointer to an external out_memory_size
-            if( out_memory_size is null ) {
+            // or in the optionally passed in pointer to an external io_memory_size
+            if( io_memory_size is null ) {
                 meta_resource.device_memory_offset = meta_resource.alignedOffset( device_memory_size );
                 device_memory_size = meta_resource.device_memory_offset + meta_resource.requiredMemorySize;
             } else {
-                *out_memory_size = meta_resource.alignedOffset( *out_memory_size ) + meta_resource.requiredMemorySize;
+                *io_memory_size = meta_resource.alignedOffset( *io_memory_size ) + meta_resource.requiredMemorySize;
             }
         } else {
             static assert(0);   // types not matching
@@ -424,16 +424,18 @@ struct Meta_Memory {
 
 
     /// Bind the corresponding range of allocated memory to its client Meta_Buffer(s) or Meta_Image(s). The memory object and and its range is stored in each Meta struct.
-    auto ref bind( META )( ref META meta_resource, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__, ) if( hasMemReqs!META ) {
+    auto ref bind( META )( ref META meta_resource, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__, ) {
         static if( isDataArrayOrSlice!META ) {
             vkAssert( device_memory != VK_NULL_HANDLE, "No memory allocated for resources.", file, line, func, "Must call allocate() before bind()ing a buffers or images." );
-            foreach( ref resource; meta_resources ) {
+            foreach( ref resource; meta_resource ) {
                 resource.bindMemory( device_memory, resource.device_memory_offset, file, line, func );
             }
         } else static if( hasMemReqs!META ) {
             // confirm that memory for this resource has been allocated
             vkAssert( device_memory != VK_NULL_HANDLE, "No memory allocated for resource.", file, line, func, "Must call allocate() before bind()ing a buffer or image." );
             meta_resource.bindMemory( device_memory, meta_resource.device_memory_offset, file, line, func );
+        } else {
+            static assert(0);   // types not matching
         }
         return this;
     }
@@ -443,13 +445,13 @@ struct Meta_Memory {
     /// but obey alignment constraints. Method accepts var args of Meta_Buffer, Meta_Image or Slices/Arrays of the same.
     auto ref allocateAndBind( Args... )( ref Args args, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
 
-        static foreach( arg; args )
-            addRange( arg, null, file, line, func );
+        static foreach( i; 0 .. Args.length )
+            addRange!( Args[ i ] )( args[ i ], null, file, line, func );
 
         allocate;
 
-        foreach( ref arg; args )
-            bind( arg, file, line, func );
+        static foreach( i; 0 .. Args.length )
+            bind!( Args[ i ] )( args[ i ], file, line, func );
 
         return this;
     }
@@ -549,7 +551,7 @@ mixin template Memory_Member() {
 
     auto ref bindMemory( VkDeviceMemory device_memory, VkDeviceSize memory_offset = 0, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
         vkAssert( isValid, "Vulkan state not assigned", file, line, func );       // meta struct must be initialized with a valid vulkan state pointer
-        vkAssert( this.device_memory == VK_NULL_HANDLE, "Memory can be bound only once, rebinding is not allowed", file, line, func );
+        vkAssert( this.device_memory == VK_NULL_HANDLE, "Memory already bound to object: ", file, line, func );
 
         this.owns_device_memory = false;
         this.device_memory = device_memory;
