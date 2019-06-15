@@ -906,9 +906,9 @@ template isStaticArray(  A, E ) { enum isStaticArray  = isStaticArray!A  && is( 
 template isDataArray(    A, E ) { enum isDataArray    = isDataArray!A    && is( A.Val_T == E ); }
 template isSomeArray(    A, E ) { enum isSomeArray    = isSomeArray!A    && is( A.Val_T == E ); }
 
+import std.traits : isArray;
+template isDataArrayOrSlice( A )    { enum isDataArrayOrSlice = isDataArray!( A )    || isArray!A; }
 template isDataArrayOrSlice( A, E ) { enum isDataArrayOrSlice = isDataArray!( A, E ) || is( A : E[] ); }
-
-template is_D_or_S_array(   A ) { enum is_D_or_S_array= isDynamicArray!A || isStaticArray!A; }
 
 
 
