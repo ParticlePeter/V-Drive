@@ -96,7 +96,7 @@ struct Meta_Buffer {
 
 
     /// Specify buffer size.
-    auto ref bufferSize( VkBufferUsageFlags buffer_size ) {
+    auto ref bufferSize( VkDeviceSize buffer_size ) {
         buffer_ci.size = buffer_size;
         return this;
     }
@@ -154,8 +154,7 @@ struct Meta_Buffer {
 
 
 /// package template to identify Meta_Image_T
-package template isMetaBuffer( T ) { enum isMetaBuffer = is( typeof( isMetaBufferImpl( T.init ))); }
-private void isMetaBufferImpl( Meta_Buffer meta_buffer ) {}
+package template isMetaBuffer( T ) { enum isMetaBuffer = is( T == Meta_Buffer ); }
 
 
 
