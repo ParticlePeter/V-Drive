@@ -216,6 +216,21 @@ package mixin template Memory_Buffer_Image_Common() {
     }
 
 
+    /// map the underlying memory object into mapped_memory param and return reference to the Meta_Struct
+    auto ref mapMemory(
+        ref void*           mapped_memory,
+        VkDeviceSize        size    = 0,        // if 0, the device_memory_size will be used
+        VkDeviceSize        offset  = 0,
+    //  VkMemoryMapFlags    flags   = 0,        // for future use
+        string              file    = __FILE__,
+        size_t              line    = __LINE__,
+        string              func    = __FUNCTION__
+        ) {
+        mapped_memory = mapMemory( size, offset, /*flags,*/ file, line, func );
+        return this;
+    }
+
+
     /// map the underlying memory object, copy the provided data into it and return the mapped memory pointer
     auto mapMemory(
         void[]              data,
@@ -244,6 +259,21 @@ package mixin template Memory_Buffer_Image_Common() {
             .vkFlushMappedMemoryRanges( 1, & mapped_memory_range )
             .vkAssert( "Map Memory", file, line, func );
         return mapped_memory;
+    }
+
+
+    /// map the underlying memory object into mapped_memory param, copy the provided data into it and return reference to the Meta_Struct
+    auto mapMemory(
+        ref void*           mapped_memory,
+        void[]              data,
+        VkDeviceSize        offset  = 0,
+    //  VkMemoryMapFlags    flags   = 0,        // for future use
+        string              file    = __FILE__,
+        size_t              line    = __LINE__,
+        string              func    = __FUNCTION__
+        ) {
+        mapped_memory = mapMemory( data, offset, /*flags,*/ file, line, func );
+        return this;
     }
 
 
