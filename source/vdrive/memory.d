@@ -125,8 +125,9 @@ auto mapMemory(
 
 
 /// Unmap allocated memory.
-void unmapMemory( ref Vulkan vk, VkDeviceMemory memory ) {
+ref Vulkan unmapMemory( ref Vulkan vk, VkDeviceMemory memory ) {
     vk.device.vkUnmapMemory( memory );
+    return vk;
 }
 
 
@@ -152,29 +153,33 @@ auto createMappedMemoryRange(
 
 
 /// Flush a mapped memory range.
-void flushMappedMemoryRange( ref Vulkan vk, VkMappedMemoryRange mapped_memory_range, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+ref Vulkan flushMappedMemoryRange( ref Vulkan vk, VkMappedMemoryRange mapped_memory_range, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
     vk.device.vkFlushMappedMemoryRanges( 1, & mapped_memory_range ).vkAssert( "Flush Mapped Memory Range", file, line, func );
+    return vk;
 }
 
 
 
 /// Flush multiple mapped memory ranges.
-void flushMappedMemoryRanges( ref Vulkan vk, VkMappedMemoryRange[] mapped_memory_ranges, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+ref Vulkan flushMappedMemoryRanges( ref Vulkan vk, VkMappedMemoryRange[] mapped_memory_ranges, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
     vk.device.vkFlushMappedMemoryRanges( mapped_memory_ranges.length.toUint, mapped_memory_ranges.ptr ).vkAssert( "Flush Mapped Memory Ranges", file, line, func );
+    return vk;
 }
 
 
 
 /// Invalidate a mapped memory range.
-void invalidateMappedMemoryRange( ref Vulkan vk, VkMappedMemoryRange mapped_memory_range, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+ref Vulkan invalidateMappedMemoryRange( ref Vulkan vk, VkMappedMemoryRange mapped_memory_range, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
     vk.device.vkInvalidateMappedMemoryRanges( 1, & mapped_memory_range ).vkAssert( "Flush Mapped Memory Range", file, line, func );
+    return vk;
 }
 
 
 
 /// Invalidate multiple mapped memory ranges.
-void invalidateMappedMemoryRanges( ref Vulkan vk, VkMappedMemoryRange[] mapped_memory_ranges, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+ref Vulkan invalidateMappedMemoryRanges( ref Vulkan vk, VkMappedMemoryRange[] mapped_memory_ranges, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
     vk.device.vkInvalidateMappedMemoryRanges( mapped_memory_ranges.length.toUint, mapped_memory_ranges.ptr ).vkAssert( "Flush Mapped Memory Ranges", file, line, func );
+    return vk;
 }
 
 
@@ -197,9 +202,7 @@ package mixin template Memory_Buffer_Image_Common() {
         string              file    = __FILE__,
         size_t              line    = __LINE__,
         string              func    = __FUNCTION__
-
         ) {
-
         // if we want to map the memory of an underlying buffer or image,
         // we need to account for the buffer or image offset into its VkDeviceMemory
         static if( is( typeof( this ) == Meta_Memory )) VkDeviceSize combined_offset = offset;
