@@ -417,6 +417,91 @@ VkImageFormatProperties imageFormatProperties(
 
 
 
+///////////////////////////////
+// Core_Image and Meta_Image //
+///////////////////////////////
+
+alias IMC = Image_Member_Copy;
+enum Image_Member_Copy : uint {
+    None        = 0,
+    Memory      = 1,
+    Extent      = 2,
+    Sub_Range   = 4,
+};
+
+
+alias   Core_Image                                      = Core_Image_T!(  0,  0 );
+alias   Core_Image_View                                 = Core_Image_T!(  1,  0 );
+alias   Core_Image_Sampler                              = Core_Image_T!(  1,  1 );
+alias   Core_Image_View_Sampler                         = Core_Image_T!(  1,  1 );
+alias   Core_Image_View_T( uint vc, uint mc = 0 )       = Core_Image_T!( vc,  0, mc );
+alias   Core_Image_Sampler_T( uint sc, uint mc = 0 )    = Core_Image_T!(  1, sc, mc );
+
+alias   Core_Image_Memory                               = Core_Image_T!(  0,  0, IMC.Memory );
+alias   Core_Image_Memory_View                          = Core_Image_T!(  1,  0, IMC.Memory );
+alias   Core_Image_Memory_Sampler                       = Core_Image_T!(  1,  1, IMC.Memory );
+alias   Core_Image_Memory_View_Sampler                  = Core_Image_T!(  1,  1, IMC.Memory );
+
+alias   Core_Image_Memory_View_T( uint vc, uint mc = 0 )    = Core_Image_T!( vc,  0, IMC.Memory | mc );
+alias   Core_Image_Memory_Sampler_T( uint sc, uint mc = 0 ) = Core_Image_T!(  1, sc, IMC.Memory | mc );
+alias   Core_Image_Memory_T( uint vc, uint sc, uint mc = 0) = Core_Image_T!( vc, sc, IMC.Memory | mc );
+
+/// Wraps the essential Vulkan objects created with the editing procedure
+/// of Meta_Image_T, all other internal structures are obsolete
+/// after construction so that the Meta_Image_Sampler_T can be reused
+/// after being reset.
+struct  Core_Image_T( uint view_count, uint sampler_count, uint member_copies = IMC.None ) {
+    alias vc = view_count;
+    alias sc = sampler_count;
+    alias mc = member_copies;
+
+    VkImage image;
+
+         static if( vc == 1 )           VkImageView                     view;
+    else static if( vc  > 1 )           VkImageView[ vc ]               view;
+
+         static if( sc == 1 )           VkSampler                       sampler;
+    else static if( sc  > 1 )           VkSampler[ sc ]                 sampler;
+
+    static if( mc & IMC.Memory )        VkDeviceMemory                  memory;
+    static if( mc & IMC.Extent )        VkExtent3D                      extent;
+
+    static if( mc & IMC.Sub_Range ) {
+             static if( vc == 1 )       VkImageSubresourceRange         subresourceRange;
+        else static if( vc  > 1 )       VkImageSubresourceRange[ vc ]   subresourceRange;
+    }
+
+
+    /// Check if all Vulkan resources are null, not available for multi buffer view.
+         static if( vc == 0 && sc == 0 ) bool   is_null() { return image.is_null_handle; }
+    else static if( vc == 1 && sc == 0 ) bool   is_null() { return image.is_null_handle && view.is_null_handle; }
+    else static if( vc == 1 && sc == 1 ) bool   is_null() { return image.is_null_handle && view.is_null_handle && sampler.is_null_handle; }
+    else static if( vc == 0 && sc == 1 ) bool   is_null() { return image.is_null_handle                        && sampler.is_null_handle; }
+}
+
+
+/// Bulk destroy the resources belonging to this meta struct.
+void destroy( CORE )( ref Vulkan vk, ref CORE core, bool destroy_sampler = true ) if( isCoreImage!CORE ) {
+    vk.destroyHandle( core.image );
+
+         static if( core.vc == 1 )  { if( core.view != VK_NULL_HANDLE ) vk.destroyHandle( core.view ); }
+    else static if( core.vc  > 1 )  { foreach( ref v; core.view )  if( v != VK_NULL_HANDLE ) vk.destroyHandle( v ); }
+
+    if( destroy_sampler ) {
+             static if( core.sc == 1 )  { if( core.sampler != VK_NULL_HANDLE ) vk.destroyHandle( core.sampler ); }
+        else static if( core.sc  > 1 )  { foreach( ref s; core.sampler )  if( s != VK_NULL_HANDLE ) vk.destroyHandle( s ); }
+    }
+
+    static if( CORE.mc & IMC.Memory )  vk.destroyHandle( core.memory );
+}
+
+
+/// Private template to identify Core_Image_T .
+private template isCoreImage( T ) { enum isCoreImage = is( typeof( isCoreImageImpl( T.init ))); }
+private void isCoreImageImpl( uint view_count, uint sampler_count, uint member_copies )( Core_Image_T!( view_count, sampler_count, member_copies ) ivs ) {}
+
+
+
 
     alias vc = view_count;
 
