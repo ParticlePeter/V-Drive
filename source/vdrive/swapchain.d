@@ -30,6 +30,7 @@ auto ref listSurfaceFormats( Result_T )(
     string          file = __FILE__,
     size_t          line = __LINE__,
     string          func = __FUNCTION__
+
     ) if( isScratchResult!Result_T || isDynamicResult!Result_T ) {
 
     // extract gpu member based on template argument
@@ -213,18 +214,24 @@ auto  getSwapchainImageViews_t( int32_t max_image_count )(
     string          file = __FILE__,
     size_t          line = __LINE__,
     string          func = __FUNCTION__
+
     ) {
+
     // get swapchain images
     auto swapchain_images = getSwapchainImages_t!max_image_count( vk.device, swapchain, file, line, func );
 
     // allocate storage for image views and create one view per swapchain image in a loop
-    D_OR_S_ARRAY!( max_image_count, VkImageView ) swapchain_image_views;
-    swapchain_image_views.length = swapchain_images.length;
+    D_OR_S_ARRAY!( max_image_count, VkImageView ) image_views;
+    image_views.length = swapchain_images.length;
     foreach( i; 0 .. swapchain_images.length ) {
         image_view_ci.image = swapchain_images[i];   // complete VkImageViewCreateInfo with image i:
-        vkCreateImageView( vk.device, & image_view_ci, vk.allocator, & swapchain_image_views[i] ).vkAssert( "Create Image View", file, line, func );
+        vkCreateImageView( vk.device, & image_view_ci, vk.allocator, & image_views[i] ).vkAssert( "Create Image View", file, line, func );
     }
-    return swapchain_image_views;
+    return image_views;
+}
+
+
+
 }
 
 
