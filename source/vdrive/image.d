@@ -502,6 +502,31 @@ private void isCoreImageImpl( uint view_count, uint sampler_count, uint member_c
 
 
 
+/////////////////////////////////////////////////////////////////////////////////////////
+// Meta_IView and Mete_Sampler simple instantiation of IView_Member and Sampler_Member //
+/////////////////////////////////////////////////////////////////////////////////////////
+
+alias  Meta_IView = Meta_IView_T!1;
+/// Meta struct to configure and construct a VkImageView.
+/// Must be initialized with a Vulkan state struct.
+struct Meta_IView_T( uint32_t view_count ) {
+    mixin Vulkan_State_Pointer;
+    mixin IView_Member!view_count;
+    alias construct = constructView;
+}
+
+
+alias Meta_Sampler = Meta_Sampler_T!1;
+/// Meta struct to configure and construct a VkSampler.
+/// Must be initialized with a Vulkan state struct.
+struct Meta_Sampler_T( uint32_t sampler_count ) {
+    mixin Vulkan_State_Pointer;
+    mixin Sampler_Member!sampler_count;
+    alias construct = constructSampler;
+}
+
+
+
 /// template to mixin VkImage construction related members and methods
 mixin template Image_Member( uint image_count ) if( image_count > 0 ) {
 
