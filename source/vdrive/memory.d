@@ -574,10 +574,10 @@ mixin template Memory_Member() {
         owns_device_memory = true;                                              // using this method the resource always owns the memory
         device_memory = vk.allocateMemory( memory_requirements.size, memoryTypeIndex( memory_property_flags ));
 
-        import vdrive.buffer;   // ??? Compilation error without this import, isMetaBuffer is unknown, but isMetaImage not ???
-        static      if( isMetaBuffer!(typeof( this )))  vk.device.vkBindBufferMemory( buffer, device_memory, 0 ).vkAssert( "Bind Buffer Memory", file, line, func );
-        else static if( isMetaImage!( typeof( this )))  vk.device.vkBindImageMemory(  image,  device_memory, 0 ).vkAssert( "Bind Image Memory" , file, line, func );
-        else static assert( 0, "Memory Member can only be mixed into Meta_Memory, Meta_Buffer or Meta_Image_T" );
+        static import vdrive.buffer, vdrive.image;  // without the static import of vdrive.buffer the isMetaBuffer template cannot be found. DMD bug?
+             static if( vdrive.buffer.isMetaBuffer!(typeof( this )))  vk.device.vkBindBufferMemory( buffer, device_memory, 0 ).vkAssert( "Bind Buffer Memory", file, line, func );
+        else static if( vdrive.image .isMetaImage!( typeof( this )))  vk.device.vkBindImageMemory(  image,  device_memory, 0 ).vkAssert( "Bind Image Memory" , file, line, func );
+        else static assert( 0, "Memory Member can only be mixed into Meta_Memory, Meta_Buffer or Meta_Image_T, but found: " ~ typeof( this ).stringof );
         return this;
     }
 
