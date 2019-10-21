@@ -232,7 +232,66 @@ auto  getSwapchainImageViews_t( int32_t max_image_count )(
 
 
 
+alias SMC = Swapchain_Member_Copy;
+enum Swapchain_Member_Copy : uint32_t {
+    None        = 0,
+    Queue       = 1,
+    Extent      = 2,
+    Format      = 4,
+};
+
+
+alias   Core_Swapchain                              = Core_Swapchain_T!(  4, SMC.None   );
+alias   Core_Swapchain_Queue                        = Core_Swapchain_T!(  4, SMC.Queue  );
+alias   Core_Swapchain_Extent                       = Core_Swapchain_T!(  4, SMC.Extent );
+alias   Core_Swapchain_Queue_Extent                 = Core_Swapchain_T!(  4, SMC.Queue  | SMC.Extent );
+alias   Core_Swapchain_T( uint ic )                 = Core_Swapchain_T!( ic, SMC.None   );
+alias   Core_Swapchain_Queue_T( uint ic )           = Core_Swapchain_T!( ic, SMC.Queue  );
+alias   Core_Swapchain_Extent_T( uint ic )          = Core_Swapchain_T!( ic, SMC.Extent );
+alias   Core_Swapchain_Queue_Extent_T( uint ic )    = Core_Swapchain_T!( ic, SMC.Queue  | SMC.Extent );
+
+/// Wraps the essential Vulkan objects created with the editing procedure
+/// of Meta_Image_T, all other internal structures are obsolete
+/// after construction so that the Meta_Image_Sampler_T can be reused
+/// after being reset.
+struct Core_Swapchain_T( int32_t max_image_count, uint32_t member_copies = SMC.None ) if( max_image_count > 0 ) {
+    alias ic = max_image_count;
+    alias mc = member_copies;
+
+    VkSurfaceKHR    surface;
+    VkSwapchainKHR  swapchain;
+    D_OR_S_ARRAY!(  max_image_count,    VkImageView )   image_views;
+    static if( mc & SMC.Queue  )        VkQueue         present_queue;
+    static if( mc & SMC.Extent )        VkExtent2D      image_extent;
+    static if( mc & SMC.Format )        VkFormat        image_format;
+
+    auto image_count()                  { return image_views.length.toUint; }
+
+    bool is_null()                      { return swapchain.is_null_handle; }
 }
+
+
+/// Bulk destroy the resources belonging to this meta struct.
+void destroy( CORE )( ref Vulkan vk, ref CORE core, bool destroy_surface = true, bool destroy_image_view = true ) if( isCoreSwapchain!CORE ) {
+    vk.destroyHandle( core.swapchain );
+
+    if( destroy_image_view ) {
+             static if( core.ic == 1 )  { if( !core.image_view.is_null_handle ) vk.destroyHandle( core.image_view ); }
+        else static if( core.ic  > 1 )  { foreach( ref v; core.image_views )  if( !v.is_null_handle ) vk.destroyHandle( v ); }
+    }
+
+    vk.destroyHandle( core.swapchain );
+
+    if( destroy_surface )
+        vk.destroyHandle( core.surface );
+}
+
+
+/// Private template to identify Core_Image_T .
+private template isCoreSwapchain( T ) { enum isCoreSwapchain = is( typeof( isCoreSwapchainImpl( T.init ))); }
+private void isCoreSwapchainImpl( int32_t max_view_count, uint32_t member_copies )( Core_Swapchain_T!( max_view_count, member_copies ) cs ) {}
+
+
 
 
 
