@@ -502,6 +502,232 @@ private void isCoreImageImpl( uint view_count, uint sampler_count, uint member_c
 
 
 
+/// template to mixin VkImage construction related members and methods
+mixin template Image_Member( uint image_count ) if( image_count > 0 ) {
+
+    alias ic = image_count;
+
+    VkImageCreateInfo       image_ci    = {
+        mipLevels   : 1,
+        arrayLayers : 1,
+        samples     : VK_SAMPLE_COUNT_1_BIT
+    };
+
+    static if( ic == 1 ) {
+
+        VkImage         image;
+
+
+        /// Construct the image from specified data. If format or type was not specified, the corresponding image format and/or type will be used.
+        auto ref constructImage( string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+
+            // assert validity
+            assureValidImage( file, line, func );
+
+            // construct the image
+            vkCreateImage( vk.device, & image_ci, vk.allocator, & image ).vkAssert( "Construct image", file, line, func );
+
+            // if this template is embedded in some Meta_Image, we must retrieve the memory requirements here
+            static if( hasMemReqs!( typeof( this )))
+                vk.device.vkGetImageMemoryRequirements( image, & memory_requirements );
+
+            return this;
+        }
+
+
+        /// Destroy the image
+        void destroyImage() {
+            if( image != VK_NULL_HANDLE )
+                vk.destroyHandle( image );
+        }
+
+
+        /// get image and reset it to VK_NULL_HANDLE such that a new, different image can be created
+        auto resetImage() {
+            auto result = image;
+            image = VK_NULL_HANDLE;
+            initImageCreateInfo;
+            return result;
+        }
+
+
+        /// check if the handle is a null handle. This does not check the validity of the handle, only its value.
+        bool is_image_null()            { return image.is_null_handle; }
+    }
+
+    else {
+
+        VkImage[ic]     image;
+
+
+        /// Construct the image from specified data. If format or type was not specified, the corresponding image format and/or type will be used.
+        auto ref constructImage( uint32_t image_index, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+
+            // assert validity
+            assureValidImage( file, line, func );
+
+            // construct the image
+            vk.device.vkCreateImage( & image_ci, vk.allocator, & image[ image_index ] ).vkAssert( "Construct image", file, line, func );
+            return this;
+        }
+
+
+        /// Destroy the image views
+        void destroyImage() {
+            foreach( ref img; image )
+                if( img != VK_NULL_HANDLE )
+                    vk.destroyHandle( img );
+        } alias destroyImages = destroyImage;
+
+
+        /// get one image and reset it to VK_NULL_HANDLE such that a new, different image can be created at that index
+        auto resetImage( uint image_index ) {
+            auto result = image[ image_index ];
+            image[ image_index ] = VK_NULL_HANDLE;
+            return result;
+        }
+
+
+        /// get all image views and reset them to VK_NULL_HANDLE such that a new, different views can be created
+        auto resetImage() {
+            auto result = image;
+            foreach( ref img; image )
+                img = VK_NULL_HANDLE;
+            initImageCreateInfo;
+            return result;
+        } alias resetImages = resetImage;
+
+
+        /// check if the handle is a null handle. This does not check the validity of the handle, only its value.
+        bool is_image_null(        uint32_t image_index )   { return image[ image_index ].is_null_handle; }
+    }
+
+
+    private void assureValidImage( string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+        // assert that meta struct is initialized with a valid vulkan state pointer
+        vkAssert( isValid, "Vulkan state not assigned", file, line, func );
+
+        // assert that 3D format is not combined with array layers if(!A != !B)
+        vkAssert( image_ci.imageType == VK_IMAGE_TYPE_3D ? image_ci.arrayLayers == 1 : true,
+            "Length of sharing_queue_family_indices must either be 0 (VK_SHARING_MODE_EXCLUSIVE) or greater 1 (VK_SHARING_MODE_CONCURRENT)",
+            file, line, func );
+
+        // assert that sharing_queue_family_indices is not 1
+        vkAssert( image_ci.queueFamilyIndexCount != 1,
+            "Length of sharing_queue_family_indices must either be 0 (VK_SHARING_MODE_EXCLUSIVE) or greater 1 (VK_SHARING_MODE_CONCURRENT)",
+            file, line, func );
+    }
+
+
+    /// Initialize image create info to useful defaults
+    void initImageCreateInfo() {
+        image_ci = VkImageCreateInfo.init;
+        image_ci.mipLevels      = 1;
+        image_ci.arrayLayers    = 1;
+        image_ci.samples        = VK_SAMPLE_COUNT_1_BIT;
+    }
+
+
+    /// image_ci extent shortcut
+    auto const ref extent() {
+        return image_ci.extent;
+    }
+
+
+    /// specify format of image
+    auto ref format( VkFormat format ) {
+        image_ci.format = format;
+        return this;
+    }
+
+
+    /// Specify image type and extent. For 2D type omit depth extent argument, for 1D type omit height extent argument.
+    auto ref extent( uint32_t width, uint32_t height = 0, uint32_t depth = 0 ) {
+        image_ci.imageType  = height == 0 ? VK_IMAGE_TYPE_1D : depth == 0 ? VK_IMAGE_TYPE_2D : VK_IMAGE_TYPE_3D;
+        image_ci.extent     = VkExtent3D( width, height == 0 ? 1 : height, depth == 0 ? 1 : depth );
+        return this;
+    }
+
+
+    /// Specify 2D image type and extent.
+    auto ref extent( VkExtent2D extent, VkImageType image_type = VK_IMAGE_TYPE_2D ) {
+        image_ci.imageType  = image_type;
+        image_ci.extent     = VkExtent3D( extent.width, extent.height, 1 );
+        return this;
+    }
+
+
+    /// Specify 3D image type and extent.
+    auto ref extent( VkExtent3D extent, VkImageType image_type = VK_IMAGE_TYPE_3D ) {
+        image_ci.imageType  = image_type;
+        image_ci.extent     = extent;
+        return this;
+    }
+
+
+    /// Specify image usage.
+    auto ref usage( VkImageUsageFlags usage ) {
+        image_ci.usage = usage;
+        return this;
+    }
+
+
+    /// Add image usage. The added usage will be or-ed with the existing one.
+    auto ref addUsage( VkImageUsageFlags usage ) {
+        image_ci.usage |= usage;
+        return this;
+    }
+
+
+    /// Specify mipmap levels.
+    auto ref mipLevels( uint32_t levels ) {
+        image_ci.mipLevels = levels;
+        return this;
+    }
+
+
+    /// Specify array layers.
+    auto ref arrayLayers( uint32_t layers ) {
+        image_ci.arrayLayers = layers;
+        return this;
+    }
+
+
+    /// Specify sample count, this function is aliased more descriptively to sampleCount.
+    auto ref samples( VkSampleCountFlagBits samples ) {
+        image_ci.samples = samples;
+        return this;
+    }
+    alias sampleCount = samples;
+
+
+    /// Specify image tiling.
+    auto ref tiling( VkImageTiling tiling ) {
+        image_ci.tiling = tiling;
+        return this;
+    }
+
+
+    /// Specify the sharing queue families and implicitly the sharing mode, which defaults to VK_SHARING_MODE_EXCLUSIVE.
+    auto ref sharingQueueFamilies( uint32_t[] sharing_queue_family_indices, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+        vkAssert( sharing_queue_family_indices.length != 1,
+            "Length of sharing_queue_family_indices must either be 0 (VK_SHARING_MODE_EXCLUSIVE) or greater 1 (VK_SHARING_MODE_CONCURRENT)", file, line, func );
+        image_ci.sharingMode            = sharing_queue_family_indices.length > 1 ? VK_SHARING_MODE_CONCURRENT : VK_SHARING_MODE_EXCLUSIVE;
+        image_ci.queueFamilyIndexCount  = sharing_queue_family_indices.length.toUint;
+        image_ci.pQueueFamilyIndices    = sharing_queue_family_indices.ptr;
+    }
+
+
+    /// Specify the initial image layout. Can only be VK_IMAGE_LAYOUT_UNDEFINED or VK_IMAGE_LAYOUT_PREINITIALIZED.
+    auto ref initialLayout( VkImageLayout layout, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__  ) {
+        vkAssert( layout == VK_IMAGE_LAYOUT_UNDEFINED || VK_IMAGE_LAYOUT_PREINITIALIZED,
+            "Initial image layout must be either VK_IMAGE_LAYOUT_UNDEFINED or VK_IMAGE_LAYOUT_PREINITIALIZED.", file, line, func );
+        image_ci.initialLayout = layout;
+        return this;
+    }
+}
+
+
 
     alias vc = view_count;
 
