@@ -11,7 +11,7 @@ import erupted;
 
 
 ///////////////////////////////
-// VkBuffer and  Descriptors //
+// VkBuffer and VkBufferView //
 ///////////////////////////////
 
 
@@ -218,28 +218,176 @@ void destroy( CORE )( ref Vulkan vk, ref CORE core ) if( isCoreBuffer!CORE ) {
 /// Private template to identify Core_Image_T .
 private template isCoreBuffer( T ) { enum isCoreBuffer = is( typeof( isCoreBufferImpl( T.init ))); }
 private void isCoreBufferImpl( uint32_t view_count, uint32_t member_copies )( Core_Buffer_T!( view_count, member_copies ) cb ) {}
+
+
+
+alias   Meta_Buffer             = Meta_Buffer_T!( 0 );
+alias   Meta_Buffer_View        = Meta_Buffer_T!( 1 );
+alias   Meta_Buffer_Memory      = Meta_Buffer_T!( 0, BMC.Memory );
+alias   Meta_Buffer_Memory_View = Meta_Buffer_T!( 1, BMC.Memory );
+alias   Meta_Buffer_T( T )      = Meta_Buffer_T!( T.vc, T.mc );
+
 /// struct to capture buffer and memory creation as well as binding
 /// the struct can travel through several methods and can be filled with necessary data
 /// first thing after creation of this struct must be the assignment of the address of a valid vulkan state struct
 /// Here we have a distinction between bufferSize, which is the (requested) size of the VkBuffer
 /// and memSeize, which is the size of the memory range attached to the VkBuffer
 /// They might differ based on memory granularity and alignment, but both should be safe for memory mapping
-struct Meta_Buffer {
-    mixin                   Vulkan_State_Pointer;
-    VkBuffer                buffer;
-    VkBufferCreateInfo      buffer_ci;
-    VkDeviceSize            bufferSize() { return buffer_ci.size; }
-    mixin                   Memory_Member;
-    mixin                   Memory_Buffer_Image_Common;
-    version( DEBUG_NAME )   string name;
+struct Meta_Buffer_T( uint32_t view_count, uint32_t member_copies = BMC.None ) {
+    alias   vc = view_count;
+    alias   mc = member_copies;
+    mixin   Vulkan_State_Pointer;
+    mixin   Memory_Member;
+    mixin   Memory_Buffer_Image_Common;
+    mixin   Buffer_Member!1;
+    static if( vc > 0 ) {
+        mixin  BView_Member!vc      bview_member;   // named mixin template to resolve overloaded functions
+        alias  view = buffer_view;
+        static if( vc > 1 ) alias   views = buffer_view;
+    }
+
+    version( DEBUG_NAME )   string  name;
 
 
     // bulk destroy the resources belonging to this meta struct
     void destroyResources() {
-        vk.destroy( buffer );
-        if( owns_device_memory )
-            vk.destroy( device_memory );
-        resetMemoryMember;
+        vk.destroyHandle( buffer );
+        if( owns_device_memory )    vk.destroyHandle( device_memory );
+        static if( vc > 0 )         destroyView;
+        resetMemory;
+    }
+
+
+    /// reset all internal data and return wrapped Vulkan objects
+    /// VkBuffer as well as optional VkBufferView(s)
+    /// in a new matching Core_Buffer_T
+    auto reset() {
+        Core_Buffer_T!( vc, mc ) out_core;
+        reset( out_core );
+        return out_core;
+    }
+
+
+    /// reset all internal data and return wrapped Vulkan objects
+    /// VkBuffer as well as optional VkBufferView(s)
+    /// in the passed in ref Core_Buffer_T
+    auto ref reset( ref Core_Buffer_T!( vc, mc ) out_core ) {
+                                            out_core.buffer     = resetBuffer;
+        static if( vc > 0 )                 out_core.view       = resetView;
+        static if( mc & BMC.Mem_Range )     out_core.mem_range  = createMappedMemoryRange;  // VkMappedMemoryRange has all the properties listed next line.
+        else {
+            static if( mc & BMC.Offset )    out_core.offset     = device_memory_offset;
+            static if( mc & BMC.Memory )    out_core.memory     = resetMemory;
+            static if( mc & BMC.Size )      out_core.size       = bufferSize;
+        }
+        return this;
+    }
+
+
+    /// extract core descriptor elements VkDescriptorPool, VkDescriptorSet and VkDescriptorSetLayout
+    /// without resetting the internal data structures
+    auto extractCore() {
+        Core_Buffer_T!( vc, mc )            out_core;
+                                            out_core.buffer     = buffer;
+        static if( vc > 0 )                 out_core.view       = buffer_view;
+        static if( mc & BMC.Mem_Range )     out_core.mem_range  = createMappedMemoryRange;  // VkMappedMemoryRange has all the properties listed next line.
+        else {
+            static if( mc & BMC.Offset )    out_core.offset     = device_memory_offset;
+            static if( mc & BMC.Memory )    out_core.memory     = resetMemory;
+            static if( mc & BMC.Size )      out_core.size       = bufferSize;
+        }
+        return out_core;
+    }
+
+
+    /// conditionally extract core descriptor elements VkDescriptorPool, VkDescriptorSet and VkDescriptorSetLayout
+    /// without resetting the internal data structures. Takes a ref to the Core struct, and extracts the data only
+    /// if it is not a VK_NULL_HANDLE. Returns ref to this for additional function chaining.
+    auto ref extractCore( ref Core_Buffer_T!( vc, mc ) out_core, bool overwrite_valid_handles = true ) {
+
+                                if(      !buffer.is_null_handle && ( overwrite_valid_handles || out_core.buffer.is_null_handle ))  out_core.buffer  = buffer;
+        static if( vc == 1 )    if( !buffer_view.is_null_handle && ( overwrite_valid_handles ||   out_core.view.is_null_handle ))  out_core.view    = buffer_view;
+
+        // now handle arrays of views
+        static if( vc > 1 )
+            foreach( i; 0 .. vc )
+                if(!buffer_view[i].is_null_handle && ( overwrite_valid_handles || out_core.view[i].is_null_handle ))
+                    out_core.view[i] = buffer_view[i];
+
+        static if( mc & BMC.Mem_Range )     out_core.mem_range  = createMappedMemoryRange;  // VkMappedMemoryRange has all the properties listed next line.
+        else {
+            static if( mc & BMC.Offset )    out_core.offset     = device_memory_offset;
+            static if( mc & BMC.Memory )    out_core.memory     = resetMemory;
+            static if( mc & BMC.Size )      out_core.size       = bufferSize;
+        }
+
+        return this;
+    }
+
+
+    /// Overload and hide constructView from BView_Member template, so that we do not need to and cannot pass in a VkBuffer to create the view from, as this Meta_Struct is supposed to use its own VkBuffer for that.
+    static if( vc == 1 ) {
+
+        /// Construct buffer view using this Meta_Buffer's buffer. This overloads and hides the constructView from BView_Member template.
+        auto ref constructView( string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+
+            // check if the buffer has been constructed already (not a VK_NULL_HANDLE).
+            vkAssert( !buffer.is_null_handle, "No buffer constructed.", file, line, func, "First construct the underlying buffer before creating a buffer view for it." );
+
+            // check if memory was bound to the buffer
+            vkAssert( !device_memory.is_null_handle, "No memory bound to buffer.", file, line, func, "First allocate and bind memory to the underlying buffer before creating an buffer view for it." );
+
+            // assign the buffer to the buffer view ci and create the view
+            buffer_view_ci.buffer = buffer;
+            vk.device.vkCreateBufferView( & buffer_view_ci, vk.allocator, & buffer_view ).vkAssert( null, file, line, func );
+            return this;
+        }
+    }
+
+    else static if( vc > 1 ) {
+
+        /// Construct a buffer view using this Meta_Buffer's buffer.
+        auto ref constructView( uint32_t view_index, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+
+            // check if the buffer has been constructed already (not a VK_NULL_HANDLE).
+            vkAssert( !buffer.is_null_handle, "No buffer constructed.", file, line, func, "First construct the underlying buffer before creating a buffer view for it." );
+
+            // check if memory was bound to the buffer
+            vkAssert( !device_memory.is_null_handle, "No memory bound to buffer.", file, line, func, "First allocate and bind memory to the underlying buffer before creating an buffer view for it." );
+
+            // assign the buffer to the buffer view ci and create the view
+            buffer_view_ci.buffer = buffer;
+            vk.device.vkCreateBufferView( & buffer_view_ci, vk.allocator, & buffer_view[ view_index ] ).vkAssert( null, file, line, func );
+            return this;
+        }
+    }
+
+
+    /// Convenience function exists if we have 0 or 1 buffer view(s)
+    static if( vc <= 1 ) {
+        /// Construct the Buffer, and possibly BufferView(s) from specified data.
+        auto ref construct( VkMemoryPropertyFlags memory_property_flags, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+            constructBuffer( file, line, func );
+            allocateMemory( memory_property_flags );
+            static if( vc == 1 ) constructView( file, line, func );
+            return this;
+        }
+    }
+
+
+    /// Check if all Vulkan resources are null, not available for multi buffer view.
+         static if( vc == 0 ) alias is_null = is_buffer_null;
+    else static if( vc == 1 ) bool  is_null() { return is_buffer_null && is_view_null; }
+
+}
+
+
+/// package template to identify Meta_Buffer_T
+package template isMetaBuffer( T ) { enum isMetaBuffer = is( typeof( isMetaBufferImpl( T.init ))); }
+private void isMetaBufferImpl( uint32_t view_count, uint32_t member_copies )( Meta_Buffer_T!( view_count, member_copies ) bv ) {}
+
+
+
 /////////////////////////////////////////////////////
 // Meta_BView simple instantiation of BView_Member //
 /////////////////////////////////////////////////////
