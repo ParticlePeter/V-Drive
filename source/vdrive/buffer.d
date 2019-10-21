@@ -240,6 +240,110 @@ struct Meta_Buffer {
         if( owns_device_memory )
             vk.destroy( device_memory );
         resetMemoryMember;
+////////////////////////////////////////////////////
+// Buffer_Member and BView_Member mixin templates //
+////////////////////////////////////////////////////
+
+/// template to mixin VkBuffer construction related members and methods
+mixin template Buffer_Member( uint32_t buffer_count ) if( buffer_count > 0 ) {
+
+    alias bc = buffer_count;
+
+    VkBufferCreateInfo      buffer_ci;
+
+
+    static if( bc == 1 ) {
+
+        VkBuffer                buffer;
+
+        VkDeviceSize            bufferSize()    { return buffer_ci.size; }
+
+        /// Construct the buffer from passed in data.
+        auto ref constructBuffer( string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+            // assert that meta struct is initialized with a valid vulkan state pointer
+            vkAssert( isValid, "Vulkan state not assigned", file, line, func );
+
+            // construct the image buffer
+            vk.device.vkCreateBuffer( & buffer_ci, vk.allocator, & buffer ).vkAssert( null, file, line, func );
+
+            // if this template is embedded in some Meta_Buffer, we must retrieve the memory requirements here
+            static if( hasMemReqs!( typeof( this )))
+                vk.device.vkGetBufferMemoryRequirements( buffer, & memory_requirements );
+
+            return this;
+        }
+
+
+        /// Destroy the buffer
+        void destroyBuffer() {
+            if( buffer != VK_NULL_HANDLE )
+                vk.destroyHandle( buffer );
+        }
+
+
+        /// get buffer and reset it to VK_NULL_HANDLE such that a new, different buffer can be created
+        auto resetBuffer() {
+            auto result = buffer;
+            buffer = VK_NULL_HANDLE;
+            return result;
+        }
+
+
+        /// check if the handle is a null handle. This does not check the validity of the handle, only its value.
+        bool is_buffer_null()           { return buffer.is_null_handle; }
+
+    } else {
+
+        VkBuffer[bc]                    buffer;
+        private VkDeviceSize[bc]        buffer_size;
+        VkDeviceSize                    bufferSize( uint32_t buffer_index )     { return buffer_size[ buffer_index ]; }
+
+        /// Construct the buffer from passed in data.
+        auto ref constructBuffer( uint32_t buffer_index, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+            // assert that meta struct is initialized with a valid vulkan state pointer
+            vkAssert( isValid, "Vulkan state not assigned", file, line, func );
+
+            // construct the image buffer and capture the buffer size from the buffer create info (we have only one ci for multiple buffers).
+            vk.device.vkCreateBuffer( & buffer_ci, vk.allocator, & buffer[ buffer_index ] ).vkAssert( null, file, line, func );
+            buffer_size[ buffer_index ] = buffer_ci.size;
+
+            return this;
+        }
+
+
+        /// Destroy the buffer
+        void destroyBuffer() {
+            foreach( ref buf; buffer )
+                if( buf != VK_NULL_HANDLE )
+                    vk.destroyHandle( buf );
+        } alias destroyBuffers = destroyBuffer;
+
+
+        /// get one buffer and reset it to VK_NULL_HANDLE such that a new, different buffer can be created at that index
+        auto resetBuffer( uint32_t buffer_index ) {
+            auto result = buffer[ buffer_index ];
+            buffer[ buffer_index ] = VK_NULL_HANDLE;
+            return result;
+        }
+
+
+        /// get all buffer and reset them to VK_NULL_HANDLE such that a new, different buffers can be created
+        auto resetBuffer() {
+            auto result = buffer;
+            foreach( ref buf; buffer )
+                buf = VK_NULL_HANDLE;
+            return result;
+        } alias resetBuffers = resetBuffer;
+
+
+        /// check if the handle is a null handle. This does not check the validity of the handle, only its value.
+        bool is_buffer_null( uint32_t buffer_index )  { return buffer[ buffer_index ].is_null_handle; }
+    }
+
+
+    /// Initialize buffer view create info to useful defaults
+    void initBufferCreateInfo() {
+        buffer_ci = VkBufferCreateInfo.init;
     }
 
 
@@ -265,58 +369,143 @@ struct Meta_Buffer {
 
 
     /// Specify the sharing queue families and implicitly the sharing mode, which defaults to VK_SHARING_MODE_EXCLUSIVE.
-    auto ref sharingQueueFamilyIndices( uint32_t[] sharing_family_queue_indices ) {
-        buffer_ci.sharingMode           = VK_SHARING_MODE_CONCURRENT;
-        buffer_ci.queueFamilyIndexCount = sharing_family_queue_indices.length.toUint;
-        buffer_ci.pQueueFamilyIndices   = sharing_family_queue_indices.ptr;
-    }
-
-
-    /// Construct the Image from specified data.
-    auto ref construct( string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
-        // assert that meta struct is initialized with a valid vulkan state pointer
-        vkAssert( isValid, "Vulkan state not assigned", file, line, func );
-
-        vk.device.vkCreateBuffer( & buffer_ci, allocator, & buffer ).vkAssert( "Construct Buffer", file, line, func );
-        vk.device.vkGetBufferMemoryRequirements( buffer, & memory_requirements );
-
-        return this;
-    }
-
-
-    /// initialize a VkBuffer object, this function or createBuffer must be called first, further operations require the buffer
-    /// the resulting buffer and its create info are stored in the Meta_Buffer struct
-    /// the Meta_Buffer struct is returned for function chaining
-    auto ref construct(
-        VkBufferUsageFlags  buffer_usage_flags,
-        VkDeviceSize        buffer_size,
-        uint32_t[]          sharing_family_queue_indices = [],
-        string              file = __FILE__,
-        size_t              line = __LINE__,
-        string              func = __FUNCTION__
-
-        ) {
-
-        // assert that meta struct is initialized with a valid vulkan state pointer
-        vkAssert( isValid, "Vulkan state not assigned", file, line, func );
-
-        // buffer create info from arguments
-        buffer_ci.size                  = buffer_size; // size in Bytes
-        buffer_ci.usage                 = buffer_usage_flags;
-        buffer_ci.sharingMode           = sharing_family_queue_indices == [] ? VK_SHARING_MODE_EXCLUSIVE : VK_SHARING_MODE_CONCURRENT;
-        buffer_ci.queueFamilyIndexCount = sharing_family_queue_indices.length.toUint;
-        buffer_ci.pQueueFamilyIndices   = sharing_family_queue_indices.ptr;
-
-        vk.device.vkCreateBuffer( & buffer_ci, allocator, & buffer ).vkAssert( "Construct Buffer", file, line, func );
-        vk.device.vkGetBufferMemoryRequirements( buffer, & memory_requirements );
-
-        return this;
+    /// Specify the sharing queue families and implicitly the sharing mode, which defaults to VK_SHARING_MODE_EXCLUSIVE.
+    auto ref sharingQueueFamilies( uint32_t[] sharing_queue_family_indices, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+        vkAssert( sharing_queue_family_indices.length != 1,
+            "Length of sharing_queue_family_indices must either be 0 (VK_SHARING_MODE_EXCLUSIVE) or greater 1 (VK_SHARING_MODE_CONCURRENT)", file, line, func );
+        buffer_ci.sharingMode           = sharing_queue_family_indices.length > 1 ? VK_SHARING_MODE_CONCURRENT : VK_SHARING_MODE_EXCLUSIVE;
+        buffer_ci.queueFamilyIndexCount = sharing_queue_family_indices.length.toUint;
+        buffer_ci.pQueueFamilyIndices   = sharing_queue_family_indices.ptr;
     }
 }
 
 
-/// package template to identify Meta_Image_T
-package template isMetaBuffer( T ) { enum isMetaBuffer = is( T == Meta_Buffer ); }
+
+/// template to mixin VkBufferView construction related members and methods
+mixin template BView_Member( uint32_t view_count ) if( view_count > 0 ) {
+
+    alias vc = view_count;
+
+    VkBufferViewCreateInfo   buffer_view_ci = { range : VK_WHOLE_SIZE };
+
+
+    static if( vc == 1 ) {
+
+        VkBufferView         buffer_view;
+
+
+        /// Construct the buffer view for a passed in VkBuffer.
+        auto ref constructView( VkBuffer buffer, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+
+            // assert that meta struct is initialized with a valid vulkan state pointer
+            vkAssert( isValid, "Vulkan state not assigned", file, line, func );
+
+            // assert that the passed in buffer is not a null handle
+            vkAssert( !buffer.is_null_handle, "Specified VkBuffer is null", file, line, func );
+
+            // assign the buffer to the buffer view ci and create the view
+            buffer_view_ci.buffer = buffer;
+            vk.device.vkCreateBufferView( & buffer_view_ci, vk.allocator, & buffer_view ).vkAssert( null, file, line, func );
+            return this;
+        }
+
+
+        /// Destroy the buffer view
+        void destroyView() {
+            if( buffer_view != VK_NULL_HANDLE )
+                vk.destroyHandle( buffer_view );
+        }
+
+
+        /// get buffer view and reset it to VK_NULL_HANDLE such that a new, different view can be created
+        auto resetView() {
+            auto result = buffer_view;
+            buffer_view = VK_NULL_HANDLE;
+            return result;
+        }
+
+
+        /// check if the handle is a null handle, or constructed. This does not check the validity of the handle, only its value.
+        bool is_view_null() { return buffer_view.is_null_handle; }
+    }
+
+    else static if( vc > 1 ) {
+
+        VkBufferView[vc]     buffer_view;
+
+
+        /// Construct the buffer view for a passed in VkBuffer.
+        auto ref constructView( VkBuffer buffer, uint32_t view_index, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+            // assert that meta struct is initialized with a valid vulkan state pointer
+            vkAssert( isValid, "Vulkan state not assigned", file, line, func );
+
+            // assert that the passed in buffer is not a null handle
+            vkAssert( !buffer.is_null_handle, "Specified VkBuffer is null", file, line, func );
+
+            // assign the buffer to the buffer view ci and create the view
+            buffer_view_ci.buffer = buffer;
+            vk.device.vkCreateBufferView( & buffer_view_ci, vk.allocator, & buffer_view[ view_index ] ).vkAssert( null, file, line, func );
+            return this;
+        }
+
+
+        /// Destroy the buffer views
+        void destroyView() {
+            foreach( ref view; buffer_view )
+                if( view != VK_NULL_HANDLE )
+                    vk.destroyHandle( view );
+        } alias destroyViews = destroyView;
+
+
+        /// get one buffer view and reset it to VK_NULL_HANDLE such that a new, different view can be created at that index
+        auto resetView( uint32_t view_index ) {
+            auto result = buffer_view[ view_index ];
+            buffer_view[ view_index ] = VK_NULL_HANDLE;
+            return result;
+        }
+
+
+        /// get all buffer views and reset them to VK_NULL_HANDLE such that a new, different views can be created
+        auto resetView() {
+            auto result = buffer_view;
+            foreach( ref view; buffer_view )
+                view = VK_NULL_HANDLE;
+            return result;
+        } alias resetViews = resetView;
+
+
+        /// check if the handle is a null handle. This does not check the validity of the handle, only its value.
+        bool is_view_null( uint32_t view_index )  { return buffer_view[ view_index ].is_null_handle; }
+    }
+
+
+    /// Initialize buffer view create info to useful defaults.
+    void initBufferViewCreateInfo() {
+        buffer_view_ci = VkBufferViewCreateInfo.init;
+        buffer_view_ci.range = VK_WHOLE_SIZE;
+    }
+
+
+    /// Specify buffer view create flags.
+    auto ref viewFlags( VkBufferViewCreateFlags view_flags ) {
+        buffer_view_ci.flags = view_flags;
+        return this;
+    }
+
+
+    /// Specify buffer view format.
+    auto ref viewFormat( VkFormat view_format ) {
+        buffer_view_ci.format = view_format;
+        return this;
+    }
+
+
+    /// Specify buffer view offset and range.
+    auto viewOffsetRange( VkDeviceSize offset, VkDeviceSize range ) {
+        buffer_view_ci.offset = offset;
+        buffer_view_ci.range  = range;
+    }
+}
 
 
 
@@ -329,7 +518,7 @@ deprecated( "Use member methods to edit and/or Meta_Buffer.construct instead" ) 
         ref Meta_Buffer     meta,
         VkBufferUsageFlags  usage,
         VkDeviceSize        size,
-        uint32_t[]          sharing_family_queue_indices = [],
+        uint32_t[]          sharing_queue_family_indices = [],
         string              file = __FILE__,
         size_t              line = __LINE__,
         string              func = __FUNCTION__
@@ -340,9 +529,9 @@ deprecated( "Use member methods to edit and/or Meta_Buffer.construct instead" ) 
         // buffer create info from arguments
         meta.buffer_ci.size                  = size; // size in Bytes
         meta.buffer_ci.usage                 = usage;
-        meta.buffer_ci.sharingMode           = sharing_family_queue_indices == [] ? VK_SHARING_MODE_EXCLUSIVE : VK_SHARING_MODE_CONCURRENT;
-        meta.buffer_ci.queueFamilyIndexCount = sharing_family_queue_indices.length.toUint;
-        meta.buffer_ci.pQueueFamilyIndices   = sharing_family_queue_indices.ptr;
+        meta.buffer_ci.sharingMode           = sharing_queue_family_indices == [] ? VK_SHARING_MODE_EXCLUSIVE : VK_SHARING_MODE_CONCURRENT;
+        meta.buffer_ci.queueFamilyIndexCount = sharing_queue_family_indices.length.toUint;
+        meta.buffer_ci.pQueueFamilyIndices   = sharing_queue_family_indices.ptr;
 
         meta.device.vkCreateBuffer( & meta.buffer_ci, meta.allocator, & meta.buffer ).vkAssert( "Init Buffer", file, line, func );
         meta.device.vkGetBufferMemoryRequirements( meta.buffer, & meta.memory_requirements );
@@ -356,14 +545,12 @@ deprecated( "Use member methods to edit and/or Meta_Buffer.construct instead" ) 
     /// create a VkBuffer object, this function or initBuffer (or its alias create) must be called first, further operations require the buffer
     /// the resulting buffer and its create info are stored in the Meta_Buffer struct
     /// the Meta_Buffer struct is returned for function chaining
-    auto createBuffer( ref Vulkan vk, VkBufferUsageFlags usage, VkDeviceSize size, uint32_t[] sharing_family_queue_indices = [] ) {
+    auto createBuffer( ref Vulkan vk, VkBufferUsageFlags usage, VkDeviceSize size, uint32_t[] sharing_queue_family_indices = [] ) {
         Meta_Buffer meta = vk;
-        meta.construct( usage, size, sharing_family_queue_indices );
+        meta.initBuffer( usage, size, sharing_queue_family_indices );
         return meta;
     }
 }
 
 
 
-bool is_null(        Meta_Buffer meta ) { return meta.buffer.is_null_handle; }
-bool is_constructed( Meta_Buffer meta ) { return !meta.is_null; }
