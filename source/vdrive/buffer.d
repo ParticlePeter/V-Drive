@@ -148,10 +148,76 @@ VkBufferView createBufferView(
 
 
 
-///////////////////////////////////////
-// Meta_Buffer and related functions //
-///////////////////////////////////////
+/////////////////////////////////
+// Core_Buffer and Meta_Buffer //
+/////////////////////////////////
 
+alias BMC = Buffer_Member_Copy;
+enum Buffer_Member_Copy : uint32_t {
+    None        = 0,
+    Memory      = 1,
+    Offset      = 2,
+    Size        = 4,
+    Ptr         = 8,
+    Mem_Range   = 16,
+};
+
+
+alias   Core_Buffer             = Core_Buffer_T!( 0 );
+alias   Core_Buffer_View        = Core_Buffer_T!( 1 );
+alias   Core_Buffer_Memory      = Core_Buffer_T!( 0, BMC.Memory );
+alias   Core_Buffer_Memory_View = Core_Buffer_T!( 1, BMC.Memory );
+
+alias   Core_Buffer_Memory_View_T( uint mc = 0 )    = Core_Buffer_T!(  1, BMC.Memory | mc );
+alias   Core_Buffer_Memory_T( uint vc, uint mc = 0) = Core_Buffer_T!( vc, BMC.Memory | mc );
+
+/// Wraps the essential Vulkan objects created with the editing procedure
+/// of Meta_Image_T, all other internal structures are obsolete
+/// after construction so that the Meta_Image_Sampler_T can be reused
+/// after being reset.
+struct  Core_Buffer_T( uint32_t view_count, uint32_t member_copies = BMC.None ) {
+    alias vc = view_count;
+    alias mc = member_copies;
+
+    VkBuffer buffer;
+
+         static if( vc == 1 )               VkBufferView                view;
+    else static if( vc  > 1 )               VkBufferView[ vc ]          view;
+
+    static if( mc & BMC.Mem_Range ) {
+                                            VkMappedMemoryRange         mem_range;
+        static if( mc & BMC.Memory )        ref VkDeviceMemory          memory() { return mem_range.memory; }
+        static if( mc & BMC.Offset )        VkDeviceSize                offset() { return mem_range.offset; }
+        static if( mc & BMC.Size )          VkDeviceSize                size()   { return mem_range.size; }
+    } else {
+        static if( mc & BMC.Memory )        VkDeviceMemory              memory;
+        static if( mc & BMC.Offset )        VkDeviceSize                offset;
+        static if( mc & BMC.Size )          VkDeviceSize                size;
+    }
+
+    static if( mc & BMC.Ptr )               void*                       ptr;
+
+    /// Check if all Vulkan resources are null, not available for multi buffer view.
+         static if( vc == 0 )               bool                        is_null() { return buffer.is_null_handle; }
+    else static if( vc == 1 )               bool                        is_null() { return buffer.is_null_handle && view.is_null_handle; }
+}
+
+
+/// Bulk destroy the resources belonging to this meta struct.
+void destroy( CORE )( ref Vulkan vk, ref CORE core ) if( isCoreBuffer!CORE ) {
+    vk.destroyHandle( core.buffer );
+
+         static if( core.vc == 1 )  { if( core.view != VK_NULL_HANDLE ) vk.destroyHandle( core.view ); }
+    else static if( core.vc  > 1 )  { foreach( ref v; core.view )  if( v != VK_NULL_HANDLE ) vk.destroyHandle( v ); }
+
+    static if( CORE.mc & BMC.Memory )   vk.destroyHandle( core.memory );
+    static if( CORE.mc & BMC.Ptr )      core.ptr = null;
+}
+
+
+/// Private template to identify Core_Image_T .
+private template isCoreBuffer( T ) { enum isCoreBuffer = is( typeof( isCoreBufferImpl( T.init ))); }
+private void isCoreBufferImpl( uint32_t view_count, uint32_t member_copies )( Core_Buffer_T!( view_count, member_copies ) cb ) {}
 /// struct to capture buffer and memory creation as well as binding
 /// the struct can travel through several methods and can be filled with necessary data
 /// first thing after creation of this struct must be the assignment of the address of a valid vulkan state struct
