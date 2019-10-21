@@ -10,9 +10,80 @@ import erupted;
 
 
 
-/////////////////
-// Descriptors //
-/////////////////
+///////////////////////////////
+// VkBuffer and  Descriptors //
+///////////////////////////////
+
+
+
+/// create a VkBuffer
+/// Params:
+///     vk      = reference to a VulkanState struct
+///     size    = size of the buffer
+///     usage   = usage of the buffer
+///     queue_familly_indices = optional queu family indices, if length > 1
+///                             sets sharingMode to VK_SHARING_MODE_CONCURRENT,
+///                             specifies queueFamilyIndexCount and
+///                             sets the pQueueFamilyIndices pointer
+///     flags   = optional create flags of the buffer
+/// Returns: VkBuffer
+VkBuffer createBuffer(
+    ref Vulkan              vk,
+    VkDeviceSize            size,
+    VkBufferUsageFlags      usage,
+    const uint32_t[]        sharing_queue_family_indices = [],
+    VkBufferCreateFlags     flags   = 0,
+    string                  file    = __FILE__,
+    size_t                  line    = __LINE__,
+    string                  func    = __FUNCTION__
+
+    ) {
+
+    vkAssert( sharing_queue_family_indices.length != 1,
+        "Length of sharing_queue_family_indices must either be 0 (VK_SHARING_MODE_EXCLUSIVE) or greater 1 (VK_SHARING_MODE_CONCURRENT)",
+        file, line, func );
+
+    VkBufferCreateInfo buffer_ci = {
+        flags   : flags,
+        size    : size,
+        usage   : usage,
+    };
+
+    if( sharing_queue_family_indices.length > 1 ) {
+        buffer_ci.sharingMode           = VK_SHARING_MODE_CONCURRENT;
+        buffer_ci.queueFamilyIndexCount = sharing_queue_family_indices.length.toUint;
+        buffer_ci.pQueueFamilyIndices   = sharing_queue_family_indices.ptr;
+    }
+
+    VkBuffer buffer;
+    vk.device.vkCreateBuffer( & buffer_ci, vk.allocator, & buffer ).vkAssert( null, file, line, func );
+    return buffer;
+}
+
+
+/// create a VkBuffer
+/// Params:
+///     vk      = reference to a VulkanState struct
+///     flags   = create flags of the view
+///     size    = size of the buffer
+///     usage   = usage of the buffer
+///     queue_familly_indices = optional queu family indices, if length > 1
+///                             sets sharingMode to VK_SHARING_MODE_CONCURRENT,
+///                             specifies queueFamilyIndexCount and
+///                             sets the pQueueFamilyIndices pointer
+/// Returns: VkBuffer
+VkBuffer createBuffer(
+    ref Vulkan              vk,
+    VkBufferCreateFlags     flags,
+    VkDeviceSize            size,
+    VkBufferUsageFlags      usage,
+    const uint32_t[]        queue_familly_indices = [],
+    string                  file    = __FILE__,
+    size_t                  line    = __LINE__,
+    string                  func    = __FUNCTION__
+    ) {
+    return vk.createBuffer( size, usage, queue_familly_indices, flags );
+}
 
 
 
@@ -23,22 +94,23 @@ import erupted;
 ///     format = of the view
 ///     offset = optional offset into the original buffer
 ///     range  = optional range of the view (starting at offset), VK_WHOLE_SIZE if not specified
+///     flags  = create flags of the view
 /// Returns: VkBufferView
-auto createBufferView(
-    ref Vulkan      vk,
-    VkBuffer        buffer,
-    VkFormat        format,
-    VkDeviceSize    offset = 0,
-    VkDeviceSize    range = VK_WHOLE_SIZE,
-//  VkBufferViewCreateFlags flags = 0,
-    string          file = __FILE__,
-    size_t          line = __LINE__,
-    string          func = __FUNCTION__
+VkBufferView createBufferView(
+    ref Vulkan              vk,
+    VkBuffer                buffer,
+    VkFormat                format,
+    VkDeviceSize            offset  = 0,
+    VkDeviceSize            range   = VK_WHOLE_SIZE,
+    VkBufferViewCreateFlags flags   = 0,
+    string                  file    = __FILE__,
+    size_t                  line    = __LINE__,
+    string                  func    = __FUNCTION__
 
     ) {
 
     VkBufferViewCreateInfo buffer_view_ci = {
-    //  flags   : flags,
+        flags   : flags,
         buffer  : buffer,
         format  : format,
         offset  : offset,
@@ -46,8 +118,32 @@ auto createBufferView(
     };
 
     VkBufferView buffer_view;
-    vk.device.vkCreateBufferView( &buffer_view_ci, vk.allocator, & buffer_view ).vkAssert( null, file, line, func );
+    vk.device.vkCreateBufferView( & buffer_view_ci, vk.allocator, & buffer_view ).vkAssert( null, file, line, func );
     return buffer_view;
+}
+
+
+/// create a VkBufferView which can be exclusively used as a descriptor
+/// Params:
+///     vk = reference to a VulkanState struct
+///     flags  = create flags of the view
+///     buffer = for which the view will be created
+///     format = of the view
+///     offset = optional offset into the original buffer
+///     range  = optional range of the view (starting at offset), VK_WHOLE_SIZE if not specified
+/// Returns: VkBufferView
+VkBufferView createBufferView(
+    ref Vulkan              vk,
+    VkBuffer                buffer,
+    VkBufferViewCreateFlags flags,
+    VkFormat                format,
+    VkDeviceSize            offset  = 0,
+    VkDeviceSize            range   = VK_WHOLE_SIZE,
+    string                  file    = __FILE__,
+    size_t                  line    = __LINE__,
+    string                  func    = __FUNCTION__
+    ) {
+    return vk.createBufferView( buffer, format, offset, range, flags, file, line, func );
 }
 
 
