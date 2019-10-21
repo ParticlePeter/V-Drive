@@ -70,7 +70,7 @@ auto createDescriptorPool(
     };
 
     VkDescriptorPool descriptor_pool;
-    vk.device.vkCreateDescriptorPool( &pool_create_info, vk.allocator, &descriptor_pool ).vkAssert( null, file, line, func );
+    vk.device.vkCreateDescriptorPool( & pool_create_info, vk.allocator, & descriptor_pool ).vkAssert( null, file, line, func );
     return descriptor_pool;
 }
 
@@ -168,8 +168,8 @@ auto createSetLayout(
 
     VkDescriptorSetLayout descriptor_set_layout;
     vk.device.vkCreateDescriptorSetLayout(
-        &descriptor_set_layout_create_info,
-        vk.allocator, &descriptor_set_layout ).vkAssert( null, file, line, func );
+        & descriptor_set_layout_create_info,
+        vk.allocator, & descriptor_set_layout ).vkAssert( null, file, line, func );
     return descriptor_set_layout;
 }
 
@@ -193,12 +193,12 @@ auto allocateSet(
     VkDescriptorSetAllocateInfo descriptor_allocate_info = {
         descriptorPool      : descriptor_pool,
         descriptorSetCount  : 1,
-        pSetLayouts         : &descriptor_set_layout,
+        pSetLayouts         : & descriptor_set_layout,
     };
 
     VkDescriptorSet descriptor_set;
     vk.device
-        .vkAllocateDescriptorSets( &descriptor_allocate_info, &descriptor_set )
+        .vkAllocateDescriptorSets( & descriptor_allocate_info, & descriptor_set )
         .vkAssert( null, file, line, func );
     return descriptor_set;
 }
@@ -227,7 +227,7 @@ auto allocateSet(
     };
     auto descriptor_sets = sizedArray!VkDescriptorSet( descriptor_sets_layouts.length );
     vk.device
-        .vkAllocateDescriptorSets( &descriptor_allocate_info, descriptor_sets.ptr )
+        .vkAllocateDescriptorSets( & descriptor_allocate_info, descriptor_sets.ptr )
         .vkAssert( null, file, line, func );
     return descriptor_sets;
 }
@@ -256,9 +256,9 @@ struct Core_Descriptor {
 ///     vk = Vulkan state struct holding the device through which these resources were created
 ///     core = the wrapped VkDescriptorPool ( with it the VkDescriptorSet ) and the VkDescriptorSetLayout to destroy
 /// Returns: the passed in Meta_Structure for function chaining
-void destroy( ref Vulkan  vk, ref Core_Descriptor core ) {
-    vdrive.state.destroy( vk, core.descriptor_set_layout ); // no nice syntax, vdrive.state.destroy overloads
-    vdrive.state.destroy( vk, core.descriptor_pool );       // get confused with this one in the module scope
+void destroy( ref Vulkan vk, ref Core_Descriptor core ) {
+    vk.destroyHandle( core.descriptor_set_layout ); // no nice syntax, vdrive.state.destroy overloads
+    vk.destroyHandle( core.descriptor_pool );       // get confused with this one in the module scope
     //core.descriptor_set_layout = VK_NULL_HANDLE;          // handled by the destroy overload
     //core.descriptor_pool = VK_NULL_HANDLE;                // handled by the destroy overload
     core.descriptor_set = VK_NULL_HANDLE;
@@ -286,7 +286,6 @@ struct Meta_Descriptor_Layout_T(
     D_OR_S_ARRAY!( immutable_sampler_count,  VkSampler                    ) immutable_samplers;             // slices of this member can be associated with any layout binding
 
 
-
     /// get minimal config for internal D_OR_S_ARRAY
     auto static_config() {
         size_t[2] result;
@@ -296,13 +295,11 @@ struct Meta_Descriptor_Layout_T(
     }
 
 
-
     /// destroy the VkDescriptorLayout and, if internal, the VkDescriptorPool
     void destroyResources() {
-        vdrive.state.destroy( vk, descriptor_set_layout );
-        if( m_descriptor_pool != VK_NULL_HANDLE ) vdrive.state.destroy( vk, m_descriptor_pool );
+        vk.destroyHandle( descriptor_set_layout );
+        if( m_descriptor_pool != VK_NULL_HANDLE ) vk.destroyHandle( m_descriptor_pool );
     }
-
 
 
     /// reset all internal data and return wrapped Vulkan objects
@@ -317,6 +314,12 @@ struct Meta_Descriptor_Layout_T(
         return result;
     }
 
+
+    /// extract core descriptor elements VkDescriptorPool, VkDescriptorSet and VkDescriptorSetLayout
+    /// without resetting the internal data structures
+    auto extractCore() {
+        return Core_Descriptor( m_descriptor_pool, descriptor_set_layout, descriptor_set );
+    }
 
 
     /// add a VkDescriptorSetLayoutBinding to the Meta_Descriptor_Layout
@@ -405,7 +408,6 @@ struct Meta_Descriptor_Layout_T(
     auto ref addInputAttachmentBinding( uint32_t binding, VkShaderStageFlags shader_stage_flags, uint32_t descriptor_count, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
         return addLayoutBinding( binding, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, shader_stage_flags, descriptor_count, file, line, func );
     }
-
 
 
     /// add a VkDescriptorSetLayoutBinding to the Meta_Descriptor_Layout
@@ -517,7 +519,6 @@ struct Meta_Descriptor_Layout_T(
     }
 
 
-
     /// create the VkDescriptorSetLayout and store it as a member of the Meta_Descriptor_Layout struct
     /// from the so far specified descriptor set layout bindings and optional immutable samplers
     /// Params:
@@ -549,7 +550,6 @@ struct Meta_Descriptor_Layout_T(
         descriptor_set_layout = vk.createSetLayout( set_layout_bindings.data, set_layout_create_flags, file, line, func );
         return this;
     }
-
 
 
     /// allocate the VkDescriptorSet stored in descriptor_set member of Meta_Descriptor_Layout
@@ -603,7 +603,6 @@ struct Meta_Descriptor_Layout_T(
     }
 
 
-
     /// allocate the VkDescriptorSet stored in descriptor_set member of Meta_Descriptor_Layout
     /// from an external VkDescriptorPool, must have sufficient descriptor memory
     /// Params:
@@ -637,7 +636,7 @@ struct Meta_Descriptor_Layout_T(
 
 
 ////////////////////////////
-// Meta_Descriptor_Update //
+// Descriptor_Update //
 ////////////////////////////
 
 
@@ -646,8 +645,8 @@ struct Meta_Descriptor_Layout_T(
 /// additional arrays exist to add VkDescriptorImageInfo, VkDescriptorBufferInfo and VkDescriptorBufferInfo
 /// several versions of this struct (partially) updating one VkDescriptorSet are meant to coexist
 /// must be initialized with a Vulkan state struct
-alias Meta_Descriptor_Update = Meta_Descriptor_Update_T!();
-struct Meta_Descriptor_Update_T(
+alias Descriptor_Update = Descriptor_Update_T!();
+struct Descriptor_Update_T(
     int32_t write_set_count         = int32_t.max,
     int32_t image_info_count        = int32_t.max,
     int32_t buffer_info_count       = int32_t.max,
@@ -655,12 +654,10 @@ struct Meta_Descriptor_Update_T(
 
     ) {
 
-    mixin                               Vulkan_State_Pointer;
     D_OR_S_ARRAY!( write_set_count,     VkWriteDescriptorSet )      write_descriptor_sets;          // write descriptor sets in case we want to update the set
     D_OR_S_ARRAY!( image_info_count,    VkDescriptorImageInfo )     image_infos;                    // slices of these three members ...
     D_OR_S_ARRAY!( buffer_info_count,   VkDescriptorBufferInfo )    buffer_infos;                   // ... can be associated with ...
     D_OR_S_ARRAY!( texel_buffer_view_count, VkBufferView )          texel_buffer_views;             // ... any write_descriptor_set
-
 
 
     /// get minimal config for internal D_OR_S_ARRAY
@@ -674,7 +671,6 @@ struct Meta_Descriptor_Update_T(
     }
 
 
-
     /// reset all internal data, no date to be returned
     void reset() {
         write_descriptor_sets.clear;
@@ -684,10 +680,9 @@ struct Meta_Descriptor_Update_T(
     }
 
 
-
-    /// add a VkWriteDescriptorSet to the Meta_Descriptor_Update
+    /// add a VkWriteDescriptorSet to the Descriptor_Update
     /// Params:
-    ///     meta = reference to a Meta_Descriptor_Update struct
+    ///     meta = reference to a Descriptor_Update struct
     ///     binding = index of the corresponding layout binding
     ///     descriptor_type  = the type of the corresponding layout binding and hence descriptor(s)
     ///     dst_array_element = optional starting index of the array element which should be updated, defaults to 0
@@ -703,10 +698,9 @@ struct Meta_Descriptor_Update_T(
         ) {
 
         VkWriteDescriptorSet write_set = {
-        //  dstSet              : descriptor_set,
             dstBinding          : binding,
             dstArrayElement     : dst_array_element,
-            descriptorCount     : 0,    // descriptorCount, will increase addDescriptorTypeUpdate
+            descriptorCount     : 0,
             descriptorType      : descriptor_type,
             pImageInfo          : null,
             pBufferInfo         : null,
@@ -772,14 +766,13 @@ struct Meta_Descriptor_Update_T(
     }
 
 
-
     /// private template function to add either
     /// VkDescriptorImageInfo, VkDescriptorBufferInfo or VkDescriptorBufferInfo
-    /// to the Meta_Descriptor_Update
+    /// to the Descriptor_Update
     /// Params:
     ///     descriptor_array = evaluates to image_infos, buffer_infos or texel_buffer_views
     ///     write_pointer = evaluates to pImageInfo, pBufferInfo or pTexelBufferView
-    ///     meta = reference to a Meta_Descriptor_Update struct
+    ///     meta = reference to a Descriptor_Update struct
     ///     descriptor = VkDescriptorImageInfo, VkDescriptorBufferInfo or VkDescriptorBufferInfo
     ///     dst_array_element = starting index of the array element which should be updated
     ///     descriptor_type = the type of the corresponding layout binding and hence descriptor(s)
@@ -820,7 +813,7 @@ struct Meta_Descriptor_Update_T(
                         ? msg( 2 ) : descriptor.sampler == VK_NULL_HANDLE ? msg( 5 ) : descriptor.imageView != VK_NULL_HANDLE ? msg( 4 ) : null,
                     file, line, func, "\n             : VK_DESCRIPTOR_TYPE_SAMPLER requires a VkSampler without VkImageView" ); break;
 
-                case VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER : vkAssert( /*descriptor.sampler != VK_NULL_HANDLE &&*/ descriptor.imageView != VK_NULL_HANDLE,  // if an immutable sampler was created at this binding we do not need to pass the sampler here again
+                case VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER : vkAssert( /*descriptor.sampler != VK_NULL_HANDLE && */ descriptor.imageView != VK_NULL_HANDLE,  // if an immutable sampler was created at this binding we do not need to pass the sampler here again
                     descriptor.imageView == VK_NULL_HANDLE ? msg( 3 ) : null,
                     file, line, func, "\n             : VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER requires a VkImageView and VkSampler" ); break;
 
@@ -894,7 +887,6 @@ struct Meta_Descriptor_Update_T(
     }
 
 
-
     /// add a (mutable) VkSampler descriptor, convenience function to create and add VkImageInfo
     /// no image view and image layout are required in this case
     /// Params:
@@ -905,11 +897,10 @@ struct Meta_Descriptor_Update_T(
     }
 
 
-
-    /// add a VkImageInfo with specifying its members as function params to the Meta_Descriptor_Update
+    /// add a VkImageInfo with specifying its members as function params to the Descriptor_Update
     /// several sampler less image attachments do not require a sampler specification
     /// Params:
-    ///     meta = reference to a Meta_Descriptor_Update struct
+    ///     meta = reference to a Descriptor_Update struct
     ///     image_view = of an VkImage which should be accessed through the VkDescriptorSet
     ///     image_layout = layout of the image when it will be accessed in a shader
     /// Returns: the passed in Meta_Structure for function chaining
@@ -918,9 +909,8 @@ struct Meta_Descriptor_Update_T(
     }
 
 
-
     /// add a VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER VkImageInfo with specifying its members as function params
-    /// to the Meta_Descriptor_Update
+    /// to the Descriptor_Update
     /// Params:
     ///     sampler = optional VkSampler, required for e.g. VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER
     ///     image_view = of an VkImage which should be accessed through the VkDescriptorSet
@@ -931,12 +921,11 @@ struct Meta_Descriptor_Update_T(
     }
 
 
-
-    /// add a VkBufferInfo with specifying its members as function params to the Meta_Descriptor_Update
+    /// add a VkBufferInfo with specifying its members as function params to the Descriptor_Update
     /// offset and range are optional, in this case the whole buffer will be attached
     /// if only offset is specified the buffer from offset till its end will be attached
     /// Params:
-    ///     meta = reference to a Meta_Descriptor_Update struct
+    ///     meta = reference to a Descriptor_Update struct
     ///     buffer = to be accessed through the VkDescriptorSet
     ///     offset = optional offset into the buffer
     ///     range  = optional range of the buffer access, till end if not specified
@@ -946,12 +935,11 @@ struct Meta_Descriptor_Update_T(
     }
 
 
-
-    /// add VkBufferInfos with specifying its members as function params to the Meta_Descriptor_Update
+    /// add VkBufferInfos with specifying its members as function params to the Descriptor_Update
     /// offset and range are optional and common to each buffer, in this case the whole buffer will be attached
     /// if only offset is specified the buffer from offset till its end will be attached
     /// Params:
-    ///     meta = reference to a Meta_Descriptor_Update struct
+    ///     meta = reference to a Descriptor_Update struct
     ///     buffers = to be accessed through the VkDescriptorSet
     ///     offset = optional offset into each of the buffers
     ///     range  = optional range of each of the buffer access, till end if not specified
@@ -963,10 +951,9 @@ struct Meta_Descriptor_Update_T(
     }
 
 
-
     /// add a VkBufferView handle as textel uniform or shader storage buffers
     /// Params:
-    ///     meta = reference to a Meta_Descriptor_Update struct
+    ///     meta = reference to a Descriptor_Update struct
     ///     buffer_view = to access the underlying VkBuffer through the VkDescriptorSet
     /// Returns: the passed in Meta_Structure for function chaining
     auto ref addTexelBufferView( VkBufferView buffer_view, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
@@ -976,7 +963,7 @@ struct Meta_Descriptor_Update_T(
 
     /// add VkBufferView handles as texel unifor or shader storage buffers
     /// Params:
-    ///     meta = reference to a Meta_Descriptor_Update struct
+    ///     meta = reference to a Descriptor_Update struct
     ///     buffer_views = to access the array of VkBuffers through the VkDescriptorSet
     /// Returns: the passed in Meta_Structure for function chaining
     auto ref addTexelBufferViews( VkBufferView[] buffer_views, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
@@ -992,7 +979,7 @@ struct Meta_Descriptor_Update_T(
     /// this means that the VkWriteDescriptorSet might point to wrong memory location
     /// the pointers get properly re-connected with this function
     /// Params:
-    ///     meta = reference to a Meta_Descriptor_Update struct
+    ///     meta = reference to a Descriptor_Update struct
     ///     descriptor_set = which should be updated in a later step
     /// Returns: the passed in Meta_Structure for function chaining
     auto ref attachSet( VkDescriptorSet descriptor_set ) {
@@ -1012,11 +999,11 @@ struct Meta_Descriptor_Update_T(
 
 
     /// update the VkWriteDescriptorSet
-    /// calls solely vkUpdateDescriptorSets using the internal structures of the Meta_Descriptor_Update
-    ///     meta = reference to a Meta_Descriptor_Update struct
+    /// calls solely vkUpdateDescriptorSets using the internal structures of the Descriptor_Update
+    ///     vk = reference to a Vulkan state struct
     /// Returns: the passed in Meta_Structure for function chaining
-    auto ref update() nothrow {
-        device.vkUpdateDescriptorSets(
+    auto ref update( ref Vulkan vk ) nothrow {
+        vk.device.vkUpdateDescriptorSets(
             write_descriptor_sets.length.toUint,
             write_descriptor_sets.ptr, 0, null
         );  // last parameters are copy count and pointer to copies
@@ -1025,14 +1012,24 @@ struct Meta_Descriptor_Update_T(
 }
 
 
+/// Convenience function to update the VkWriteDescriptorSet of the passed in Descriptor_Update struct.
+/// Makes more syntactical sense using UFCS.
+///     vk = reference to a Vulkan state struct
+///     descriptor_update = reference to a Descriptor_Update struct
+/// Returns: the passed in Meta_Structure for function chaining
+void updateDescriptor( ref Vulkan vk, ref Descriptor_Update descriptor_update ) {
+    descriptor_update.update( vk );
+}
+
+
 
 //////////////////////////////////////////////////////////////////////////////////
-// Meta_Descriptor to connect Meta_Descriptor_Layout and Meta_Descriptor_Update //
+// Meta_Descriptor to connect Meta_Descriptor_Layout and Descriptor_Update //
 //////////////////////////////////////////////////////////////////////////////////
 
 
 /// meta struct which combines the data structures and functionality of
-/// Meta_Descriptor_Layout and Meta_Descriptor_Update
+/// Meta_Descriptor_Layout and Descriptor_Update
 /// the purpose is to create and and update (initialize) a VkDescriptorSet
 /// with one set of functions, without redundantly specifying same parameters
 /// must be initialized with a Vulkan state struct which will be passed to
@@ -1052,29 +1049,28 @@ struct Meta_Descriptor_T(
         set_layout_binding_count,
         immutable_sampler_count );
 
-    alias Update_T = Meta_Descriptor_Update_T!(
+    alias Update_T = Descriptor_Update_T!(
         write_set_count,
         image_info_count,
         buffer_info_count,
         texel_buffer_view_count );
 
-    Layout_T                        meta_descriptor_layout;
-    Update_T                        meta_descriptor_update;
-    alias meta_descriptor_layout    this;
-
-    bool add_write_descriptor = false;
+    Layout_T    descriptor_layout;
+    Update_T    descriptor_update;
+    alias       descriptor_layout this;
+    bool        add_write_descriptor = false;
 
     // the two following statements constructor and function are necessary
-    // to override the same from mixed in Vulkan_State_Pointer of the meta_descriptor_update
-    this( ref Vulkan vk )               { meta_descriptor_layout.vk_ptr = meta_descriptor_update.vk_ptr = &vk; }
-    auto ref opCall( ref Vulkan vk )    { meta_descriptor_layout.vk_ptr = meta_descriptor_update.vk_ptr = &vk; return this; }
+    // to override the same from mixed in Vulkan_State_Pointer of the descriptor_update
+    this( ref Vulkan vk )               { descriptor_layout.vk_ptr = & vk; }
+    auto ref opCall( ref Vulkan vk )    { descriptor_layout.vk_ptr = & vk; return this; }
 
 
     /// get minimal config for internal D_OR_S_ARRAY
     auto static_config() {
         size_t[6] result;
-        result[ 0..2 ] = meta_descriptor_layout.static_config[];
-        result[ 2..6 ] = meta_descriptor_update.static_config[];
+        result[ 0 .. 2 ] = descriptor_layout.static_config[];
+        result[ 2 .. 6 ] = descriptor_update.static_config[];
         return result;
     }
 
@@ -1083,10 +1079,9 @@ struct Meta_Descriptor_T(
     /// VkDescriptorPool, VkDescriptorSet and VkDescriptorSetLayout
     /// of the internal Meta_Descriptor_Layout
     auto reset() {
-        meta_descriptor_update.reset;
-        return meta_descriptor_layout.reset;
+        descriptor_update.reset;
+        return descriptor_layout.reset;
     }
-
 
 
     /// add a VkDescriptorSetLayoutBinding to the Meta_Descriptor
@@ -1110,14 +1105,16 @@ struct Meta_Descriptor_T(
         string              file = __FILE__,
         size_t              line = __LINE__,
         string              func = __FUNCTION__
+
         ) {
+
         // descriptor_count, in this case, is a starting value which will increase when using
         // Meta_Descriptor to create and update the descriptor set
         // Note however, that, in this case these descriptor_count descriptors will not be updated when
-        // editing has finished. They must be updated later on either using Meta_Descriptor_Update or manually.
+        // editing has finished. They must be updated later on either using Descriptor_Update or manually.
         // The count will be reset to 0 first, when adding immutable samplers, as those cannot have any offset.
         add_write_descriptor = true;
-        meta_descriptor_layout.addLayoutBinding( binding, descriptor_type, shader_stage_flags, descriptor_count, file, line, func );
+        descriptor_layout.addLayoutBinding( binding, descriptor_type, shader_stage_flags, descriptor_count, file, line, func );
         return this;
     }
 
@@ -1177,7 +1174,6 @@ struct Meta_Descriptor_T(
     }
 
 
-
     /// add a VkDescriptorSetLayoutBinding to the Meta_Descriptor
     /// to configure immutable samplers, consequently this layout will only accept
     /// descriptor_type VK_DESCRIPTOR_TYPE_SAMPLER or VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER
@@ -1202,18 +1198,16 @@ struct Meta_Descriptor_T(
         // descriptor_count in this case is a starting value which will increase when using
         // Meta_Descriptor to create and update the descriptor set
         // note however, that in this case these descriptor_count descriptors will not be updated when
-        // editing has finished they must be updated later on either using Meta_Descriptor_Update or manually
+        // editing has finished they must be updated later on either using Descriptor_Update or manually
         // When editing immutable samplers there cannot be any offset, so that this value is reset to 0
         // descriptor_count = 0 cannot be passed to the Meta_Descriptor_Layout.addLayoutBinding function
         // hence the descriptor_count is incremented by one for the call and decremented from
         // the added layout binding afterwards
         if( descriptor_type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER )
             add_write_descriptor = true;
-        meta_descriptor_layout.addImmutableBinding( binding, descriptor_type, shader_stage_flags, file, line, func );
-
+        descriptor_layout.addImmutableBinding( binding, descriptor_type, shader_stage_flags, file, line, func );
         return this;
     }
-
 
 
     /// convenience func
@@ -1222,12 +1216,10 @@ struct Meta_Descriptor_T(
     }
 
 
-
     /// convenience func
     auto ref addImmutableSamplerImageBinding( uint32_t binding, VkShaderStageFlags shader_stage_flags, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
         return addImmutableBinding( binding, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, shader_stage_flags, file, line, func );
     }
-
 
 
     /// private template function, forwards to addDescriptorTypeUpdate, to add either
@@ -1256,7 +1248,7 @@ struct Meta_Descriptor_T(
         // and only if the last command was to add a layout binding
         if( add_write_descriptor ) {
             add_write_descriptor = false;
-            meta_descriptor_update.addBindingUpdate( layout_binding.binding, layout_binding.descriptorType );
+            descriptor_update.addBindingUpdate( layout_binding.binding, layout_binding.descriptorType );
         }
 
         Pack_Index_And_Count piac = layout_binding.descriptorCount;         // preserve index and count
@@ -1264,10 +1256,9 @@ struct Meta_Descriptor_T(
         layout_binding.descriptorCount = piac.descriptor_count;             // assigning back to the original member
 
         // we must not update the descriptor if we have added an immutable sampler without image
-        meta_descriptor_update.addDescriptorTypeUpdate( descriptor, file, line, func ); // Former additional template args: descriptor_array, write_pointer )
+        descriptor_update.addDescriptorTypeUpdate( descriptor, file, line, func ); // Former additional template args: descriptor_array, write_pointer )
         return this;
     }
-
 
 
     /// add a (mutable) VkSampler descriptor, convenience function to create and add VkImageInfo
@@ -1292,10 +1283,9 @@ struct Meta_Descriptor_T(
         if( set_layout_bindings[ $-1 ].pImmutableSamplers is null )
             addDescriptorType( VkDescriptorImageInfo( sampler, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_UNDEFINED ), file, line, func );
         else
-            meta_descriptor_layout.addImmutableSampler( sampler, file, line, func );
+            descriptor_layout.addImmutableSampler( sampler, file, line, func );
         return this;
     }
-
 
 
     //Todo(pp): finish dis!!!
@@ -1315,7 +1305,6 @@ struct Meta_Descriptor_T(
 
         return addDescriptorType( VkDescriptorImageInfo( VK_NULL_HANDLE, image_view, image_layout ), file, line, func );
     }
-
 
 
     /// add a VkImageInfo with specifying its members as function params to the Meta_Descriptor
@@ -1352,13 +1341,12 @@ struct Meta_Descriptor_T(
             file, line, func, toCharPtr( layout_binding.descriptorType ));
 
         if( layout_binding.pImmutableSamplers !is null ) {
-            meta_descriptor_layout.immutable_samplers.append( sampler, logInfo( file, line, func ));
+            descriptor_layout.immutable_samplers.append( sampler, logInfo( file, line, func ));
             addDescriptorType( VkDescriptorImageInfo( VK_NULL_HANDLE, image_view, image_layout ), file, line, func );
         } else
             addDescriptorType( VkDescriptorImageInfo( sampler, image_view, image_layout ), file, line, func );
         return this;
     }
-
 
 
     /// add a VkBufferInfo with specifying its members as function params to the Meta_Descriptor
@@ -1390,7 +1378,7 @@ struct Meta_Descriptor_T(
     /// offset and range are optional and common to each buffer, in this case the whole buffer will be attached
     /// if only offset is specified the buffer from offset till its end will be attached
     /// Params:
-    ///     meta = reference to a Meta_Descriptor_Update struct
+    ///     meta = reference to a Descriptor_Update struct
     ///     buffers = to be accessed through the VkDescriptorSet
     ///     offset = optional offset into each of the buffers
     ///     range  = optional range of each of the buffer access, till end if not specified
@@ -1433,7 +1421,7 @@ struct Meta_Descriptor_T(
 
     /// add VkBufferView handles as texel unifor or shader storage buffers
     /// Params:
-    ///     meta = reference to a Meta_Descriptor_Update struct
+    ///     meta = reference to a Descriptor_Update struct
     ///     buffer_views = to access the array of VkBuffers through the VkDescriptorSet
     /// Returns: the passed in Meta_Structure for function chaining
     auto ref addTexelBufferViews(
@@ -1465,8 +1453,8 @@ struct Meta_Descriptor_T(
 
         ) {
 
-        meta_descriptor_layout.allocateSet( descriptor_pool_create_flags, file, line, func );
-        meta_descriptor_update.attachSet( descriptor_set ).update;
+        descriptor_layout.allocateSet( descriptor_pool_create_flags, file, line, func );
+        descriptor_update.attachSet( descriptor_set ).update( vk );
         return this;
     }
 
@@ -1488,10 +1476,10 @@ struct Meta_Descriptor_T(
 
         ) {
 
-        meta_descriptor_layout
+        descriptor_layout
             .createSetLayout( set_layout_create_flags, file, line, func )
             .allocateSet( descriptor_pool_create_flags, file, line, func );
-        meta_descriptor_update.attachSet( descriptor_set ).update;
+        descriptor_update.attachSet( descriptor_set ).update( vk );
         return this;
     }
 
@@ -1513,10 +1501,10 @@ struct Meta_Descriptor_T(
 
         ) {
 
-        meta_descriptor_layout
+        descriptor_layout
             .createSetLayout( set_layout_create_flags, file, line, func )
             .allocateSet( descriptor_pool, file, line, func );
-        meta_descriptor_update.attachSet( descriptor_set ).update;
+        descriptor_update.attachSet( descriptor_set ).update( vk );
         return this;
     }
 }
