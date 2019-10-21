@@ -62,8 +62,8 @@ struct Scratch_Result( Result_T ) {
         vk_ptr = & vk;
         array = Array_T( vk.scratch );
         if( count > 0 ) {
-            array.reserve( count );
-            array.length(  count, true );
+            array.reserve( count );         // first reserve
+            array.length(  count, true );   // then resize to the same size, to no eagerly over allocate
         }
     }
 }
@@ -412,10 +412,12 @@ template is_handle( T ) { enum bool is_handle = is_dispatch_handle!T || is_non_d
 
 T resetHandle( T )( ref T handle ) if( is_handle !T ) { T result = handle; handle = VK_NULL_HANDLE; return result; }
 
-alias is_null = is_null_handle;
-bool is_null_handle( T )( T handle ) if( is_handle!T ) {
-    return handle == VK_NULL_HANDLE;
-}
+
+
+bool is_null_handle(        T )( T handle ) if( is_handle!T ) { return handle == VK_NULL_HANDLE; }
+bool is_constructed_handle( T )( T handle ) if( is_handle!T ) { return handle != VK_NULL_HANDLE; }
+alias is_null           = is_null_handle;
+alias is_constructed    = is_constructed_handle;
 
 
 mixin template Is_Null(             alias handle ) { bool is_null()         { return handle == VK_NULL_HANDLE; }}
