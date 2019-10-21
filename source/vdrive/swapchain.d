@@ -294,37 +294,41 @@ private void isCoreSwapchainImpl( int32_t max_view_count, uint32_t member_copies
 
 
 
+alias Meta_Swapchain = Meta_Swapchain_T!( int32_t.max );
+alias Meta_Swapchain_T( T ) = Meta_Swapchain_T!( T.ic, T.mc );
 
 /// struct to capture buffer and memory creation as well as binding
 /// the struct can travel through several methods and can be filled with necessary data
 /// first thing after creation of this struct must be the assignment of the address of a valid vulkan state struct
-struct Meta_Swapchain_T( int32_t max_image_count ) {
+struct Meta_Swapchain_T( int32_t max_image_count, uint member_copies = SMC.None )  if( max_image_count > 0 ) {
+    alias ic = max_image_count;
+    alias mc = member_copies;
+
     mixin                                           Vulkan_State_Pointer;
     VkQueue                                         present_queue = VK_NULL_HANDLE;
     VkSwapchainKHR                                  swapchain;
     VkSwapchainCreateInfoKHR                        swapchain_ci;
-    D_OR_S_ARRAY!( max_image_count, VkImageView )   swapchain_image_views;
-    alias present_image_views = swapchain_image_views;  // Todo(pp): rename to all project wide occurrences present_image_views to swapchain_image_views
+    D_OR_S_ARRAY!( max_image_count, VkImageView )   image_views;
 
     // convenience function to get the refernce or pointer to the VkSurface of swapchain_ci
     auto surface_ptr()      { return & swapchain_ci.surface; }
 
     // convenience to get the swapchain image count
-    auto imageCount()       { return swapchain_image_views.length.toUint; }
+    auto image_count()       { return image_views.length.toUint; }
 
     // convenience to get VkSurfaceFormatKHR from VkSwapchainCreateInfoKHR.imageFormat and .imageColorSpace and set vice versa
-    auto surfaceFormat()    { return VkSurfaceFormatKHR( swapchain_ci.imageFormat, swapchain_ci.imageColorSpace ); }
-    void surfaceFormat( VkSurfaceFormatKHR surface_format ) {
+    auto surface_format()    { return VkSurfaceFormatKHR( swapchain_ci.imageFormat, swapchain_ci.imageColorSpace ); }
+    void surface_format( VkSurfaceFormatKHR surface_format ) {
         swapchain_ci.imageFormat = surface_format.format;
         swapchain_ci.imageColorSpace = surface_format.colorSpace;
     }
 
     // two different resource destroy functions for two distinct places
-    void destroySurface() { vk.destroy( swapchain_ci.surface ); }
-    void destroySwapchain() { vk.destroy( swapchain ); }
+    void destroySurface() { vk.destroyHandle( swapchain_ci.surface ); }
+    void destroySwapchain() { vk.destroyHandle( swapchain ); }
     void destroyImageViews() {
-        foreach( ref image_view; swapchain_image_views ) {
-            vk.destroy( image_view );
+        foreach( ref image_view; image_views ) {
+            vk.destroyHandle( image_view );
         }
     }
 
@@ -336,15 +340,49 @@ struct Meta_Swapchain_T( int32_t max_image_count ) {
     }
 
 
-    auto ref selectSurfaceFormat( VkFormat[] include_formats, bool first_available_as_fallback = true ) {
-        // store available surface formats temporarily in an util.array : Static_Array with max length of count of all VkFormat and filter with the requested include_formats
-        auto surface_formats = List_Surface_Formats_Result( vk );
-        surfaceFormat = listSurfaceFormats( surface_formats, surface, false ).filter( include_formats );
+    /// reset all internal data and return wrapped Vulkan objects
+    /// VkSurface, VkSwapchain, VkImageviews and other optional members
+    /// in the passed in ref Core_Swapchain_T.
+    auto reset() {
+        Core_Swapchain_T!( ic, mc ) out_core;
+        reset( out_core );
+        return out_core;
+    }
+
+
+    /// reset all internal data and return wrapped Vulkan objects
+    /// VkSurface, VkSwapchain, VkImageviews and other optional members
+    /// in a new matching Core_Swapchain_T.
+    auto ref reset( ref Core_Swapchain_T!( ic, mc ) out_core ) {
+                                                    out_core.surface        = resetHandle( swapchain_ci.surface );
+                                                    out_core.swapchain      = resetHandle( swapchain );
+                                                    out_core.image_views    = image_views.release;
+        static if( mc & SMC.Extent  )               out_core.image_extent   = swapchain_ci.imageExtent;
+        static if( mc & SMC.Format  )               out_core.image_format   = swapchain_ci.imageFformat;
+        static if( mc & SMC.Queue   )           if( out_core.present_queue.is_null_handle && !present_queue.is_null_handle )
+                                                    out_core.present_queue  = resetHandle( present_queue );
+
         return this;
     }
 
 
-    auto ref selectPresentMode( VkPresentModeKHR[] include_modes, bool first_available_as_fallback = true ) {
+    /// Select surface format from passed in prefered formats, optionally select the first available if prefered cannot be found.
+    auto ref selectSurfaceFormat( VkFormat[] include_formats, bool first_available_as_fallback = true, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+        // assert that meta struct is initialized with a valid vulkan state pointer
+        vkAssert( isValid, "Vulkan state not assigned", file, line, func );
+
+        // store available surface formats temporarily in an util.array : Static_Array with max length of count of all VkFormat and filter with the requested include_formats
+        auto surface_formats = List_Surface_Formats_Result( vk );
+        surface_format = listSurfaceFormats( surface_formats, surface, false ).filter( include_formats );
+        return this;
+    }
+
+
+    /// Select presentation mode from passed in prefered modes, optionally select the first available if prefered cannot be found.
+    auto ref selectPresentMode( VkPresentModeKHR[] include_modes, bool first_available_as_fallback = true, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+        // assert that meta struct is initialized with a valid vulkan state pointer
+        vkAssert( isValid, "Vulkan state not assigned", file, line, func );
+
         // store available present modes temporarily in an util.array : Static_Array with max length of count of all VkPresentModeKHR and filter with the requested include_modes
         auto prsent_modes = List_Present_Modes_Result( vk );
         presentMode = listPresentModes( prsent_modes, surface, false ).filter( include_modes );
@@ -353,8 +391,17 @@ struct Meta_Swapchain_T( int32_t max_image_count ) {
 
 
     // forward members of Meta_Swapchain.swapchain_ci to setter and getter functions
-    mixin( Forward_To_Inner_Struct!( VkSwapchainCreateInfoKHR, "swapchain_ci" ));
+    mixin( Forward_To_Inner_Struct!( VkSwapchainCreateInfoKHR, "swapchain_ci", "imageSharingMode", "queueFamilyIndexCount", "pQueueFamilyIndices" ));
 
+
+    /// Specify the sharing queue families and implicitly the sharing mode, which defaults to VK_SHARING_MODE_EXCLUSIVE.
+    auto ref sharingQueueFamilies( uint32_t[] sharing_queue_family_indices, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+        vkAssert( sharing_queue_family_indices.length != 1,
+            "Length of sharing_queue_family_indices must either be 0 (VK_SHARING_MODE_EXCLUSIVE) or greater 1 (VK_SHARING_MODE_CONCURRENT)", file, line, func );
+        swapchain_ci.imageSharingMode       = sharing_queue_family_indices.length > 1 ? VK_SHARING_MODE_CONCURRENT : VK_SHARING_MODE_EXCLUSIVE;
+        swapchain_ci.queueFamilyIndexCount  = sharing_queue_family_indices.length.toUint;
+        swapchain_ci.pQueueFamilyIndices    = sharing_queue_family_indices.ptr;
+    }
 
 
     auto ref createSwapchain( string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
@@ -401,7 +448,7 @@ struct Meta_Swapchain_T( int32_t max_image_count ) {
         swapchain_ci.oldSwapchain = swapchain;         // store this in case we are recreating the swapchain
         vkCreateSwapchainKHR( vk.device, & swapchain_ci, allocator, & swapchain ).vkAssert( "Create Swapchain", file, line, func );
         if( swapchain_ci.oldSwapchain )                // if the old swapchain was valid
-            vk.destroy( swapchain_ci.oldSwapchain );   // destroy it now
+            vk.destroyHandle( swapchain_ci.oldSwapchain );   // destroy it now
 
         return this;
     }
@@ -419,7 +466,9 @@ struct Meta_Swapchain_T( int32_t max_image_count ) {
         string              file = __FILE__,
         size_t              line = __LINE__,
         string              func = __FUNCTION__
+
         ) {
+
         VkImageSubresourceRange image_subresource_range = {
             aspectMask      : VK_IMAGE_ASPECT_COLOR_BIT,
             baseMipLevel    : 0,
@@ -439,7 +488,9 @@ struct Meta_Swapchain_T( int32_t max_image_count ) {
         string                  file = __FILE__,
         size_t                  line = __LINE__,
         string                  func = __FUNCTION__
+
         ) {
+
         VkImageViewCreateInfo image_view_ci = {
             viewType            : image_view_type,
             format              : imageFormat,
@@ -457,25 +508,27 @@ struct Meta_Swapchain_T( int32_t max_image_count ) {
         string                  file = __FILE__,
         size_t                  line = __LINE__,
         string                  func = __FUNCTION__
+
         ) {
+
         // assert that meta struct is initialized with a valid vulkan state pointer
         vkAssert( isValid, "Vulkan state not assigned", file, line, func );
 
         // destroy old image views if they exist
-        foreach( ref image_view; swapchain_image_views ) vk.destroy( image_view );
+        foreach( ref image_view; image_views ) vk.destroyHandle( image_view );
 
         // get swapchain images
         auto swapchain_images = swapchainImages( file, line, func );
 
         // allocate storage for image views and create one view per swapchain image in a loop
-        swapchain_image_views.length = swapchain_images.length;
+        image_views.length = swapchain_images.length;
         foreach( i; 0 .. swapchain_images.length ) {
             image_view_ci.image = swapchain_images[i];   // complete VkImageViewCreateInfo with image i:
-            vkCreateImageView( vk.device, & image_view_ci, allocator, & swapchain_image_views[i] ).vkAssert( "Create Image View", file, line, func );
+            vkCreateImageView( vk.device, & image_view_ci, allocator, & image_views[i] ).vkAssert( "Create Image View", file, line, func );
         }
 
         // Todo(pp): debug this, not working variant (access violation)
-        //swapchain_image_views = vk.getSwapchainImageViews_t!max_image_count( swapchain, image_view_ci );
+        //image_views = vk.getSwapchainImageViews_t!max_image_count( swapchain, image_view_ci );
 
         return this;
     }
@@ -492,42 +545,10 @@ struct Meta_Swapchain_T( int32_t max_image_count ) {
     /// get minimal config for internal D_OR_S_ARRAY
     auto static_config() {
         size_t[1] result;   // return static array even if we have only one value to maintain conssitency
-        result[0] = swapchain_image_views.length;
+        result[0] = image_views.length;
         return result;
     }
 }
 
 
-// Meta_Swapchain is an alias for Meta_Swapchain_T with a dynamic array as data backing
-alias Meta_Swapchain = Meta_Swapchain_T!( int32_t.max );
 
-
-/*
-// Todo(pp): this function is only a stub and must be merged with the one above.
-// issue with the approach bellow: the two overloads above and bellow must return the same type
-// ... as overloads based on return type only are not allowed
-// hence both must return some kind of dynamic array which is optionally able to use scratch memory
-// moreover, to not over complicate the argument amount the option to use scratch space
-// should be set globally and recorded in the vulkan state struct
-// see requirements and recipe on array in util.array module
-auto createImageViews( ref Meta_Swapchain meta, VkImageViewCreateInfo image_view_ci, void* scratch = null, uint32_t* size_used = null ) {
-    // assert that meta struct is initialized with a valid vulkan state pointer
-    vkAssert( meta.isValid, "Vulkan state not assigned" );
-
-    // Create image views of the swapchain images in the passed in argument swapchain_image_views
-    auto swapchain_images = listVulkanProperty!( VkImage, vkGetSwapchainImagesKHR, VkDevice, VkSwapchainKHR )( scratch, meta.device, meta.swapchain );
-
-    // offset scratch pointer and use the remaining memory to store the image views
-    scratch += swapchain_images.sizeof;
-    auto swapchain_image_views = ( cast( VkImageView* )scratch )[ 0 .. swapchain_images.length ];
-    foreach( i; 0 .. swapchain_image_views.length ) {
-        image_view_ci.image = swapchain_images[i];   // complete VkImageViewCreateInfo with image i:
-        vkCreateImageView( meta.device, & image_view_ci, meta.allocator, & swapchain_image_views[i] ).vkAssert;
-    }
-
-    if( size_used )
-        *size_used = swapchain_images.sizeof + swapchain_image_views.sizeof;
-
-    return swapchain_image_views;
-}
-*/

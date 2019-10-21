@@ -410,6 +410,7 @@ template is_non_dispatch_handle( T ) {
 
 template is_handle( T ) { enum bool is_handle = is_dispatch_handle!T || is_non_dispatch_handle!T; }
 
+T resetHandle( T )( ref T handle ) if( is_handle !T ) { T result = handle; handle = VK_NULL_HANDLE; return result; }
 
 alias is_null = is_null_handle;
 bool is_null_handle( T )( T handle ) if( is_handle!T ) {
