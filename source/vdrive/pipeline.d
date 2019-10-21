@@ -125,8 +125,8 @@ struct Core_Pipeline {
 ///     core = the wrapped VkDescriptorPool ( with it the VkDescriptorSet ) and the VkDescriptorSetLayout to destroy
 /// Returns: the passed in Meta_Structure for function chaining
 void destroy( ref Vulkan vk, ref Core_Pipeline core ) {
-    vdrive.state.destroy( vk, core.pipeline );          // no nice syntax, vdrive.state.destroy overloads
-    vdrive.state.destroy( vk, core.pipeline_layout );   // get confused with this one in the module scope
+    vk.destroyHandle( core.pipeline );
+    vk.destroyHandle( core.pipeline_layout );
 }
 
 
@@ -226,8 +226,8 @@ struct Meta_Graphics_T(
 
 
     void destroyResources() {
-        vdrive.state.destroy( vk, pipeline );          // no nice syntax, vdrive.state.destroy overloads
-        vdrive.state.destroy( vk, pipeline_layout );   // get confused with this one in the module scope
+        vk.destroyHandle( pipeline );
+        vk.destroyHandle( pipeline_layout );
     }
 
 
@@ -287,7 +287,7 @@ struct Meta_Graphics_T(
     auto ref destroyShaderModules() {
         foreach( ref shader_stage; shader_stages )
             if( !shader_stage._module.is_null )
-                vdrive.state.destroy( vk, shader_stage._module );
+                vk.destroyHandle( shader_stage._module );
         shader_stages.clear;
         return this;
     }
@@ -771,8 +771,8 @@ struct Meta_Compute_T(
 
 
     void destroyResources() {
-        vdrive.state.destroy( vk, pipeline );              // no nice syntax, vdrive.state.destroy overloads
-        vdrive.state.destroy( vk, pipeline_ci.layout );    // get confused with this one in the module scope
+        vk.destroyHandle( pipeline );
+        vk.destroyHandle( pipeline_ci.layout );
     }
 
 
@@ -810,7 +810,7 @@ struct Meta_Compute_T(
     /// destroy shader module, can happen immediatelly after PSO construction
     auto ref destroyShaderModule() {
         if( !pipeline_ci.stage._module.is_null )
-            vdrive.state.destroy( vk, pipeline_ci.stage._module );
+            vk.destroyHandle( pipeline_ci.stage._module );
         return this;
     }
 
