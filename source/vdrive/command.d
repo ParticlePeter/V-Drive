@@ -5,19 +5,28 @@ import core.stdc.stdio : printf;
 import vdrive.util;
 import vdrive.state;
 
-
 import erupted;
 
-nothrow:
 
-auto createCommandPool( ref Vulkan vk, uint32_t queue_family_index, VkCommandPoolCreateFlags command_pool_create_flags = 0 ) {
+nothrow @nogc:
+
+auto createCommandPool(
+    ref Vulkan                  vk,
+    uint32_t                    queue_family_index,
+    VkCommandPoolCreateFlags    command_pool_create_flags = 0,
+    string                      file = __FILE__,
+    size_t                      line = __LINE__,
+    string                      func = __FUNCTION__
+
+    ) {
+
     VkCommandPoolCreateInfo command_pool_create_info = {
         flags               : command_pool_create_flags,
         queueFamilyIndex    : queue_family_index,
     };
 
     VkCommandPool command_pool;
-    vk.device.vkCreateCommandPool( &command_pool_create_info, vk.allocator, &command_pool ).vkAssert;
+    vk.device.vkCreateCommandPool( &command_pool_create_info, vk.allocator, &command_pool ).vkAssert( "Create Command Pool", file, line, func );
     return command_pool;
 }
 
