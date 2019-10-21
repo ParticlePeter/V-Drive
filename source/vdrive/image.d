@@ -10,12 +10,413 @@ import erupted;
 
 
 
+/////////////////////////////////////////////
+// VkImage, VkImageView, VkSampler related //
+/////////////////////////////////////////////
 
-/////////////////
-// Descriptors //
-/////////////////
 
-mixin template IView_Memeber( uint view_count ) if( view_count > 0 ) {
+
+/// Create a VkImage of type VK_IMAGE_TYPE_2D (VK_IMAGE_TYPE_1D if height is set to 0)
+/// without one mipmap level and one layer.
+/// several parameters are deducted (e.g. image type) from other parameters,
+/// or combined into one (e.g. sharingMode, queueFamilyIndexCount, pQueueFamilyIndices
+/// as uint32_t[] sharing_queue_family_indices). Parameters are arranged in importance
+/// while les important parameters have most used defaults.
+/// Params:
+///     vk      = reference to a VulkanState struct
+///     format  = format of the image
+///     width   = width of the image
+///     height  = height of the image (if set to 0, a VK_IMAGE_TYPE_1D will be created)
+///     usage   = the usage of the image
+///     samples = optional sample count, default is VK_SAMPLE_COUNT_1_BIT
+///     tiling  = optional image tiling, default is VK_IMAGE_TILING_OPTIMAL
+///     initial_layout = optional image layout, default is VK_IMAGE_LAYOUT_UNDEFINED
+///     sharing_queue_family_indices = optional, default is [], length must not be 1,
+///         if length > 1 sharingMode is set to VK_SHARING_MODE_CONCURRENT,
+///         specifies queueFamilyIndexCount (length) and assigns the pQueueFamilyIndices pointer
+///     flags   = optional create flags of the image
+/// Returns: VkImage
+VkImage createImage(
+    ref Vulkan              vk,
+    VkFormat                format,
+    uint32_t                width,
+    uint32_t                height,
+    VkImageUsageFlags       usage,
+    VkSampleCountFlagBits   samples = VK_SAMPLE_COUNT_1_BIT,
+    VkImageTiling           tiling  = VK_IMAGE_TILING_OPTIMAL,
+    VkImageLayout           initial_layout = VK_IMAGE_LAYOUT_UNDEFINED,
+    uint32_t[]              sharing_queue_family_indices = [],
+    VkImageCreateFlags      flags   = 0,
+    string                  file    = __FILE__,
+    size_t                  line    = __LINE__,
+    string                  func    = __FUNCTION__
+
+    ) {
+
+    return vk.createImage(
+        format, width, height, 0, 1, 1, usage, samples,
+        tiling, initial_layout, sharing_queue_family_indices, flags,
+        file, line, func );
+}
+
+
+/// Create a VkImage of type VK_IMAGE_TYPE_3D / _2D if depth is set to 0 / _1D if height to 0
+/// several parameters are deducted (e.g. imageType) from other parameters,
+/// or combined into one (e.g. sharingMode, queueFamilyIndexCount, pQueueFamilyIndices
+/// as uint32_t[] sharing_queue_family_indices). Parameters are arranged in importance
+/// while les important parameters have most used defaults.
+/// Params:
+///     vk          = reference to a VulkanState struct
+///     format      = format of the image
+///     width       = width of the image
+///     height      = height of the image (if set to 0, a VK_IMAGE_TYPE_1D will be created)
+///     depth       = depth  of the image (if set to 0, a VK_IMAGE_TYPE_2D will be created)
+///     mip_levels  = mipmap levels of the image
+///     array_layers= array layers of the image
+///     usage       = the usage of the image
+///     samples     = optional sample count, default is VK_SAMPLE_COUNT_1_BIT
+///     tiling      = optional image tiling, default is VK_IMAGE_TILING_OPTIMAL
+///     initial_layout = optional image layout, default is VK_IMAGE_LAYOUT_UNDEFINED
+///     sharing_queue_family_indices = optional, default is [], length must not be 1,
+///         if length > 1 sharingMode is set to VK_SHARING_MODE_CONCURRENT,
+///         specifies queueFamilyIndexCount (length) and assigns the pQueueFamilyIndices pointer
+///     flags       = optional create flags of the image
+/// Returns: VkImage
+VkImage createImage(
+    ref Vulkan              vk,
+    VkFormat                format,
+    uint32_t                width,
+    uint32_t                height,
+    uint32_t                depth,
+    uint32_t                mip_levels,
+    uint32_t                array_layers,
+    VkImageUsageFlags       usage,
+    VkSampleCountFlagBits   samples = VK_SAMPLE_COUNT_1_BIT,
+    VkImageTiling           tiling  = VK_IMAGE_TILING_OPTIMAL,
+    VkImageLayout           initial_layout = VK_IMAGE_LAYOUT_UNDEFINED,
+    uint32_t[]              sharing_queue_family_indices = [],
+    VkImageCreateFlags      flags   = 0,
+    string                  file    = __FILE__,
+    size_t                  line    = __LINE__,
+    string                  func    = __FUNCTION__
+
+    ) {
+
+    vkAssert( sharing_queue_family_indices.length != 1,
+        "Length of sharing_queue_family_indices must either be 0 (VK_SHARING_MODE_EXCLUSIVE) or greater 1 (VK_SHARING_MODE_CONCURRENT)",
+        file, line, func );
+
+    VkImageCreateInfo image_ci = {
+        flags                   : flags,
+        imageType               : height == 0 ? VK_IMAGE_TYPE_1D : depth == 0 ? VK_IMAGE_TYPE_2D : VK_IMAGE_TYPE_3D,
+        format                  : format,
+        extent                  : { width, height == 0 ? 1 : height, depth == 0 ? 1 : depth },
+        mipLevels               : mip_levels,
+        arrayLayers             : array_layers,
+        samples                 : samples,
+        tiling                  : tiling,
+        usage                   : usage,
+        initialLayout           : initial_layout,
+    };
+
+    if( sharing_queue_family_indices.length > 1 ) {
+        image_ci.sharingMode           = VK_SHARING_MODE_CONCURRENT;
+        image_ci.queueFamilyIndexCount = sharing_queue_family_indices.length.toUint;
+        image_ci.pQueueFamilyIndices   = sharing_queue_family_indices.ptr;
+    }
+
+    VkImage image;
+    vk.device.vkCreateImage( & image_ci, vk.allocator, & image ).vkAssert( "Create Image", file, line, func );
+    return image;
+}
+
+
+/// Create a VkImage, prioritizing image create flags, of type VK_IMAGE_TYPE_3D /
+/// _2D if depth is set to 0 / _1D if height to 0.
+/// several parameters are deducted (e.g. imageType) from other parameters,
+/// or combined into one (e.g. sharingMode, queueFamilyIndexCount, pQueueFamilyIndices
+/// as uint32_t[] sharing_queue_family_indices). Parameters are arranged in importance
+/// while les important parameters have most used defaults.
+/// Params:
+///     vk          = reference to a VulkanState struct
+///     flags       = create flags of the image
+///     format      = format of the image
+///     width       = width of the image
+///     height      = height of the image (if set to 0, a VK_IMAGE_TYPE_1D will be created)
+///     depth       = depth  of the image (if set to 0, a VK_IMAGE_TYPE_2D will be created)
+///     mip_levels  = mipmap levels of the image
+///     array_layers= array layers of the image
+///     usage       = the usage of the image
+///     samples     = optional sample count, default is VK_SAMPLE_COUNT_1_BIT
+///     tiling      = optional image tiling, default is VK_IMAGE_TILING_OPTIMAL
+///     initial_layout = optional image layout, default is VK_IMAGE_LAYOUT_UNDEFINED
+///     sharing_queue_family_indices = optional, default is [], length must not be 1,
+///         if length > 1 sharingMode is set to VK_SHARING_MODE_CONCURRENT,
+///         specifies queueFamilyIndexCount (length) and assigns the pQueueFamilyIndices pointer
+/// Returns: VkImage
+VkImage createImage(
+    ref Vulkan              vk,
+    VkImageCreateFlags      flags,
+    VkFormat                format,
+    uint32_t                width,
+    uint32_t                height,
+    uint32_t                depth,
+    uint32_t                mip_levels,
+    uint32_t                array_layers,
+    VkImageUsageFlags       usage,
+    VkSampleCountFlagBits   samples = VK_SAMPLE_COUNT_1_BIT,
+    VkImageTiling           tiling  = VK_IMAGE_TILING_OPTIMAL,
+    VkImageLayout           initial_layout = VK_IMAGE_LAYOUT_UNDEFINED,
+    uint32_t[]              sharing_queue_family_indices = [],
+    string                  file    = __FILE__,
+    size_t                  line    = __LINE__,
+    string                  func    = __FUNCTION__
+    ) {
+    return vk.createImage(
+        format, width, height, depth, mip_levels, array_layers, usage, samples,
+        tiling, initial_layout, sharing_queue_family_indices, flags,
+        file, line, func );
+}
+
+
+
+/// Create a VkImageView using expanded parameters of sub-structs
+/// Params:
+///     vk              = reference to a VulkanState struct, other params same as VkImageViewCreateInfo
+///     image           = the VkImage base for the resulting VkImageView
+///     viewType        = the view type of the image view ( VK_IMAGE_VIEW_TYPE_1D / 2D / 3D / CUBE / ...)
+///     format          = format of the image view
+///     aspectMask      = optional aspect mask, default is VK_IMAGE_ASPECT_COLOR_BIT
+///     baseMipLevel    = optional base mipmap level, default is 0
+///     levelCount      = optional mipmap level count, default is 1
+///     baseArrayLayer  = optional base array layer, default is 0
+///     layerCount      = optional layer count, default is 1
+///     flags           = optional create flags of the image view
+///     r               = optional component swizzle r, default is VK_COMPONENT_SWIZZLE_IDENTITY
+///     g               = optional component swizzle g, default is VK_COMPONENT_SWIZZLE_IDENTITY
+///     b               = optional component swizzle b, default is VK_COMPONENT_SWIZZLE_IDENTITY
+///     a               = optional component swizzle a, default is VK_COMPONENT_SWIZZLE_IDENTITY
+/// Returns: VkImageView
+VkImageView createImageView(
+    ref Vulkan              vk,
+    ref VkImage             image,
+    VkImageViewType         viewType,
+    VkFormat                format,
+    VkImageAspectFlags      aspectMask          = VK_IMAGE_ASPECT_COLOR_BIT,
+    uint32_t                baseMipLevel        = 0,
+    uint32_t                levelCount          = 1,
+    uint32_t                baseArrayLayer      = 0,
+    uint32_t                layerCount          = 1,
+    VkImageViewCreateFlags  flags               = 0,
+    VkComponentSwizzle      r                   = VK_COMPONENT_SWIZZLE_IDENTITY,
+    VkComponentSwizzle      g                   = VK_COMPONENT_SWIZZLE_IDENTITY,
+    VkComponentSwizzle      b                   = VK_COMPONENT_SWIZZLE_IDENTITY,
+    VkComponentSwizzle      a                   = VK_COMPONENT_SWIZZLE_IDENTITY,
+    string                  file                = __FILE__,
+    size_t                  line                = __LINE__,
+    string                  func                = __FUNCTION__
+
+    ) {
+
+    return vk.createImageView( image, flags, viewType, format,
+        VkImageSubresourceRange( aspectMask, baseMipLevel, levelCount, baseArrayLayer, layerCount ),
+        VkComponentMapping( r, g, b, a ), file, line, func );
+}
+
+
+/// Create a VkImageView, prioritizing image view create flags, requiring sub-structs as parameters.
+/// Params:
+///     vk              = reference to a VulkanState struct, other params same as VkImageViewCreateInfo
+///     image           = the VkImage base for the resulting VkImageView
+///     flags           = create flags of the image view
+///     viewType        = the view type of the image view ( VK_IMAGE_VIEW_TYPE_1D / 2D / 3D / CUBE / ...)
+///     format          = format of the image view
+///     subresourceRange= subresource range of the image view, default is VkImageSubresourceRange( VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 )
+///     flags           = optional flags
+///     components      = the component mapping of the image view, dafault is all VK_COMPONENT_SWIZZLE_IDENTITY
+/// Returns: VkImageView
+VkImageView createImageView(
+    ref Vulkan              vk,
+    ref VkImage             image,
+    VkImageViewCreateFlags  flags,
+    VkImageViewType         viewType,
+    VkFormat                format,
+    VkImageSubresourceRange subresourceRange    = VkImageSubresourceRange( VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 ),
+    VkComponentMapping      components          = VkComponentMapping( VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY ),
+    string                  file                = __FILE__,
+    size_t                  line                = __LINE__,
+    string                  func                = __FUNCTION__
+
+    ) {
+
+    VkImageViewCreateInfo image_view_ci = {
+        flags               : flags,
+        image               : image,
+        viewType            : viewType,
+        format              : format,
+        components          : components,
+        subresourceRange    : subresourceRange,
+    };
+
+    VkImageView image_view;
+    vk.device.vkCreateImageView( & image_view_ci, vk.allocator, & image_view ).vkAssert( "Create image view", file, line, func );
+    return image_view;
+}
+
+
+
+/// Create a VkSampler, parameters are sorted by importance, are all optional and have usefull defaults.
+/// Params:
+///     vk                  = reference to a VulkanState struct
+///     mag_filter          = the magnification filter of the sampler, default is VK_FILTER_LINEAR
+///     min_filter          = the minification  filter of the sampler, default is VK_FILTER_LINEAR
+///     mipmap_mode         = the mipmap mode of the sampler, default is VK_SAMPLER_MIPMAP_MODE_NEAREST
+///     address_mode_u      = address mode in u direction, default is VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE
+///     address_mode_v      = address mode in v direction, default is VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE
+///     address_mode_w      = address mode in w direction, default is VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE
+///     border_color        = border color of the image, default is VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK
+///     mip_lod_bias        = mipmap lod bias setting, default is 0.0f
+///     anisotropy_enable   = whether to enable anisotropic filtering, default VK_FALSE
+///     max_anisotropy      = max anisotropy setting, default is 1.0f
+///     compare_enable      = whether to eanble comparison functionality, default is VK_FALSE
+///     compare_op          = the comparison operation, default is VK_COMPARE_OP_NEVER
+///     min_lod             = the minimum lod, defualt is 0.0f disabling minimum bound
+///     max_lod             = the maximum lod, default is 0.0f disabling maximum bound
+///     unnormalized_coordinates = whether to use unnormalized coordinate, default is VK_FALSE
+///     flags               = sampler create flags
+/// Returns: VkSampler
+VkSampler createSampler(
+    ref Vulkan              vk,
+    VkFilter                mag_filter          = VK_FILTER_LINEAR,
+    VkFilter                min_filter          = VK_FILTER_LINEAR,
+    VkSamplerMipmapMode     mipmap_mode         = VK_SAMPLER_MIPMAP_MODE_NEAREST,
+    VkSamplerAddressMode    address_mode_u      = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+    VkSamplerAddressMode    address_mode_v      = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+    VkSamplerAddressMode    address_mode_w      = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+    VkBorderColor           border_color        = VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK,
+    float                   mip_lod_bias        = 0.0f,
+    VkBool32                anisotropy_enable   = VK_FALSE,
+    float                   max_anisotropy      = 1.0f,
+    VkBool32                compare_enable      = VK_FALSE,
+    VkCompareOp             compare_op          = VK_COMPARE_OP_NEVER,
+    float                   min_lod             = 0.0f,
+    float                   max_lod             = 0.0f,
+    VkBool32                unnormalized_coordinates = VK_FALSE,
+    VkSamplerCreateFlags    flags               = 0,
+    string                  file                = __FILE__,
+    size_t                  line                = __LINE__,
+    string                  func                = __FUNCTION__
+
+    ) {
+
+    VkSamplerCreateInfo sampler_ci = {
+        flags                   : flags,
+        magFilter               : mag_filter,
+        minFilter               : min_filter,
+        mipmapMode              : mipmap_mode,
+        addressModeU            : address_mode_u,
+        addressModeV            : address_mode_v,
+        addressModeW            : address_mode_w,
+        mipLodBias              : mip_lod_bias,
+        anisotropyEnable        : anisotropy_enable,
+        maxAnisotropy           : max_anisotropy,
+        compareEnable           : compare_enable,
+        compareOp               : compare_op,
+        minLod                  : min_lod,
+        maxLod                  : max_lod,
+        borderColor             : border_color,
+        unnormalizedCoordinates : unnormalized_coordinates,
+    };
+
+    VkSampler sampler;
+    vk.device.vkCreateSampler( & sampler_ci, vk.allocator, & sampler ).vkAssert( "Create sampler", file, line, func );
+    return sampler;
+}
+
+
+/// Create a VkSampler, prioritizing image view create flags. Parameters are sorted by importance,
+/// are all optional except sampler create flags and have usefull defaults.
+/// Params:
+///     vk                  = reference to a VulkanState struct
+///     flags               = sampler create flags
+///     mag_filter          = the magnification filter of the sampler, default is VK_FILTER_LINEAR
+///     min_filter          = the minification  filter of the sampler, default is VK_FILTER_LINEAR
+///     mipmap_mode         = the mipmap mode of the sampler, default is VK_SAMPLER_MIPMAP_MODE_NEAREST
+///     address_mode_u      = address mode in u direction, default is VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE
+///     address_mode_v      = address mode in v direction, default is VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE
+///     address_mode_w      = address mode in w direction, default is VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE
+///     border_color        = border color of the image, default is VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK
+///     mip_lod_bias        = mipmap lod bias setting, default is 0.0f
+///     anisotropy_enable   = whether to enable anisotropic filtering, default VK_FALSE
+///     max_anisotropy      = max anisotropy setting, default is 1.0f
+///     compare_enable      = whether to eanble comparison functionality, default is VK_FALSE
+///     compare_op          = the comparison operation, default is VK_COMPARE_OP_NEVER
+///     min_lod             = the minimum lod, defualt is 0.0f disabling minimum bound
+///     max_lod             = the maximum lod, default is 0.0f disabling maximum bound
+///     unnormalized_coordinates = whether to use unnormalized coordinate, default is VK_FALSE
+/// Returns: VkSampler
+VkSampler createSampler(
+    ref Vulkan              vk,
+    VkSamplerCreateFlags    flags,
+    VkFilter                mag_filter          = VK_FILTER_LINEAR,
+    VkFilter                min_filter          = VK_FILTER_LINEAR,
+    VkSamplerMipmapMode     mipmap_mode         = VK_SAMPLER_MIPMAP_MODE_NEAREST,
+    VkSamplerAddressMode    address_mode_u      = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+    VkSamplerAddressMode    address_mode_v      = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+    VkSamplerAddressMode    address_mode_w      = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+    VkBorderColor           border_color        = VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK,
+    float                   mip_lod_bias        = 0.0f,
+    VkBool32                anisotropy_enable   = VK_FALSE,
+    float                   max_anisotropy      = 1.0f,
+    VkBool32                compare_enable      = VK_FALSE,
+    VkCompareOp             compare_op          = VK_COMPARE_OP_NEVER,
+    float                   min_lod             = 0.0f,
+    float                   max_lod             = 0.0f,
+    VkBool32                unnormalized_coordinates = VK_FALSE,
+    string                  file                = __FILE__,
+    size_t                  line                = __LINE__,
+    string                  func                = __FUNCTION__
+
+    ) {
+
+    return vk.createSampler( mag_filter, min_filter, mipmap_mode, address_mode_u, address_mode_v, address_mode_w, border_color, mip_lod_bias,
+        anisotropy_enable, max_anisotropy, compare_enable, compare_op, min_lod, max_lod, unnormalized_coordinates, flags, file, line, func );
+}
+
+
+/// Query the physical device image properties of a certain image format, type, tiling, usage and create flags.
+/// Params:
+///     vk      = reference to a VulkanState struct
+///     format  = image format for the query
+///     type    = image type for the query
+///     tiling  = image tiling  for the query
+///     usage   = image usage for the query
+///     flags   = optional image create flags for the query
+/// return VkImageFormatProperties
+VkImageFormatProperties imageFormatProperties(
+    ref Vulkan          vk,
+    VkFormat            format,
+    VkImageType         type,
+    VkImageTiling       tiling,
+    VkImageUsageFlags   usage,
+    VkImageCreateFlags  flags = 0,
+    string              file = __FILE__,
+    size_t              line = __LINE__,
+    string              func = __FUNCTION__
+
+    ) {
+
+    VkImageFormatProperties image_format_properties;
+    vk.gpu.vkGetPhysicalDeviceImageFormatProperties(
+        format, type, tiling, usage, flags, & image_format_properties ).vkAssert( "Image Format Properties", file, line, func );
+    return image_format_properties;
+}
+
+
+// TODO(pp): create functions for VkImageSubresourceRange, VkBufferImageCopy and conversion functions between them
+
+
+
 
     alias vc = view_count;
 
