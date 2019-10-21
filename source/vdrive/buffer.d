@@ -240,6 +240,22 @@ struct Meta_Buffer {
         if( owns_device_memory )
             vk.destroy( device_memory );
         resetMemoryMember;
+/////////////////////////////////////////////////////
+// Meta_BView simple instantiation of BView_Member //
+/////////////////////////////////////////////////////
+
+alias  Meta_BView = Meta_BView_T!1;
+/// Meta struct to configure and construct a VkImageView.
+/// Must be initialized with a Vulkan state struct.
+struct Meta_BView_T( uint32_t view_count ) {
+    mixin Vulkan_State_Pointer;
+    mixin BView_Member!view_count;
+    alias construct = constructView;
+    alias is_null   = is_view_null;
+}
+
+
+
 ////////////////////////////////////////////////////
 // Buffer_Member and BView_Member mixin templates //
 ////////////////////////////////////////////////////
