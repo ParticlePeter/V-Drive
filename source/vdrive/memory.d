@@ -10,6 +10,7 @@ import vdrive.buffer;
 import erupted;
 
 
+nothrow @nogc:
 
 //////////////////////////////
 // general memory functions //
@@ -17,7 +18,7 @@ import erupted;
 
 /// memory_type_bits is a bit-field where if bit i is set, it means that the VkMemoryType i
 /// of the VkPhysicalDeviceMemoryProperties structure satisfies the memory requirements.
-auto memoryTypeIndex(
+uint32_t memoryTypeIndex(
     const ref VkPhysicalDeviceMemoryProperties  memory_properties,
     const ref VkMemoryRequirements              memory_requirements,
     VkMemoryPropertyFlags                       memory_property_flags
@@ -44,7 +45,7 @@ auto memoryTypeIndex(
 
 /// Search the memory heap (index) which satisfies given memory heap flags.
 /// An minimum heap index can be optionally specified. Returns uint32_t.max if heap not found.
-auto memoryHeapIndex(
+uint32_t memoryHeapIndex(
     VkPhysicalDeviceMemoryProperties    memory_properties,
     VkMemoryHeapFlags                   memory_heap_flags,
     uint32_t                            min_memory_heap_index = 0,
@@ -65,14 +66,14 @@ auto memoryHeapIndex(
 
 
 /// Query if a memory heap is available that satisfies given memory heap flags.
-auto hasMemoryHeapType( VkPhysicalDeviceMemoryProperties memory_properties, VkMemoryHeapFlags memory_heap_flags ) {
+uint32_t hasMemoryHeapType( VkPhysicalDeviceMemoryProperties memory_properties, VkMemoryHeapFlags memory_heap_flags ) {
     return memoryHeapIndex( memory_properties, memory_heap_flags ) < uint32_t.max;
 }
 
 
 
 /// Query the memory heap size of a given memory heap (index).
-auto memoryHeapSize( VkPhysicalDeviceMemoryProperties memory_properties, uint32_t memory_heap_index, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+VkDeviceSize memoryHeapSize( VkPhysicalDeviceMemoryProperties memory_properties, uint32_t memory_heap_index, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
     vkAssert( memory_heap_index < memory_properties.memoryHeapCount, "Memory Heap Index out of bounds", file, line, func );
     return memory_properties.memoryHeaps[ memory_heap_index ].size;
 }
@@ -80,7 +81,7 @@ auto memoryHeapSize( VkPhysicalDeviceMemoryProperties memory_properties, uint32_
 
 
 /// Allocate device memory from a given memory type (index).
-auto allocateMemory(
+VkDeviceMemory allocateMemory(
     ref Vulkan      vk,
     VkDeviceSize    allocation_size,
     uint32_t        memory_type_index,
@@ -106,17 +107,16 @@ auto allocateMemory(
 
 
 /// Map allocated memory.
-auto mapMemory(
+void* mapMemory(
     ref Vulkan          vk,
     VkDeviceMemory      memory,
-    VkDeviceSize        size,
     VkDeviceSize        offset  = 0,
-//  VkMemoryMapFlags    flags   = 0,        // for future use
+    VkDeviceSize        size    = VK_WHOLE_SIZE,
+    VkMemoryMapFlags    flags   = 0,
     string              file    = __FILE__,
     size_t              line    = __LINE__,
     string              func    = __FUNCTION__
     ) {
-    VkMemoryMapFlags flags;
     void* mapped_memory;
     vk.device.vkMapMemory( memory, offset, size, flags, & mapped_memory ).vkAssert( "Map Memory", file, line, func );
     return mapped_memory;
@@ -133,7 +133,71 @@ ref Vulkan unmapMemory( ref Vulkan vk, VkDeviceMemory memory ) {
 
 
 /// Create a VkMappedMemoryRange and initialize struct.
-auto createMappedMemoryRange(
+VkMappedMemoryRange createMappedMemoryRange(
+    VkDeviceMemory      memory,
+    VkDeviceSize        offset  = 0,
+    VkDeviceSize        size    = VK_WHOLE_SIZE,
+    string              file    = __FILE__,
+    size_t              line    = __LINE__,
+    string              func    = __FUNCTION__
+    ) {
+    VkMappedMemoryRange mapped_memory_range = {
+        memory  : memory,
+        offset  : offset,
+        size    : size,
+    };
+    return mapped_memory_range;
+}
+
+
+
+/// Flush a mapped memory range.
+ref Vulkan flushMappedMemoryRange(
+    ref Vulkan          vk,
+    VkDeviceMemory      memory,
+    VkDeviceSize        offset  = 0,
+    VkDeviceSize        size    = VK_WHOLE_SIZE,
+    string              file    = __FILE__,
+    size_t              line    = __LINE__,
+    string              func    = __FUNCTION__
+    ) {
+    auto mapped_memory_range = createMappedMemoryRange( memory, offset, size, file, line, func );
+    vk.device.vkFlushMappedMemoryRanges( 1, & mapped_memory_range ).vkAssert( "Flush Mapped Memory Range", file, line, func );
+    return vk;
+}
+
+
+
+/// Flush a mapped memory range.
+ref Vulkan flushMappedMemoryRange(
+    ref Vulkan                      vk,
+    const ref VkMappedMemoryRange   mapped_memory_range,
+    string                          file = __FILE__,
+    size_t                          line = __LINE__,
+    string                          func = __FUNCTION__
+    ) {
+    vk.device.vkFlushMappedMemoryRanges( 1, & mapped_memory_range ).vkAssert( "Flush Mapped Memory Range", file, line, func );
+    return vk;
+}
+
+
+
+/// Flush multiple mapped memory ranges.
+ref Vulkan flushMappedMemoryRanges(
+    ref Vulkan                      vk,
+    const ref VkMappedMemoryRange[] mapped_memory_ranges,
+    string                          file = __FILE__,
+    size_t                          line = __LINE__,
+    string                          func = __FUNCTION__
+    ) {
+    vk.device.vkFlushMappedMemoryRanges( mapped_memory_ranges.length.toUint, mapped_memory_ranges.ptr ).vkAssert( "Flush Mapped Memory Ranges", file, line, func );
+    return vk;
+}
+
+
+
+/// Invalidate a mapped memory range.
+ref Vulkan invalidateMappedMemoryRange(
     ref Vulkan          vk,
     VkDeviceMemory      memory,
     VkDeviceSize        size    = VK_WHOLE_SIZE,
@@ -142,34 +206,21 @@ auto createMappedMemoryRange(
     size_t              line    = __LINE__,
     string              func    = __FUNCTION__
     ) {
-    VkMappedMemoryRange mapped_memory_range = {
-        memory  : memory,
-        size    : size,
-        offset  : offset,
-    };
-    return mapped_memory_range;
-}
-
-
-
-/// Flush a mapped memory range.
-ref Vulkan flushMappedMemoryRange( ref Vulkan vk, VkMappedMemoryRange mapped_memory_range, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
-    vk.device.vkFlushMappedMemoryRanges( 1, & mapped_memory_range ).vkAssert( "Flush Mapped Memory Range", file, line, func );
-    return vk;
-}
-
-
-
-/// Flush multiple mapped memory ranges.
-ref Vulkan flushMappedMemoryRanges( ref Vulkan vk, VkMappedMemoryRange[] mapped_memory_ranges, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
-    vk.device.vkFlushMappedMemoryRanges( mapped_memory_ranges.length.toUint, mapped_memory_ranges.ptr ).vkAssert( "Flush Mapped Memory Ranges", file, line, func );
+    auto mapped_memory_range = createMappedMemoryRange( memory, offset, size, file, line, func );
+    vk.device.vkInvalidateMappedMemoryRanges( 1, & mapped_memory_range ).vkAssert( "Flush Mapped Memory Range", file, line, func );
     return vk;
 }
 
 
 
 /// Invalidate a mapped memory range.
-ref Vulkan invalidateMappedMemoryRange( ref Vulkan vk, VkMappedMemoryRange mapped_memory_range, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+ref Vulkan invalidateMappedMemoryRange(
+    ref Vulkan                      vk,
+    const ref VkMappedMemoryRange   mapped_memory_range,
+    string                          file = __FILE__,
+    size_t                          line = __LINE__,
+    string                          func = __FUNCTION__
+    ) {
     vk.device.vkInvalidateMappedMemoryRanges( 1, & mapped_memory_range ).vkAssert( "Flush Mapped Memory Range", file, line, func );
     return vk;
 }
@@ -177,7 +228,13 @@ ref Vulkan invalidateMappedMemoryRange( ref Vulkan vk, VkMappedMemoryRange mappe
 
 
 /// Invalidate multiple mapped memory ranges.
-ref Vulkan invalidateMappedMemoryRanges( ref Vulkan vk, VkMappedMemoryRange[] mapped_memory_ranges, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+ref Vulkan invalidateMappedMemoryRanges(
+    ref Vulkan                      vk,
+    const ref VkMappedMemoryRange[] mapped_memory_ranges,
+    string                          file = __FILE__,
+    size_t                          line = __LINE__,
+    string                          func = __FUNCTION__
+    ) {
     vk.device.vkInvalidateMappedMemoryRanges( mapped_memory_ranges.length.toUint, mapped_memory_ranges.ptr ).vkAssert( "Flush Mapped Memory Ranges", file, line, func );
     return vk;
 }
