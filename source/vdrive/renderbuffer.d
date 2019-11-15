@@ -122,7 +122,6 @@ struct Meta_Render_Pass_T(
     }
 
 
-
     void destroyResources() {
         vk.device.vkDestroyRenderPass( render_pass, vk.allocator );
     }
@@ -1001,7 +1000,6 @@ auto createFramebuffer(
 }
 
 
-private template is_D_S_BIS_array( T ) { enum is_D_S_BIS_array = __traits( isStaticArray, T ) || is_D_or_S_array!T; }
 private template isClearValueType( T ) { enum isClearValueType = is( T == float ) || is( T == int32_t ) || is( T == uint32_t ); }
 
 
@@ -1134,7 +1132,7 @@ auto ref add( Array_T, T )(
 ///     clear_values    = clear values array which will be mutated
 ///     rgba            = the rgba clear value as array or four component math vector
 /// Returns: reference to clear_vaues for function chaining
-auto ref add( Array_T, T )( ref Array_T clear_values, T[4] rgba ) if( is_D_or_S_array!Array_T && isClearValueType!T ) {
+auto ref add( Array_T, T )( ref Array_T clear_values, T[4] rgba ) if( isDataArray!( Array_T, VkClearValue ) && isClearValueType!T ) {
     VkClearValue clear_value;
          static if( is( T == float ))    clear_value.color.float32 = rgba;
     else static if( is( T == int32_t ))  clear_value.color.int32   = rgba;
@@ -1150,7 +1148,7 @@ auto ref add( Array_T, T )( ref Array_T clear_values, T[4] rgba ) if( is_D_or_S_
 ///     depth           = the depth clear value
 ///     stencil         = optional stencil clear value, defaults to 0
 /// Returns: reference to clear_vaues for function chaining
-auto ref add( Array_T, UINT32_T )( ref Array_T clear_values, float depth, UINT32_T stencil = 0 ) if( is_D_or_S_array!Array_T && is( UINT32_T : uint32_t )) {
+auto ref add( Array_T, UINT32_T )( ref Array_T clear_values, float depth, UINT32_T stencil = 0 ) if( isDataArray!( Array_T, VkClearValue ) && is( UINT32_T : uint32_t )) {
     VkClearValue clear_value = { depthStencil : VkClearDepthStencilValue( depth, stencil ) };
     return add( clear_values, clear_value );
 }
@@ -1160,7 +1158,7 @@ auto ref add( Array_T, UINT32_T )( ref Array_T clear_values, float depth, UINT32
 /// Params:
 ///     clear_values    = clear values array which will be mutated
 /// Returns: reference to clear_vaues for function chaining
-auto ref add( Array_T )( ref Array_T clear_values, VkClearValue clear_value ) if( is_D_or_S_array!Array_T ) {
+auto ref add( Array_T )( ref Array_T clear_values, VkClearValue clear_value ) if( isDataArray!( Array_T, VkClearValue )) {
     clear_values.append( clear_value );
     return clear_values;
 }
@@ -1172,7 +1170,7 @@ auto ref add( Array_T )( ref Array_T clear_values, VkClearValue clear_value ) if
 ///     render_pass_bi  = the begin info struct to which clear value get attached
 ///     clear_values    = clear values array which will be attached
 /// Returns: render_pass_bi reference for function chaining
-auto ref clearValues( Array_T )( ref VkRenderPassBeginInfo render_pass_bi, ref Array_T clear_values ) if( is_D_S_BIS_array!Array_T ) {
+auto ref clearValues( Array_T )( ref VkRenderPassBeginInfo render_pass_bi, ref Array_T clear_values ) if( isDataArrayOrSlice!( Array_T, VkClearValue )) {
     render_pass_bi.pClearValues     = clear_values.ptr;
     render_pass_bi.clearValueCount  = clear_values.length.toUint;
     return render_pass_bi;
