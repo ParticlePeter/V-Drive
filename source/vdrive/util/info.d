@@ -924,7 +924,7 @@ auto ref filterQueueFlags( Array_T )(
     VkQueueFlags    include_queue,
     VkQueueFlags    exclude_queue = 0
 
-    ) if( isDataArray!( Array_T, Queue_Family ) || is( Array_T : Queue_Family[] )) {
+    ) if( isDataArrayOrSlice!( Array_T, Queue_Family )) {
 
     // remove invalid entries by overwriting them with valid ones
     size_t valid_index = 0;
@@ -948,7 +948,7 @@ auto ref filterPresentSupport( Array_T )(
     VkPhysicalDevice    gpu,
     VkSurfaceKHR        surface
 
-    ) if( isDataArray!( Array_T, Queue_Family ) || is( Array_T : Queue_Family[] )) {
+    ) if( isDataArrayOrSlice!( Array_T, Queue_Family )) {
 
     // remove invalid entries by overwriting them with valid ones
     size_t valid_index = 0;
