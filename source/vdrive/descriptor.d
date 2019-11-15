@@ -350,7 +350,7 @@ struct Meta_Descriptor_Layout_T(
             stageFlags          : shader_stage_flags,
             pImmutableSamplers  : null,
         };
-        set_layout_bindings.append( layout_binding, logInfo( file, line, func ));
+        set_layout_bindings.append( layout_binding, file, line, func );
         return this;
     }
 
@@ -490,7 +490,7 @@ struct Meta_Descriptor_Layout_T(
             file, line, func );
 
         // append the immutable sampler
-        immutable_samplers.append( sampler, logInfo( file, line, func ));
+        immutable_samplers.append( sampler, file, line, func );
 
         // shortcut to the last set_layout_bindings
         auto layout_binding = & set_layout_bindings[ $-1 ];
@@ -706,7 +706,7 @@ struct Descriptor_Update_T(
             pBufferInfo         : null,
             pTexelBufferView    : null,
         };
-        write_descriptor_sets.append( write_set, logInfo( file, line, func ));
+        write_descriptor_sets.append( write_set, file, line, func );
         return this;
     }
 
@@ -1341,7 +1341,7 @@ struct Meta_Descriptor_T(
             file, line, func, toCharPtr( layout_binding.descriptorType ));
 
         if( layout_binding.pImmutableSamplers !is null ) {
-            descriptor_layout.immutable_samplers.append( sampler, logInfo( file, line, func ));
+            descriptor_layout.immutable_samplers.append( sampler, file, line, func );
             addDescriptorType( VkDescriptorImageInfo( VK_NULL_HANDLE, image_view, image_layout ), file, line, func );
         } else
             addDescriptorType( VkDescriptorImageInfo( sampler, image_view, image_layout ), file, line, func );

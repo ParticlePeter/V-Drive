@@ -29,28 +29,65 @@ struct Log_Info {
 }
 
 
-private Log_Info g_log_info;
+private Log_Info p_log_info;
 
 
 
 ref Log_Info logInfo( string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) nothrow @nogc {
-    //char[64] buffer;
-    //buffer[ 0 .. func.length ] = func[];
-    //buffer[ func.length ] = '\0';
-    //printf( "%s\n", buffer.ptr );
-    return g_log_info( func, file, line );
+    return p_log_info( func, file, line );
 }
 
+
+
+// Todo(pp): print to stderr
+// Todo(pp): print to custom logger
+
+
+
+//
+// log_info
+//
+
+/// check bool condition with optional message
+void vkAssert(
+    VkResult        vk_result,
+    ref Log_Info    log_info,   //    = logInfo,    // System does not work, carries 1 file line func too late.
+    const( char )*  msg_end     = null
+    ) nothrow @nogc {
+    vk_result.vkAssert( null, logInfo, msg_end );
+}
+
+/// check bool condition
+void vkAssert(
+    VkResult        vk_result,
+    const( char )*  message,
+    ref Log_Info    log_info,   //    = logInfo,    // System does not work, carries 1 file line func too late.
+    const( char )*  msg_end     = null
+    ) nothrow @nogc {
+    if( vk_result != VK_SUCCESS ) {
+        printf( "\n! ERROR !\n==============\n" );
+        printf( "    VkResult : %s\n", vk_result.toCharPtr );
+        printHelper( message, logInfo, msg_end );
+    }
+    assert( vk_result == VK_SUCCESS );
+}
+
+/// check bool condition with optional message
+void vkAssert(
+    bool            assert_value,
+    ref Log_Info    log_info,   //    = logInfo,    // System does not work, carries 1 file line func too late.
+    const( char )*  msg_end     = null
+    ) nothrow @nogc {
+    assert_value.vkAssert( null, logInfo, msg_end );
+}
 
 /// check bool condition
 void vkAssert(
     bool            assert_value,
-    ref Log_Info    log_info,
-    const( char )*  message = null,
-    const( char )*  msg_end = null
+    const( char )*  message,
+    ref Log_Info    log_info,   //    = logInfo,
+    const( char )*  msg_end     = null
     ) nothrow @nogc {
-    // Todo(pp): print to stderr
-    // Todo(pp): print to custom logger
     if( !assert_value ) {
         printf( "\n! ERROR !\n==============\n" );
         printHelper( message, log_info, msg_end );
@@ -58,55 +95,82 @@ void vkAssert(
     assert( assert_value );
 }
 
+/// print helper for log info
+void printHelper(
+    const( char )*  message,
+    ref Log_Info    log_info,
+    const( char )*  msg_end
+    ) nothrow @nogc {
+    printf( "    File     : %s\n", log_info.file.ptr );
+    printf( "    Line     : %d\n", log_info.line );
+    printf( "    Func     : %s\n", log_info.func.ptr );
+    if( message ) {
+        printf(  "    Message  : %s", message );
+        if( msg_end ) printf( "%s", msg_end );
+        printf(  "\n" );
+    }
+    printf( "==============\n\n" );
+}
 
-/// check bool condition
+
+
+//
+// file, line, func
+//
+
+/// check the correctness of a vulkan result with optional message
 void vkAssert(
-    bool            assert_value,
-    const( char )*  message = null,
+    VkResult        vk_result,
     string          file = __FILE__,
     size_t          line = __LINE__,
     string          func = __FUNCTION__,
     const( char )*  msg_end = null
     ) nothrow @nogc {
-    // Todo(pp): print to stderr
-    // Todo(pp): print to custom logger
-    if( !assert_value ) {
-        printf( "\n! ERROR !\n==============\n" );
-        printHelper( message, file, line, func, msg_end );
-    }
-    assert( assert_value );
-}
-
-
-/// check the correctness of a vulkan result
-void vkAssert(
-    VkResult    vkResult,
-    string      file = __FILE__,
-    size_t      line = __LINE__,
-    string      func = __FUNCTION__,
-    ) nothrow @nogc {
-    // Todo(pp): print to stderr
-    // Todo(pp): print to custom logger
-    vkResult.vkAssert( null, file, line, func );
+    vk_result.vkAssert( null, file, line, func, msg_end );
 }
 
 /// check the correctness of a vulkan result with additinal message(s)
 void vkAssert(
-    VkResult        vkResult,
+    VkResult        vk_result,
     const( char )*  message,
     string          file = __FILE__,
     size_t          line = __LINE__,
     string          func = __FUNCTION__,
     const( char )*  msg_end = null
     ) nothrow @nogc {
-    // Todo(pp): print to stderr
-    // Todo(pp): print to custom logger
-    if( vkResult != VK_SUCCESS ) {
+    if( vk_result != VK_SUCCESS ) {
         printf( "\n! ERROR !\n==============\n" );
-        printf( "    VkResult : %s\n", vkResult.toCharPtr );
+        printf( "    VkResult : %s\n", vk_result.toCharPtr );
         printHelper( message, file, line, func, msg_end );
     }
-    assert( vkResult == VK_SUCCESS );
+    assert( vk_result == VK_SUCCESS );
+}
+
+/// check bool condition with optional message
+void vkAssert(
+    bool            assert_value,
+    string          file = __FILE__,
+    size_t          line = __LINE__,
+    string          func = __FUNCTION__,
+    const( char )*  msg_end = null
+    ) nothrow @nogc {
+    assert_value.vkAssert( null, file, line, func, msg_end );
+}
+
+/// check bool condition with additional message(s)
+void vkAssert(
+    bool            assert_value,
+    const( char )*  message,
+    string          file = __FILE__,
+    size_t          line = __LINE__,
+    string          func = __FUNCTION__,
+    const( char )*  msg_end = null
+    ) nothrow @nogc {
+    if( !assert_value ) {
+        printf( "\n! ERROR !\n==============\n" );
+        printHelper( message, file, line, func, msg_end );
+    }
+    assert( assert_value );
 }
 
 /// print helper for vkAssert
@@ -138,26 +202,14 @@ void printHelper(
 }
 
 
-void printHelper(
-    const( char )*  message,
-    ref Log_Info    log_info,
-    const( char )*  msg_end
-    ) nothrow @nogc {
-    printf( "    File     : %s\n", log_info.file.ptr );
-    printf( "    Line     : %d\n", log_info.line );
-    printf( "    Func     : %s\n", log_info.func.ptr );
-    if( message ) {
-        printf(  "    Message  : %s", message );
-        if( msg_end ) printf( "%s", msg_end );
-        printf(  "\n" );
-    }
-
-    printf( "==============\n\n" );
-}
 
 
-const( char )* toCharPtr( VkResult vkResult ) nothrow @nogc {
-    switch( vkResult ) {
+
+
+
+
+const( char )* toCharPtr( VkResult vk_result ) nothrow @nogc {
+    switch( vk_result ) {
         case VK_SUCCESS                             : return "VK_SUCCESS";
         case VK_NOT_READY                           : return "VK_NOT_READY";
         case VK_TIMEOUT                             : return "VK_TIMEOUT";
@@ -196,7 +248,7 @@ const( char )* toCharPtr( VkResult vkResult ) nothrow @nogc {
 /// see usage in module surface or module util.info
 /// this overload uses a static (stack) stack memory, size passed in as template argument, as result
 void listVulkanProperty( Result_AT, alias vkFunc, Args... )( ref Result_AT result, string file, size_t line, string func, Args args ) {
-    VkResult vkResult;
+    VkResult vk_result;
     uint32_t count;
 
     // consider two types of function return types
@@ -205,10 +257,9 @@ void listVulkanProperty( Result_AT, alias vkFunc, Args... )( ref Result_AT resul
 
     import std.traits : ReturnType;
     static if( is( ReturnType!vkFunc == void )) {
-        auto log_info = logInfo( file, line, func );
         vkFunc( args, & count, null );
-        vkAssert( count >  0, log_info );
-        result.length( count, log_info );
+        vkAssert( count >  0, file, line, func );
+        result.length( count, file, line, func );
         vkFunc( args, & count, result.ptr );
 
     } else {
@@ -230,11 +281,11 @@ void listVulkanProperty( Result_AT, alias vkFunc, Args... )( ref Result_AT resul
         do {
             vkFunc( args, & count, null ).vkAssert( file, line, func );
             if( count == 0 ) break;
-            result.length( count, logInfo( file, line, func ));
-            vkResult = vkFunc( args, & count, result.ptr );
-        } while( vkResult == VK_INCOMPLETE );
+            result.length( count, file, line, func );
+            vk_result = vkFunc( args, & count, result.ptr );
+        } while( vk_result == VK_INCOMPLETE );
 
-        vkResult.vkAssert( file, line, func ); // check if everything went right
+        vk_result.vkAssert( file, line, func ); // check if everything went right
     }
 }
 
@@ -302,7 +353,7 @@ private void isDynamicResultImpl( R, Q )( Dynamic_Result!( R, Q ) result ) {}
 //auto listVulkanProperty( Result_T, alias vkFunc, Args... )( ref Arena_Array arena, string file, size_t line, string func, Args args ) {
 //    alias Result_AT = Block_Array!( Result_T );
 //    auto result = Result_AT( arena );
-//    VkResult vkResult;
+//    VkResult vk_result;
 //    uint32_t count;
 //
 //    /*
@@ -321,11 +372,11 @@ private void isDynamicResultImpl( R, Q )( Dynamic_Result!( R, Q ) result ) {}
 //    do {
 //        vkFunc( args, & count, null ).vkAssert( file, line, func );
 //        if( count == 0 )  break;
-//        result.length( count, logInfo( file, line, func ));
-//        vkResult = vkFunc( args, & count, result.ptr );
-//    } while( vkResult == VK_INCOMPLETE );
+//        result.length( count, file, line, func );
+//        vk_result = vkFunc( args, & count, result.ptr );
+//    } while( vk_result == VK_INCOMPLETE );
 //
-//    vkResult.vkAssert( file, line, func ); // check if everything went right
+//    vk_result.vkAssert( file, line, func ); // check if everything went right
 //
 //    return result.release;
 //}
@@ -471,4 +522,11 @@ E to_enum( E )( uint32_t index ) if( is( E == enum )) {
         if( i == index )
             return enum_member;
     return E.init;
+}
+
+T aligned( T )( T value, T alignment ) {
+    if( value % alignment > 0 ) {
+        value = ( value / alignment + 1 ) * alignment;
+    }
+    return value;
 }

@@ -9,7 +9,7 @@ import core.stdc.stdlib : malloc, free;
 import core.stdc.string : memcpy;
 import core.stdc.stdio  : printf;
 
-import vdrive.util.util : Log_Info, logInfo, vkAssert;
+import vdrive.util.util : Log_Info, vkAssert;
 
 
 
@@ -42,10 +42,10 @@ struct Dynamic_Array( T, ST = uint ) {
 
 
     // convenience constructor, possibly sets capacity and initializes array with count of init values
-    this( Size_T count, Size_T capacity = 0, ref Log_Info log_info = logInfo ) {
+    this( Size_T count, Size_T capacity = 0, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
         if( count <= capacity )
-            reserve( capacity, log_info );
-        length( count, true, log_info );  // initialize elements
+            reserve( capacity, file, line, func );
+        length( count, true, file, line, func );  // initialize elements
     }
 
 
@@ -111,9 +111,9 @@ struct Dynamic_Array( T, ST = uint ) {
 
 
     // set desired length, resulting capacity might become larger than count
-    void length( size_t count, ref Log_Info log_info = logInfo ) {
+    void length( size_t count, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
         if( count > Capacity )
-            reserve( growCapacity( count ), log_info );
+            reserve( growCapacity( count ), file, line, func );
         Count = cast( Size_T )count;
 
         static if( debug_arena ) if( Max_Count < Count ) Max_Count = Count;
@@ -121,16 +121,16 @@ struct Dynamic_Array( T, ST = uint ) {
 
 
     // set desired length and if data should be initialized with default value, resulting capacity might become larger than count
-    void length( size_t count, bool initialize, ref Log_Info log_info = logInfo ) {
-        if( initialize ) { Val_T t; length( count, t, log_info ); }
-        else                        length( count, log_info );
+    void length( size_t count, bool initialize, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+        if( initialize ) { Val_T t; length( count, t, file, line, func ); }
+        else                        length( count, file, line, func );
     }
 
 
     // set desired length, resulting capacity might become larger than count and initialize each element
-    void length( size_t count, ref Val_T initial, ref Log_Info log_info = logInfo ) {
+    void length( size_t count, ref Val_T initial, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
         auto old_count = Count;
-        length( count, log_info );
+        length( count, file, line, func );
         foreach( ref d; data[ old_count .. count ] ) {
             d = initial;
         }
@@ -138,16 +138,16 @@ struct Dynamic_Array( T, ST = uint ) {
 
 
     // index access
-    ref inout( Val_T ) opIndex( size_t i, ref Log_Info log_info = logInfo ) inout {
-        vkAssert( i < Count, log_info, "Array out of bounds!" );
+    ref inout( Val_T ) opIndex( size_t i, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) inout {
+        vkAssert( i < Count, file, line, func, "Array out of bounds!" );
         return Data[ i ];
     }
 
 
     // Empty_Array opIndex can't return a reference but the array interface must be able to return
     // an element pointer. Hence we use this work around for empty arrays to silently retun a null pointer
-    inout( Val_T )* ptr_at( size_t i, ref Log_Info log_info = logInfo ) inout { return & opIndex(  i, log_info ); }
-    inout( Val_T )* ptr_back( ref Log_Info log_info = logInfo ) inout { return & opIndex( length - 1, log_info ); }
+    inout( Val_T )* ptr_at( size_t i, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) inout { return & opIndex(  i, file, line, func ); }
+    inout( Val_T )* ptr_back( string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) inout { return & opIndex( length - 1, file, line, func ); }
 
 
     // convenience first and last element access
@@ -173,9 +173,9 @@ struct Dynamic_Array( T, ST = uint ) {
 
 
     // append single element, return the appended element for further manipulation
-    ref T append( S )( S stuff, ref Log_Info log_info = logInfo ) if( is( S : Val_T )) {
+    ref T append( S )( S stuff, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) if( is( S : Val_T )) {
         if( Capacity == Count )
-            reserve( growCapacity( Count + 1 ), log_info );
+            reserve( growCapacity( Count + 1 ), file, line, func );
         Data[ Count ] = stuff;
         Count += 1;
         return Data[ Count - 1 ];
@@ -183,9 +183,9 @@ struct Dynamic_Array( T, ST = uint ) {
 
 
     // append slice of elements, return the append result for further manipulation
-    T[] append( S )( S[] stuff, ref Log_Info log_info = logInfo ) if( is( S : T )) {
+    T[] append( S )( S[] stuff, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) if( is( S : T )) {
         if( Capacity < Count + cast( Size_T )( stuff.length ))
-            reserve( growCapacity( Count + stuff.length ), log_info );
+            reserve( growCapacity( Count + stuff.length ), file, line, func );
         auto start = Count;
         Count += stuff.length;
         Data[ start .. Count ] = stuff[];
@@ -202,11 +202,11 @@ struct Dynamic_Array( T, ST = uint ) {
 
 
     // duplicate the struct
-    Dynamic_Array dup( ref Log_Info log_info = logInfo ) {
+    Dynamic_Array dup( string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
         if( Data is null )
             return Dynamic_Array();
         T* new_data = cast( T* )malloc( Capacity * T.sizeof );
-        static if( debug_alloc ) printf( "\n--------\nmalloc : %s : %u, %s\n--------\n\n", log_info.file.ptr, log_info.line, log_info.func.ptr );
+        static if( debug_alloc ) printf( "\n--------\nmalloc : %s : %u, %s\n--------\n\n", file, line, func.file.ptr, file, line, func.line, file, line, func.func.ptr );
 
         memcpy( new_data, Data, Capacity * T.sizeof );
         return Dynamic_Array( new_data, Count, Capacity );
@@ -221,11 +221,11 @@ struct Dynamic_Array( T, ST = uint ) {
 
 
     // reserve memory
-    void reserve( size_t capacity, ref Log_Info log_info = logInfo ) {
+    void reserve( size_t capacity, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
         if( capacity <= Capacity ) return;
         T* new_data = cast( T* )malloc( capacity * T.sizeof );          // mGui::MemAlloc( ... );
         static if( debug_alloc )
-            printf( "\n--------\nmalloc : %s : %u, %s\n--------\n\n", log_info.file.ptr, log_info.line, log_info.func.ptr );
+            printf( "\n--------\nmalloc : %s : %u, %s\n--------\n\n", file, line, func.file.ptr, file, line, func.line, file, line, func.func.ptr );
 
         if( Data !is null ) {
             memcpy( new_data, Data, Count * T.sizeof );
@@ -280,10 +280,10 @@ struct Arena_Array_T( ST = uint ) {   //, bool biderectional = false ) {
     //Block_Link                  List = { Offset : Size_T.max };
 
 
-    private void attach( BLink_T* link, ref Log_Info log_info = logInfo ) {
+    private void attach( BLink_T* link, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
         if( Head is null ) {
-            vkAssert( Tail is null, log_info, "If Head is null, Tail must be null as well!" );
-            //vkAssert( List.Prev is null, log_info, "If Next of the linked list is null, Prev must be null as well!" );
+            vkAssert( Tail is null, file, line, func, "If Head is null, Tail must be null as well!" );
+            //vkAssert( List.Prev is null, file, line, func, "If Next of the linked list is null, Prev must be null as well!" );
             Head = link;        // if no blocks were registered so far
             Tail = link;        // attach this block link as head and as tail
 
@@ -307,15 +307,15 @@ struct Arena_Array_T( ST = uint ) {   //, bool biderectional = false ) {
     }
 
 
-    private void detach( BLink_T* link, ref Log_Info log_info = logInfo ) {
+    private void detach( BLink_T* link, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
         /*
-        vkAssert( Head !is null, log_info, "No Block_Array registered!" );
+        vkAssert( Head !is null, file, line, func, "No Block_Array registered!" );
         BLink_T* prev = null;
         BLink_T* curr = Head;
 
         // search the passed in link in the linked list
         while( link !is curr ) {
-            vkAssert( curr.Next !is null, log_info, "Borrowed link not found in linked list!" );
+            vkAssert( curr.Next !is null, file, line, func, "Borrowed link not found in linked list!" );
             prev = curr;
             curr = curr.Next;
         }
@@ -333,8 +333,8 @@ struct Arena_Array_T( ST = uint ) {   //, bool biderectional = false ) {
         else                    link.Next.Prev = link.Prev;
 
         // adjust the length of the source array
-        if( Tail is null )      Source.length( 0, log_info );
-        else                    Source.length( Tail.Offset + Tail.Size, log_info );
+        if( Tail is null )      Source.length( 0, file, line, func );
+        else                    Source.length( Tail.Offset + Tail.Size, file, line, func );
 
         static if( debug_arena ) {
             --Num_Links;
@@ -342,8 +342,8 @@ struct Arena_Array_T( ST = uint ) {   //, bool biderectional = false ) {
     }
 
 
-    private void replace( BLink_T* old_link, BLink_T* new_link, ref Log_Info log_info = logInfo ) {
-        vkAssert( Head !is null, log_info, "No Block_Array registered!" );
+    private void replace( BLink_T* old_link, BLink_T* new_link, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+        vkAssert( Head !is null, file, line, func, "No Block_Array registered!" );
 
         if( Head is old_link ) {
             Head =  new_link;
@@ -355,7 +355,7 @@ struct Arena_Array_T( ST = uint ) {   //, bool biderectional = false ) {
 
         // search the passed in link in the linked list
         while( old_link !is curr.Next ) {
-            vkAssert( curr.Next !is null, log_info, "Borrowed link not found in linked list!" );
+            vkAssert( curr.Next !is null, file, line, func, "Borrowed link not found in linked list!" );
             curr = curr.Next;
         }
 
@@ -422,25 +422,25 @@ struct Block_Array( T, ST = uint ) {
 
     // we are sub-allocating from the arena array, we must make sure that we have enough room for this allocation
     // if we don't have then assert ... for now. Later we can try to move the data to some internal chunk or to the back of the arena array
-    void length( size_t count, ref Log_Info log_info = logInfo ) {
+    void length( size_t count, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
         if( count > Capacity )
-            reserve( growCapacity( count ), log_info );
-        vkAssert( count * T.sizeof <= Link.Size, log_info, "Borrowed Link has not enough size!" );
+            reserve( growCapacity( count ), file, line, func );
+        vkAssert( count * T.sizeof <= Link.Size, file, line, func, "Borrowed Link has not enough size!" );
         Count = cast( Size_T )count;
     }
 
 
     // set desired length and if data should be initialized with default value, resulting capacity might become larger than count
-    void length( size_t count, bool initialize, ref Log_Info log_info = logInfo ) {
-        if( initialize ) { T t; length( count, t, log_info ); }
-        else                    length( count,    log_info );
+    void length( size_t count, bool initialize, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+        if( initialize ) { T t; length( count, t, file, line, func ); }
+        else                    length( count,    file, line, func );
     }
 
 
     // set desired length, resulting capacity might become larger than count and initialize each element
-    void length( size_t count, ref T initial, ref Log_Info log_info = logInfo ) {
+    void length( size_t count, ref T initial, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
         auto old_count = Count;
-        length( count, log_info );
+        length( count, file, line, func );
         foreach( ref d; data[ old_count .. count ] ) {
             d = initial;
         }
@@ -448,17 +448,17 @@ struct Block_Array( T, ST = uint ) {
 
 
     // index access
-    ref inout( Val_T ) opIndex( size_t i, ref Log_Info log_info = logInfo ) inout {
-    //ref T opIndex( size_t i, ref Log_Info log_info = logInfo ) {
-        vkAssert( i < Count, log_info, "Array out of bounds!" );
+    ref inout( Val_T ) opIndex( size_t i, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) inout {
+    //ref T opIndex( size_t i, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+        vkAssert( i < Count, file, line, func, "Array out of bounds!" );
         return ptr()[ i ];
     }
 
 
     // Empty_Array opIndex can't return a reference but the array interface must be able to return
     // an element pointer. Hence we use this work around for empty arrays to silently retun a null pointer
-    inout( Val_T )* ptr_at( size_t i, ref Log_Info log_info = logInfo ) inout  { return & opIndex( i, log_info ); }
-    inout( Val_T )* ptr_back( ref Log_Info log_info = logInfo ) inout { return & opIndex( length - 1, log_info ); }
+    inout( Val_T )* ptr_at( size_t i, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) inout  { return & opIndex( i, file, line, func ); }
+    inout( Val_T )* ptr_back( string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) inout { return & opIndex( length - 1, file, line, func ); }
 
 
 
@@ -485,9 +485,9 @@ struct Block_Array( T, ST = uint ) {
 
 
     // append single element, return the appended element for further manipulation
-    ref T append( S )( S stuff, ref Log_Info log_info = logInfo ) if( is( S : T )) {
+    ref T append( S )( S stuff, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) if( is( S : T )) {
         if( Capacity <= Count )
-            reserve( growCapacity( Count + 1 ), log_info );
+            reserve( growCapacity( Count + 1 ), file, line, func );
         Count += 1;
         data[ Count - 1 ] = stuff;
         return data[ Count - 1 ];
@@ -495,7 +495,7 @@ struct Block_Array( T, ST = uint ) {
 
 
     // append slice of elements, return the append result for further manipulation
-    T[] append( S )( S[] stuff, ref Log_Info log_info = logInfo ) if( is( S : T )) {
+    T[] append( S )( S[] stuff, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) if( is( S : T )) {
         foreach( s; stuff[ 1 .. $ ] )
 
         // we prepare the following vars in case of appending this to this
@@ -514,7 +514,7 @@ struct Block_Array( T, ST = uint ) {
             stuff_ptr = stuff_ptr - source_ptr;
 
         auto old_count = Count;                     // cache the Count member, next operatin will update it
-        length( Count + stuff.length, log_info );   // extend length possibly reserving memory
+        length( Count + stuff.length, file, line, func );   // extend length possibly reserving memory
 
         // if stuff_ptr != stuff.ptr we know that we need to patch the stuff slice with stuff_ptr as offset
         if( stuff_ptr != cast( size_t )stuff.ptr )
@@ -533,13 +533,13 @@ struct Block_Array( T, ST = uint ) {
 
 
     // reserve memory
-    void reserve( size_t capacity, ref Log_Info log_info = logInfo ) {
+    void reserve( size_t capacity, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
         if( capacity <= Capacity ) return;                              // return if we have more capacity than requested
         Size_T new_block_size = cast( Size_T )( capacity * T.sizeof );  // compute new block size
 
         // if our Link is at the end of the linked Link list, simply resize the length of the borrowing array, this might re-allocate
         if( Link.Next is null ) {
-            Arena.length( Link.Offset + new_block_size, log_info );
+            Arena.length( Link.Offset + new_block_size, file, line, func );
             Link.Size = new_block_size;
         }
 
@@ -553,21 +553,21 @@ struct Block_Array( T, ST = uint ) {
 
 
     // reset internal state
-    void reset( T[] stuff = [], ref Log_Info log_info = logInfo ) {
-        reset( Arena, stuff, log_info );
+    void reset( T[] stuff = [], string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+        reset( Arena, stuff, file, line, func );
     }
 
     // reset internal state
-    void reset( ref Arena_T arena, T[] stuff = [], ref Log_Info log_info = logInfo ) {
-        reset( & arena, stuff, log_info );
+    void reset( ref Arena_T arena, T[] stuff = [], string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+        reset( & arena, stuff, file, line, func );
     }
 
     // reset internal state
-    void reset( Arena_T* arena, T[] stuff = [], ref Log_Info log_info = logInfo ) {
-        length( 0, log_info );
-        Arena.detach( & Link, logInfo );
+    void reset( Arena_T* arena, T[] stuff = [], string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+        length( 0, file, line, func );
+        Arena.detach( & Link );
         Arena = arena;
-        Arena.attach( & Link, logInfo );
+        Arena.attach( & Link );
         if( stuff.length > 0 ) append( stuff );
     }
 
@@ -596,15 +596,15 @@ struct Block_Array( T, ST = uint ) {
 
 
     // must have an array to borrow from
-    this( ref Arena_T arena, ref Log_Info log_info = logInfo ) {
+    this( ref Arena_T arena, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
         Arena = & arena;
-        Arena.attach( & Link, logInfo );
+        Arena.attach( & Link );
     }
 
 
     // convenience constructors
-    this( ref Arena_T arena, T   stuff, ref Log_Info log_info = logInfo ) { this( arena, logInfo ); append( stuff, logInfo ); }
-    this( ref Arena_T arena, T[] stuff, ref Log_Info log_info = logInfo ) { this( arena, logInfo ); append( stuff, logInfo ); }
+    this( ref Arena_T arena, T   stuff, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) { this( arena ); append( stuff ); }
+    this( ref Arena_T arena, T[] stuff, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) { this( arena ); append( stuff ); }
 
 
     // cannot be called from outside
@@ -641,7 +641,7 @@ struct Block_Array( T, ST = uint ) {
     // free data on destruction
     ~this() {
         if( Link.Offset != Size_T.max && Link.Size != Size_T.max )
-            Arena.detach( & Link, logInfo );
+            Arena.detach( & Link );
     }
 }
 
@@ -665,8 +665,8 @@ struct Static_Array( uint Capacity, T, ST = uint ) {
 
 
     // set desired length, which must not be greater then the array capacity
-    void length( size_t count, ref Log_Info log_info = logInfo ) {
-        vkAssert( count <= Capacity, log_info, "Memory not sufficient to set requested length!" );
+    void length( size_t count, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+        vkAssert( count <= Capacity, file, line, func, "Memory not sufficient to set requested length!" );
         Count = cast( Size_T )count;
     }
 
@@ -684,16 +684,16 @@ struct Static_Array( uint Capacity, T, ST = uint ) {
 
 
     // index access
-    ref inout( Val_T ) opIndex( size_t i, ref Log_Info log_info = logInfo ) inout {
-        vkAssert( i < Count, "Array out of bounds!", log_info );
+    ref inout( Val_T ) opIndex( size_t i, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) inout {
+        vkAssert( i < Count, "Array out of bounds!", file, line, func );
         return Data[ i ];
     }
 
 
     // Empty_Array opIndex can't return a reference but the array interface must be able to return
     // an element pointer. Hence we use this work around for empty arrays to silently retun a null pointer
-    inout( Val_T )* ptr_at( size_t i, ref Log_Info log_info = logInfo ) inout  { return & opIndex( i, log_info ); }
-    inout( Val_T )* ptr_back( ref Log_Info log_info = logInfo ) inout { return & opIndex( length - 1, log_info ); }
+    inout( Val_T )* ptr_at( size_t i, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) inout  { return & opIndex( i, file, line, func ); }
+    inout( Val_T )* ptr_back( string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) inout { return & opIndex( length - 1, file, line, func ); }
 
 
     // convenience first and last element access
@@ -707,20 +707,20 @@ struct Static_Array( uint Capacity, T, ST = uint ) {
 
 
     // customize appending single element
-    void opOpAssign( string op : "~" )( Val_T stuff, ref Log_Info log_info = logInfo ) {
-        return append( stuff, log_info );
+    void opOpAssign( string op : "~" )( Val_T stuff, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+        return append( stuff, file, line, func );
     }
 
 
     // customize appending slice of elements
-    void opOpAssign( string op: "~" )( Val_T[] stuff, ref Log_Info log_info = logInfo ) {
-        return append( stuff, log_info );
+    void opOpAssign( string op: "~" )( Val_T[] stuff, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+        return append( stuff, file, line, func );
     }
 
 
     // append single element, return the appended element for further manipulation
-    ref Val_T append( S )( S stuff, ref Log_Info log_info = logInfo ) if( is( S : Val_T )) {
-        vkAssert( Count < Capacity, log_info, "Memory not sufficient to append additional data!" );
+    ref Val_T append( S )( S stuff, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) if( is( S : Val_T )) {
+        vkAssert( Count < Capacity, file, line, func, "Memory not sufficient to append additional data!" );
         Data[ Count ] = stuff;
         Count += 1;
         return Data[ $-1 ];
@@ -728,8 +728,8 @@ struct Static_Array( uint Capacity, T, ST = uint ) {
 
 
     // append slice of elements, return the append result for further manipulation
-    Val_T[] append( S )( S[] stuff, ref Log_Info log_info = logInfo ) if( is( S : Val_T )) {
-        vkAssert( Count + stuff.length <= Capacity, log_info, "Memory not sufficient to append additional data!" );
+    Val_T[] append( S )( S[] stuff, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) if( is( S : Val_T )) {
+        vkAssert( Count + stuff.length <= Capacity, file, line, func, "Memory not sufficient to append additional data!" );
         auto start = Count;
         Count += stuff.length;
         Data[ start .. Count ] = stuff[];
@@ -771,8 +771,8 @@ private struct One_Array( T, ST = uint ) {
 
 
     // set length, which must always be 1
-    void length( size_t count, ref Log_Info log_info = logInfo ) {
-        vkAssert( count == 1, log_info, "One_Array.length can be set only to 1 !" );
+    void length( size_t count, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+        vkAssert( count == 1, file, line, func, "One_Array.length can be set only to 1 !" );
     }
 
 
@@ -786,8 +786,8 @@ private struct One_Array( T, ST = uint ) {
 
 
     // index access
-    ref inout( T ) opIndex( size_t i, ref Log_Info log_info = logInfo ) inout {
-        vkAssert( i == 0, log_info, "One_Array has only one element, index must always be 0 !" );
+    ref inout( T ) opIndex( size_t i, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) inout {
+        vkAssert( i == 0, file, line, func, "One_Array has only one element, index must always be 0 !" );
         return Data;
     }
 
@@ -798,14 +798,14 @@ private struct One_Array( T, ST = uint ) {
 
 
     // assert on append single element
-    void append( S )( S stuff, ref Log_Info log_info = logInfo ) if( is( S : T )) {
-        vkAssert( false, log_info, "One_Array cannot accept additional elements beyond 1 !" );
+    void append( S )( S stuff, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) if( is( S : T )) {
+        vkAssert( false, file, line, func, "One_Array cannot accept additional elements beyond 1 !" );
     }
 
 
     // assert on append single element
-    void append( S )( S[] stuff, ref Log_Info log_info = logInfo ) if( is( S : T )) {
-        vkAssert( false, log_info, "One_Array cannot accept additional elements beyond 1 !" );
+    void append( S )( S[] stuff, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) if( is( S : T )) {
+        vkAssert( false, file, line, func, "One_Array cannot accept additional elements beyond 1 !" );
     }
 }
 
@@ -823,8 +823,8 @@ private struct Empty_Array( T, ST = uint ) {
     //T[] data() { return null[0..0]; }
 
     // set length, which must always be 1
-    void length( size_t count, ref Log_Info log_info = logInfo ) {
-        vkAssert( count == 0, log_info, "One_Array.length can be set only to 0!" );
+    void length( size_t count, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+        vkAssert( count == 0, file, line, func, "One_Array.length can be set only to 0!" );
     }
 
 
@@ -841,16 +841,16 @@ private struct Empty_Array( T, ST = uint ) {
     inout( Size_T ) length()    inout { return 0; }
 
 
-    inout( Val_T ) opIndex( size_t i, ref Log_Info log_info = logInfo ) inout {
-        vkAssert( false, log_info, "Empty_Array has no data!" );
+    inout( Val_T ) opIndex( size_t i, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) inout {
+        vkAssert( false, file, line, func, "Empty_Array has no data!" );
         return T();
     }
 
 
     // Empty_Array opIndex can't return a reference but the array interface must be able to return
     // an element pointer. Hence we use this work around for empty arrays to silently retun a null pointer
-    inout( Val_T )* ptr_at( size_t i, ref Log_Info log_info = logInfo ) inout  { return null; }
-    inout( Val_T )* ptr_back( ref Log_Info log_info = logInfo ) inout { return null; }
+    inout( Val_T )* ptr_at( size_t i, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) inout  { return null; }
+    inout( Val_T )* ptr_back( string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) inout { return null; }
 
     //auto opSlice( size_t i, size_t j ) { return T[];}
     //inout @property inout( T ) front() { vkAssert( false, "Empty_Struct has no data!"; return T(); }
@@ -858,14 +858,14 @@ private struct Empty_Array( T, ST = uint ) {
 
 
     // assert on single element append
-    void append( S )( S stuff, ref Log_Info log_info = logInfo ) if( is( S : Val_T )) {
-        vkAssert( false, log_info, "Empty_Array has no memory, no data can be appended or set!" );
+    void append( S )( S stuff, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) if( is( S : Val_T )) {
+        vkAssert( false, file, line, func, "Empty_Array has no memory, no data can be appended or set!" );
     }
 
 
     // assert on multi element append
-    void append( S )( S[] stuff, ref Log_Info log_info = logInfo ) if( is( S : Val_T )) {
-        vkAssert( false, log_info, "Empty_Array has no memory, no data can be appended or set!" );
+    void append( S )( S[] stuff, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) if( is( S : Val_T )) {
+        vkAssert( false, file, line, func, "Empty_Array has no memory, no data can be appended or set!" );
     }
 }
 
@@ -937,9 +937,9 @@ template D_OR_S_ARRAY( int count, T, ST = uint ) {
 
 
 
-auto sizedArray( T )( size_t size, ref Log_Info log_info = logInfo ) {
+auto sizedArray( T )( size_t size, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
     DArray!T array;
     T initial = T.init;
-    array.length( size, initial, log_info );
+    array.length( size, initial, file, line, func );
     return array;
 }

@@ -880,9 +880,8 @@ auto ref listQueueFamilies( Result_T )(
     uint32_t queue_family_property_count;
     vkGetPhysicalDeviceQueueFamilyProperties( gpu, & queue_family_property_count, null );
 
-    auto log_info = logInfo( file, line, func );
-    family_queues.reserve( queue_family_property_count, log_info );     // we reserve first as we do not need...
-    family_queues.length(  queue_family_property_count, log_info );     // ... extra space to grow after the requested length
+    family_queues.reserve( queue_family_property_count, file, line, func );     // we reserve first as we do not need...
+    family_queues.length(  queue_family_property_count, file, line, func );     // ... extra space to grow after the requested length
 
     // now enumerate all the queues
     static if( isScratchResult!Result_T ) {

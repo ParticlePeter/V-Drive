@@ -196,7 +196,7 @@ auto ref toStringz( S, Array_T )(
     ) if(( is( S == string ) || is( S : char[] )) && isCharArray!Array_T ) {
 
     auto start_length = append_data ? result.length : 0;
-    result.length( start_length + value.length + 1, logInfo( file, line, func ));
+    result.length( start_length + value.length + 1, file, line, func );
     result[ $ - 1 ] = '\0';
     memcpy( result.ptr + start_length, value.ptr, value.length );    //result.value[ 0 .. value.length ] = value[];
     return result;
@@ -302,10 +302,10 @@ auto toPtrArray( Array_S, Array_T )(
     }
 
     size_t concat_buffer_start = out_concat_buffer.length;
-    out_concat_buffer.length( concat_buffer_start + new_buffer_length, logInfo( file, line, func ));
+    out_concat_buffer.length( concat_buffer_start + new_buffer_length, file, line, func );
 
     size_t pointer_buffer_start = out_pointer_buffer.length;
-    out_pointer_buffer.length( pointer_buffer_start + in_data.length, logInfo( file, line, func ));
+    out_pointer_buffer.length( pointer_buffer_start + in_data.length, file, line, func );
 
     in_data.toPtrArray( out_pointer_buffer.data[ pointer_buffer_start .. $ ], out_concat_buffer.data[ concat_buffer_start .. $ ], terminator, file, line, func );
     return pointer_buffer_start;
@@ -416,7 +416,7 @@ auto ref toPtrArray( Array_T )(
         if( c == '\0' )
             ++pointer_count;
 
-    out_pointer_buffer.length( pointer_count, logInfo( file, line, func ));
+    out_pointer_buffer.length( pointer_count, file, line, func );
     in_data.toPtrArray( out_pointer_buffer.data, file, line, func );
     return out_pointer_buffer;
 }
