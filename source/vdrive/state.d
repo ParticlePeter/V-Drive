@@ -412,17 +412,5 @@ template is_handle( T ) { enum bool is_handle = is_dispatch_handle!T || is_non_d
 
 T resetHandle( T )( ref T handle ) if( is_handle !T ) { T result = handle; handle = VK_NULL_HANDLE; return result; }
 
-
-
-bool is_null_handle(        T )( T handle ) if( is_handle!T ) { return handle == VK_NULL_HANDLE; }
-bool is_constructed_handle( T )( T handle ) if( is_handle!T ) { return handle != VK_NULL_HANDLE; }
-alias is_null           = is_null_handle;
-alias is_constructed    = is_constructed_handle;
-
-
-mixin template Is_Null(             alias handle ) { bool is_null()         { return handle == VK_NULL_HANDLE; }}
-mixin template Is_Constructed(      alias handle ) { bool is_constructed()  { return handle != VK_NULL_HANDLE; }}
-mixin template Is_Null_Constructed( alias handle ) {
-    bool is_null()         { return handle == VK_NULL_HANDLE; }
-    bool is_constructed()  { return handle != VK_NULL_HANDLE; }
-}
+alias   is_null = is_null_handle;
+bool    is_null_handle( T )( T handle ) if( is_handle!T ) { return handle == VK_NULL_HANDLE; }

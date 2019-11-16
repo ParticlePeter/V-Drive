@@ -113,9 +113,9 @@ VkPipelineCache createPipelineCache(
 /// after construction so that the Meta_Descriptor_Layout can be reused
 /// after being reset
 struct Core_Pipeline {
-    VkPipeline          pipeline;
-    VkPipelineLayout    pipeline_layout;
-    mixin Is_Null_Constructed!pipeline;
+    VkPipeline              pipeline;
+    VkPipelineLayout        pipeline_layout;
+    bool is_null() { return pipeline.is_null_handle; }      // query if internal pso is null_handle
 }
 
 
@@ -149,6 +149,9 @@ private mixin template Meta_Pipeline_Common() {
     auto ref addPushConstantRange( VkShaderStageFlags stage_flags, size_t offset, size_t size ) {
         return addPushConstantRange( VkPushConstantRange( stage_flags, offset.toUint, size.toUint ));
     }
+
+    /// query if internal pso is null_handle
+    bool is_null() { return pipeline.is_null_handle; }
 }
 
 
@@ -254,9 +257,6 @@ struct Meta_Graphics_T(
         return Core_Pipeline( pipeline, pipeline_layout );
     }
 
-
-    /// adds properties is_null and is_constructed
-    mixin Is_Null_Constructed!pipeline;
 
 
     ///////////////////////////
@@ -792,10 +792,6 @@ struct Meta_Compute_T(
     auto extractCore() {
         return Core_Pipeline( pipeline, pipeline_ci.layout );
     }
-
-
-    /// adds properties is_null and is_constructed
-    mixin Is_Null_Constructed!pipeline;
 
 
 

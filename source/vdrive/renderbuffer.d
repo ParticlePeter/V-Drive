@@ -62,10 +62,9 @@ private void isRenderPassImpl( int32_t a, int32_t b, int32_t c, int32_t d, int32
 struct Core_Render_Pass {
     VkRenderPassBeginInfo           render_pass_bi;     // the actual render pass is stored in a member of this struct
     ref VkRenderPass                render_pass() { return render_pass_bi.renderPass; }
-    // Todo(pp): Why does mixing in the template result in: Error: need 'this' for 'renderPass' of type 'VkRenderPass_handle*' ?
-//  mixin     Is_Null_Constructed!( render_pass_bi.renderPass );
-    bool is_null()         { return render_pass_bi.renderPass == VK_NULL_HANDLE; }
-    bool is_constructed()  { return render_pass_bi.renderPass != VK_NULL_HANDLE; }
+
+    /// query if internal VkRenderPass is null_handle
+    bool is_null() { return render_pass_bi.renderPass.is_null_handle; }
 
 }
 
