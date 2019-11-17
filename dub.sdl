@@ -8,7 +8,7 @@ copyright           "Copyright (c) 2016 Peter Particle"
 authors             "Peter Particle"
 license             "MIT"
 
-dependencies        "erupted" version = "~>1.5.1"
+dependencies        "erupted" version = "~>2.0"
 
 buildRequirements   "allowWarnings"
 
@@ -19,9 +19,8 @@ subPackage {
     description         "Vulkan Capabilities"
     targetType          "executable"
     sourcePaths         "source"    "example/pp_00_capabilities"
-    dependency          "erupted"   version = "~>1.5.1"
-    subConfiguration    "erupted"   "with-derelict-loader"
-//    buildOptions        "profile" "profileGC"
+    dependency          "erupted"   version = "~>2.0"
+//  buildOptions        "profile" "profileGC"
 }
 
 // example sw_01 : hello triangle
@@ -30,9 +29,10 @@ subPackage {
     description         "Simple Triangle"
     targetType          "executable"
     sourcePaths         "source" "example/common" "example/sw_01_triangle"
-    dependency          "erupted"           version = "~>1.5.1"
-    dependency          "derelict-glfw3"    version = "~>3.1.0"
-    dependency          "dlsl"              version = "~>0.1.1"
-//    buildOptions        "profile" "profileGC"
+    dependency          "erupted"           version = "~>2.0"
+    dependency          "derelict-glfw3"    version = "~>3.1"
+    dependency          "dlsl"              version = "~>0.1"
+//  dependency          "dlsl"              path    = "../../DLang/projects/DLSL"
+//  buildOptions        "profile" "profileGC"
 }
 
