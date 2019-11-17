@@ -477,7 +477,7 @@ auto Forward_To_Inner_Struct( inner, string path, ignore... )() {
             enum member_snake = member.snakeCaseCT;                             // convert to snake case
             //enum result = "\n"                                                // enum string wich will be mixed in, use only for pragma( msg ) output
             result ~= "\n"                                                      // comment this if debugging and formating this template
-                ~ "    /// forward member " ~ member ~ " of inner " ~ inner.stringof ~ " as setter function to this\n"
+                ~ "    /// Forward member " ~ member ~ " of inner " ~ inner.stringof ~ " as setter function to this.\n"
                 ~ "    /// Params:\n"
                 ~ "    /// \t" ~ member_snake ~ " = the value forwarded to the inner struct\n"
                 ~ "    /// Returns: ref to this for function chaining\n"
