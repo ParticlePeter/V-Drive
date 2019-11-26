@@ -297,7 +297,7 @@ void listVulkanProperty( Result_AT, alias vkFunc, Args... )( ref Result_AT resul
 auto listVulkanProperty( int32_t size, Result_T, alias vkFunc, Args... )( string file, size_t line, string func, Args args ) {
     static assert( size > 0, "Size greate zero mandatory" );
     static if( size == int32_t.max )    alias Result_AT = Dynamic_Array!( Result_T );
-    else                                alias Result_AT = Static_Array!( size, Result_T );
+    else                                alias Result_AT = Static_Array!(  Result_T, size );
     Result_AT result;
     listVulkanProperty!( Result_AT, vkFunc, Args )( result, file, line, func, args );
     return result;

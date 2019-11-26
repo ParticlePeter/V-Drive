@@ -29,10 +29,10 @@ private struct Meta_Subpass_T(
         "Template param resolve_ref_count must be either 0 or equal to preserve_ref_count!" );
     VkSubpassDescriptionFlags                                   flags;
     VkPipelineBindPoint                                         pipeline_bind_point = VK_PIPELINE_BIND_POINT_GRAPHICS;  // currently this is the only acceptable value, but might change in future
-    D_OR_S_ARRAY!( input_ref_count,     VkAttachmentReference ) input_reference;
-    D_OR_S_ARRAY!( color_ref_count,     VkAttachmentReference ) color_reference;
-    D_OR_S_ARRAY!( resolve_ref_count,   VkAttachmentReference ) resolve_reference;
-    D_OR_S_ARRAY!( preserve_ref_count,  VkAttachmentReference ) preserve_reference;
+    D_OR_S_ARRAY!( VkAttachmentReference, input_ref_count )     input_reference;
+    D_OR_S_ARRAY!( VkAttachmentReference, color_ref_count )     color_reference;
+    D_OR_S_ARRAY!( VkAttachmentReference, resolve_ref_count )   resolve_reference;
+    D_OR_S_ARRAY!( VkAttachmentReference, preserve_ref_count )  preserve_reference;
     VkAttachmentReference                                       depth_stencil_reference; //= VK_ATTACHMENT_UNUSED;
 
     auto static_config() {
@@ -100,9 +100,9 @@ struct Meta_Render_Pass_T(
     private Subpass_T*              subpass;
     private VkSubpassDependency*    subpass_dependency;
 
-    D_OR_S_ARRAY!( attachment_count, VkAttachmentDescription )  attachment_descriptions;
-    D_OR_S_ARRAY!( dependency_count, VkSubpassDependency )      subpass_dependencies;
-    D_OR_S_ARRAY!( subpass_count, Subpass_T )                   subpasses;
+    D_OR_S_ARRAY!( VkAttachmentDescription, attachment_count )  attachment_descriptions;
+    D_OR_S_ARRAY!( VkSubpassDependency,     dependency_count )  subpass_dependencies;
+    D_OR_S_ARRAY!( Subpass_T,               subpass_count )     subpasses;
 
 
     /// get minimal config for internal D_OR_S_ARRAY
@@ -524,8 +524,8 @@ struct Meta_Framebuffer_T( int32_t framebuffer_count = 1, int32_t clear_value_co
     alias cv_count = clear_value_count;
 
     VkRect2D                                    render_area;
-    D_OR_S_ARRAY!( fb_count, VkFramebuffer )    framebuffers;
-    D_OR_S_ARRAY!( cv_count, VkClearValue )     clear_values;
+    D_OR_S_ARRAY!( VkFramebuffer, fb_count )    framebuffers;
+    D_OR_S_ARRAY!( VkClearValue,  cv_count )    clear_values;
 
     auto ref opCall( ref Vulkan vk ) {
         this.vk( vk );

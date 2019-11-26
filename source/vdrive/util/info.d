@@ -782,7 +782,7 @@ struct Queue_Family_T( uint Capacity, Size_T = uint ) {
 
     private uint32_t index;
     private VkQueueFamilyProperties queue_family_properties;
-    private SArray!( Capacity, float, Size_T ) queue_priorities;
+    private SArray!( float, Capacity, Size_T ) queue_priorities;
 
     // get a copy of the family index
     auto family_index() { return index; }

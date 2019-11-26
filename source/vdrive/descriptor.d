@@ -282,8 +282,8 @@ struct Meta_Descriptor_Layout_T(
     VkDescriptorSetLayout               descriptor_set_layout;
     VkDescriptorSet                     descriptor_set;
 
-    D_OR_S_ARRAY!( set_layout_binding_count, VkDescriptorSetLayoutBinding ) set_layout_bindings;            // the set layout bindings of the resulting set
-    D_OR_S_ARRAY!( immutable_sampler_count,  VkSampler                    ) immutable_samplers;             // slices of this member can be associated with any layout binding
+    D_OR_S_ARRAY!( VkDescriptorSetLayoutBinding, set_layout_binding_count ) set_layout_bindings;            // the set layout bindings of the resulting set
+    D_OR_S_ARRAY!( VkSampler,                    immutable_sampler_count  ) immutable_samplers;             // slices of this member can be associated with any layout binding
 
 
     /// get minimal config for internal D_OR_S_ARRAY
@@ -654,10 +654,10 @@ struct Descriptor_Update_T(
 
     ) {
 
-    D_OR_S_ARRAY!( write_set_count,     VkWriteDescriptorSet )      write_descriptor_sets;          // write descriptor sets in case we want to update the set
-    D_OR_S_ARRAY!( image_info_count,    VkDescriptorImageInfo )     image_infos;                    // slices of these three members ...
-    D_OR_S_ARRAY!( buffer_info_count,   VkDescriptorBufferInfo )    buffer_infos;                   // ... can be associated with ...
-    D_OR_S_ARRAY!( texel_buffer_view_count, VkBufferView )          texel_buffer_views;             // ... any write_descriptor_set
+    D_OR_S_ARRAY!( VkWriteDescriptorSet,    write_set_count )       write_descriptor_sets;          // write descriptor sets in case we want to update the set
+    D_OR_S_ARRAY!( VkDescriptorImageInfo,   image_info_count )      image_infos;                    // slices of these three members ...
+    D_OR_S_ARRAY!( VkDescriptorBufferInfo,  buffer_info_count )     buffer_infos;                   // ... can be associated with ...
+    D_OR_S_ARRAY!( VkBufferView,      texel_buffer_view_count )     texel_buffer_views;             // ... any write_descriptor_set
 
 
     /// get minimal config for internal D_OR_S_ARRAY

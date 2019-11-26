@@ -221,7 +221,7 @@ auto  getSwapchainImageViews_t( int32_t max_image_count )(
     auto swapchain_images = getSwapchainImages_t!max_image_count( vk.device, swapchain, file, line, func );
 
     // allocate storage for image views and create one view per swapchain image in a loop
-    D_OR_S_ARRAY!( max_image_count, VkImageView ) image_views;
+    D_OR_S_ARRAY!( VkImageView, max_image_count ) image_views;
     image_views.length = swapchain_images.length;
     foreach( i; 0 .. swapchain_images.length ) {
         image_view_ci.image = swapchain_images[i];   // complete VkImageViewCreateInfo with image i:
@@ -260,7 +260,7 @@ struct Core_Swapchain_T( int32_t max_image_count, uint32_t member_copies = SMC.N
 
     VkSurfaceKHR    surface;
     VkSwapchainKHR  swapchain;
-    D_OR_S_ARRAY!(  max_image_count,    VkImageView )   image_views;
+    D_OR_S_ARRAY!(  VkImageView, max_image_count )      image_views;
     static if( mc & SMC.Queue  )        VkQueue         present_queue;
     static if( mc & SMC.Extent )        VkExtent2D      image_extent;
     static if( mc & SMC.Format )        VkFormat        image_format;
@@ -308,7 +308,7 @@ struct Meta_Swapchain_T( int32_t max_image_count, uint member_copies = SMC.None 
     VkQueue                                         present_queue = VK_NULL_HANDLE;
     VkSwapchainKHR                                  swapchain;
     VkSwapchainCreateInfoKHR                        swapchain_ci;
-    D_OR_S_ARRAY!( max_image_count, VkImageView )   image_views;
+    D_OR_S_ARRAY!( VkImageView, max_image_count )   image_views;
 
     // convenience function to get the refernce or pointer to the VkSurface of swapchain_ci
     auto surface_ptr()      { return & swapchain_ci.surface; }

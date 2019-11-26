@@ -184,38 +184,38 @@ struct Meta_Graphics_T(
 
     ) {
 
-    mixin                                       Vulkan_State_Pointer;
-    VkPipeline                                  pipeline;
-    VkPipelineCreateFlags                       pipeline_create_flags;
-    D_OR_S_ARRAY!( shader_stage_count,          VkPipelineShaderStageCreateInfo )       shader_stages;
+    mixin                                               Vulkan_State_Pointer;
+    VkPipeline                                          pipeline;
+    VkPipelineCreateFlags                               pipeline_create_flags;
+    D_OR_S_ARRAY!( VkPipelineShaderStageCreateInfo,     shader_stage_count )            shader_stages;
 
-    D_OR_S_ARRAY!( binding_description_count,   VkVertexInputBindingDescription )       vertex_input_binding_descriptions;
-    D_OR_S_ARRAY!( attribute_description_count, VkVertexInputAttributeDescription )     vertex_input_attribute_descriptions;
-    VkPipelineInputAssemblyStateCreateInfo      input_assembly_state_ci;
+    D_OR_S_ARRAY!( VkVertexInputBindingDescription,     binding_description_count )     vertex_input_binding_descriptions;
+    D_OR_S_ARRAY!( VkVertexInputAttributeDescription,   attribute_description_count )   vertex_input_attribute_descriptions;
+    VkPipelineInputAssemblyStateCreateInfo              input_assembly_state_ci;
 
-    uint32_t                                    tesselation_patch_control_points;
+    uint32_t                                            tesselation_patch_control_points;
 
-    D_OR_S_ARRAY!( viewport_count,              VkViewport )                            viewports;
-    D_OR_S_ARRAY!( scissor_count,               VkRect2D )                              scissors;
+    D_OR_S_ARRAY!( VkViewport, viewport_count )         viewports;
+    D_OR_S_ARRAY!( VkRect2D,   scissor_count )          scissors;
 
-    VkPipelineRasterizationStateCreateInfo      rasterization_state_ci = { frontFace : VK_FRONT_FACE_CLOCKWISE, depthBiasConstantFactor : 0, depthBiasClamp : 0, depthBiasSlopeFactor : 0, lineWidth : 1 };
-    VkPipelineMultisampleStateCreateInfo        multisample_state_ci   = { rasterizationSamples : VK_SAMPLE_COUNT_1_BIT, minSampleShading : 0 };
-    VkPipelineDepthStencilStateCreateInfo       depth_stencil_state_ci = { minDepthBounds : 0, maxDepthBounds : 0 };
-    VkPipelineColorBlendStateCreateInfo         color_blend_state_ci   = { blendConstants : [ 0, 0, 0, 0 ] };
-    D_OR_S_ARRAY!( color_blend_state_count,     VkPipelineColorBlendAttachmentState )   color_blend_states;
+    VkPipelineRasterizationStateCreateInfo              rasterization_state_ci = { frontFace : VK_FRONT_FACE_CLOCKWISE, depthBiasConstantFactor : 0, depthBiasClamp : 0, depthBiasSlopeFactor : 0, lineWidth : 1 };
+    VkPipelineMultisampleStateCreateInfo                multisample_state_ci   = { rasterizationSamples : VK_SAMPLE_COUNT_1_BIT, minSampleShading : 0 };
+    VkPipelineDepthStencilStateCreateInfo               depth_stencil_state_ci = { minDepthBounds : 0, maxDepthBounds : 0 };
+    VkPipelineColorBlendStateCreateInfo                 color_blend_state_ci   = { blendConstants : [ 0, 0, 0, 0 ] };
+    D_OR_S_ARRAY!( VkPipelineColorBlendAttachmentState, color_blend_state_count )       color_blend_states;
 
-    //VkPipelineDynamicStateCreateInfo          dynamic_state_create_info;
-    D_OR_S_ARRAY!( dynamic_state_count,         VkDynamicState )                        dynamic_states;
+    //VkPipelineDynamicStateCreateInfo                  dynamic_state_create_info;
+    D_OR_S_ARRAY!( VkDynamicState,                      dynamic_state_count )           dynamic_states;
 
-    //VkPipelineLayoutCreateInfo                pipeline_layout_create_info
-    VkPipelineLayout                            pipeline_layout;
-    D_OR_S_ARRAY!( descriptor_set_layout_count, VkDescriptorSetLayout )                 descriptor_set_layouts;
-    D_OR_S_ARRAY!( push_constant_range_count,   VkPushConstantRange )                   push_constant_ranges;
+    //VkPipelineLayoutCreateInfo                        pipeline_layout_create_info
+    VkPipelineLayout                                    pipeline_layout;
+    D_OR_S_ARRAY!( VkDescriptorSetLayout,               descriptor_set_layout_count )   descriptor_set_layouts;
+    D_OR_S_ARRAY!( VkPushConstantRange,                 push_constant_range_count )     push_constant_ranges;
 
-    VkRenderPass                                render_pass;
-    uint32_t                                    subpass;
-    VkPipeline                                  base_pipeline_handle = VK_NULL_HANDLE;
-    //int32_t                                   base_pipeline_index  = -1;  // Todo(pp): this is only meaningfull for multi-pipeline construction. Implement!
+    VkRenderPass                                        render_pass;
+    uint32_t                                            subpass;
+    VkPipeline                                          base_pipeline_handle = VK_NULL_HANDLE;
+    //int32_t                                           base_pipeline_index  = -1;  // Todo(pp): this is only meaningfull for multi-pipeline construction. Implement!
 
 
     /// Get minimal config for internal D_OR_S_ARRAY.
@@ -760,8 +760,8 @@ struct Meta_Compute_T(
     VkPipeline                                  pipeline;
     VkComputePipelineCreateInfo                 pipeline_ci;
 
-    D_OR_S_ARRAY!( descriptor_set_layout_count, VkDescriptorSetLayout )                 descriptor_set_layouts;
-    D_OR_S_ARRAY!( push_constant_range_count,   VkPushConstantRange )                   push_constant_ranges;
+    D_OR_S_ARRAY!( VkDescriptorSetLayout,       descriptor_set_layout_count )   descriptor_set_layouts;
+    D_OR_S_ARRAY!( VkPushConstantRange,         push_constant_range_count )     push_constant_ranges;
 
     VkPipelineLayout                            pipeline_layout() { return pipeline_ci.layout; }
 

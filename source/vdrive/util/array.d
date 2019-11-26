@@ -414,7 +414,7 @@ struct Block_Array( T, ST = uint ) {
     bool    empty()     const { return Count == 0; }
     Size_T  capacity()  const { return Capacity(); }
     Size_T  opDollar()  const { return Count; }
-    //Size_T  length()    const { return Count; }
+    //Size_T  length()  const { return Count; }
 
     inout( Val_T )*  ptr()      inout { return cast( inout( Val_T )* )( Arena.ptr + Link.Offset ); }
     inout( Size_T ) length()    inout { return Count; }
@@ -652,7 +652,7 @@ alias BArray = Block_Array;
 
 /// Static array mimicking a dynamic one. Data ends up on stack, and can not be reallocated
 /// the array has still a capacity and length of how many elements are in use
-struct Static_Array( uint Capacity, T, ST = uint ) {
+struct Static_Array( T, uint Capacity, ST = uint ) {
     alias   Val_T   = T;
     alias   Size_T  = ST;
     private Val_T[ Capacity ]   Data;
@@ -816,7 +816,7 @@ alias EArray = Empty_Array;
 /// sized array overload forwarding to D_OR_S_ARRAY template
 auto sizedArray( int max_length, T, ST = uint )( size_t length ) {
     alias   Size_T = ST;
-    D_OR_S_ARRAY!( max_length, T ) array;
+    D_OR_S_ARRAY!( T, max_length ) array;
     static if( max_length > 0 )
         array.length = cast( Size_T )length;
     return array;
@@ -831,7 +831,7 @@ private void isDynamicArrayImpl(           T, ST )( Dynamic_Array!(      T, ST )
 private void isArenaArrayImpl(             T, ST )( Arena_Array!(        T, ST ) array ) {}
 private void isBlockArrayImpl(             T, ST )( Block_Array!(        T, ST ) array ) {}
 private void isEmptyArrayImpl(             T, ST )( Empty_Array!(        T, ST ) array ) {}
-private void isStaticArrayImpl( uint size, T, ST )( Static_Array!( size, T, ST ) array ) {}
+private void isStaticArrayImpl( T, uint size, ST )( Static_Array!( T, size, ST ) array ) {}
 
 template isDynamicArray(    A ) { enum isDynamicArray = is( typeof( isDynamicArrayImpl( A.init ))); }
 template isArenaArray(      A ) { enum isArenaArray   = is( typeof( isArenaArrayImpl(   A.init ))); }
@@ -864,13 +864,13 @@ template isDataArrayOrSlice( A, E ) { enum isDataArrayOrSlice = isDataArray!( A,
 
 
 /// template that creates a Dynamic, Static (mimicking dynamic), Empty, or DLang Static Array
-template D_OR_S_ARRAY( int count, T, ST = uint ) {
+template D_OR_S_ARRAY( T, int count, ST = uint ) {
     alias   Size_T  = ST;
     //pragma( msg, "File: ", __FILE__, " Line: ", __LINE__ );
          static if( count == int.max )  alias D_OR_S_ARRAY = DArray!( T, Size_T );              // resize-able, non-copyable array
     else static if( count == int.min )  alias D_OR_S_ARRAY = BArray!( T, Size_T );              // resize-able, non-copyable array, suballocating from memory arena
 //  else static if( count == -1 )       alias D_OR_S_ARRAY = OArray!( T, Size_T );              // array with one element
-    else static if( count >   0 )       alias D_OR_S_ARRAY = SArray!( count, T, Size_T );       // static array mimicking resize-able array
+    else static if( count >   0 )       alias D_OR_S_ARRAY = SArray!( T, count, Size_T );       // static array mimicking resize-able array
     else static if( count <   0 )       alias D_OR_S_ARRAY = T[ - count ];                      // static array
     else                                alias D_OR_S_ARRAY = EArray!( T, Size_T );              // array with no element/memory
 }

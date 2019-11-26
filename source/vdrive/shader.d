@@ -244,8 +244,8 @@ struct Meta_Specialization_T( int32_t specialization_count ) {
     alias sz_count = specialization_count;
     VkSpecializationInfo specialization_info;
 
-    D_OR_S_ARRAY!( sz_count, VkSpecializationMapEntry ) specialization_map_entries;
-    D_OR_S_ARRAY!( sz_count, MapEntry32 )               specialization_data;
+    D_OR_S_ARRAY!( VkSpecializationMapEntry, sz_count )     specialization_map_entries;
+    D_OR_S_ARRAY!( MapEntry32,               sz_count )     specialization_data;
 
     void reset() {
        specialization_map_entries.clear;

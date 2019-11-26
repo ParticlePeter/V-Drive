@@ -35,8 +35,8 @@ struct Meta_Geometry_T(
     VkDeviceSize                                        index_offset;
 
     uint32_t                                            vertex_count;
-    D_OR_S_ARRAY!( vertex_offset_count, VkDeviceSize )  vertex_offsets;
-    D_OR_S_ARRAY!( vertex_buffer_count, VkBuffer )      vertex_buffers;
+    D_OR_S_ARRAY!( VkDeviceSize, vertex_offset_count )  vertex_offsets;
+    D_OR_S_ARRAY!( VkBuffer,     vertex_buffer_count )  vertex_buffers;
 
     RecordCommands                                      recordCommands;
 
