@@ -753,66 +753,6 @@ struct Static_Array( uint Capacity, T, ST = uint ) {
 alias SArray = Static_Array;
 
 
-/*
-/// array with only one element but functions same as Dynamic and static Arrays
-/// it is useful in place where one element data is required in meta structs
-/// length is always 1 and append operations always set that element
-private struct One_Array( T, ST = uint ) {
-    alias   Val_T   = T;
-    alias   Size_T  = ST;
-    private T       Data;
-//  private Size_T  Count       = 0;
-//  private Size_T  Capacity    = 0;
-
-
-    // borrowed references, don't store resulting slice!
-    alias   data this;
-    T[]     data()      { return ( & Data )[ 0 .. 1 ]; }
-
-
-    // set length, which must always be 1
-    void length( size_t count, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
-        vkAssert( count == 1, file, line, func, "One_Array.length can be set only to 1 !" );
-    }
-
-
-    // properties
-    Size_T  length()    const { return 1; }
-    Size_T  capacity()  const { return 1; }
-    Size_T  opDollar()  const { return 1; }
-    bool    empty()     const { return false; }
-    T*      ptr()       { return & Data; }
-    void    clear()     {}
-
-
-    // index access
-    ref inout( T ) opIndex( size_t i, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) inout {
-        vkAssert( i == 0, file, line, func, "One_Array has only one element, index must always be 0 !" );
-        return Data;
-    }
-
-
-    // convenience first and last element access
-    inout @property ref inout( T ) front()  { return Data; }
-    inout @property ref inout( T ) back()   { return Data; }
-
-
-    // assert on append single element
-    void append( S )( S stuff, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) if( is( S : T )) {
-        vkAssert( false, file, line, func, "One_Array cannot accept additional elements beyond 1 !" );
-    }
-
-
-    // assert on append single element
-    void append( S )( S[] stuff, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) if( is( S : T )) {
-        vkAssert( false, file, line, func, "One_Array cannot accept additional elements beyond 1 !" );
-    }
-}
-
-alias OArray = One_Array;
-*/
-
-
 
 /// empty array has no data but functions same as Dynamic and static Arrays
 /// it is useful in place where no data is required in meta structs
