@@ -121,8 +121,8 @@ struct Core_Pipeline {
 
 /// destroy all wrapped Vulkan objects
 /// Params:
-///     vk = Vulkan state struct holding the device through which these resources were created
-///     core = the wrapped VkDescriptorPool ( with it the VkDescriptorSet ) and the VkDescriptorSetLayout to destroy
+///     vk = Vulkan state struct with the VkDevice through which these resources were created
+///     core = Wraps the VkPipelinekPipeline and VkPipelineLayout wrapper to be destroyed.
 /// Returns: the passed in Meta_Structure for function chaining
 void destroy( ref Vulkan vk, ref Core_Pipeline core ) {
     vk.destroyHandle( core.pipeline );
@@ -161,10 +161,16 @@ private mixin template Meta_Pipeline_Common() {
 // Meta_Graphics related //
 ///////////////////////////
 
-/// meta struct to configure a graphics VkPipeline and allocate a
-/// dynamic arrays exist to add several related config structs
-/// must be initialized with a Vulkan state struct
+
+/// Meta struct to configure a graphics VkPipeline and VkPipelineLayout.
+/// Dynamic arrays exist to add several related config structs.
+/// Must be initialized with a Vulkan state struct.
 alias  Meta_Graphics = Meta_Graphics_T!();
+
+
+/// Meta struct to configure a graphics VkPipeline and VkPipelineLayout.
+/// Parametrizeable static or dynamic arrays exist to add several related config structs.
+/// Must be initialized with a Vulkan state struct.
 struct Meta_Graphics_T(
     int32_t shader_stage_count          = int32_t.max,
     int32_t binding_description_count   = int32_t.max,
@@ -212,7 +218,7 @@ struct Meta_Graphics_T(
     //int32_t                                   base_pipeline_index  = -1;  // Todo(pp): this is only meaningfull for multi-pipeline construction. Implement!
 
 
-    /// get minimal config for internal D_OR_S_ARRAY
+    /// Get minimal config for internal D_OR_S_ARRAY.
     auto static_config() {
         size_t[9] result;
         result[0] = shader_stages.length;

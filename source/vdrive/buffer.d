@@ -249,7 +249,7 @@ struct Meta_Buffer_T( uint32_t view_count, uint32_t member_copies = BMC.None ) {
     version( DEBUG_NAME )   string  name;
 
 
-    // bulk destroy the resources belonging to this meta struct
+    /// bulk destroy the resources belonging to this meta struct
     void destroyResources() {
         vk.destroyHandle( buffer );
         if( owns_device_memory )    vk.destroyHandle( device_memory );
