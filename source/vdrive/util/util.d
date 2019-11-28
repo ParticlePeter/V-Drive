@@ -458,7 +458,6 @@ auto Forward_To_Inner_Struct( outer, inner, string path, ignore... )() {
                 ~ "auto " ~ member ~ "( ref " ~ outer.stringof ~ " meta ) {\n"
                 ~ "\treturn " ~ path ~ "." ~ member ~ ";\n}\n\n";
             //pragma( msg, result );
-            //mixin( result );
         }
     } return result;
 }
@@ -491,7 +490,6 @@ auto Forward_To_Inner_Struct( inner, string path, ignore... )() {
                 ~ "    auto " ~ member ~ "() {\n"
                 ~ "        return " ~ path ~ "." ~ member ~ ";\n    }\n\n";
             //pragma( msg, result );
-            //mixin( result );
         }
     } return result;
 }
