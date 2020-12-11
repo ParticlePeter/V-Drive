@@ -12,6 +12,8 @@ import erupted;
 nothrow @nogc:
 
 
+bool verbose_init = true;
+
 
 auto initDevice( T )(
     ref Vulkan                  vk,
