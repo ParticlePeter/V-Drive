@@ -507,9 +507,11 @@ alias Meta_Render_Pass = Meta_Render_Pass_T!( int32_t.max, int32_t.max, int32_t.
 
 
 
+////////////////////////
+// Clear Value Helper //
+////////////////////////
 
 private template isClearValueType( T ) { enum isClearValueType = is( T == float ) || is( T == int32_t ) || is( T == uint32_t ); }
-
 
 /// set attachment specific (framebuffer attachment index) r, g, b, a clear value
 /// The type of all values must be the same and either float, int32_t or uint32_t
@@ -521,16 +523,16 @@ private template isClearValueType( T ) { enum isClearValueType = is( T == float 
 ///     b               = blue clear value
 ///     a               = alpha clear value
 /// Returns: reference to clear_vaues for function chaining
-auto ref set( Array_T, T )(
-    ref Array_T     clear_values,
-    uint32_t        index,
-    T               r,
-    T               g,
-    T               b,
-    T               a,
-    string          file = __FILE__,
-    size_t          line = __LINE__,
-    string          func = __FUNCTION__
+ref Array_T set( Array_T, T )(
+    return ref Array_T  clear_values,
+    uint32_t            index,
+    T                   r,
+    T                   g,
+    T                   b,
+    T                   a,
+    string              file = __FILE__,
+    size_t              line = __LINE__,
+    string              func = __FUNCTION__
 
     ) if( isDataArrayOrSlice!( Array_T, VkClearValue ) && isClearValueType!T ) {
 
@@ -546,13 +548,13 @@ auto ref set( Array_T, T )(
 ///     index           = array index as well as framebuffer attachment index of attachment to apply this clear values
 ///     rgba            = the rgba clear value as array or four component math vector
 /// Returns: reference to clear_vaues for function chaining
-auto ref set( Array_T, T )(
-    ref Array_T     clear_values,
-    uint32_t        index,
-    T[4]            rgba,
-    string          file = __FILE__,
-    size_t          line = __LINE__,
-    string          func = __FUNCTION__
+ref Array_T set( Array_T, T )(
+    return ref Array_T  clear_values,
+    uint32_t            index,
+    T[4]                rgba,
+    string              file = __FILE__,
+    size_t              line = __LINE__,
+    string              func = __FUNCTION__
 
     ) if( isDataArrayOrSlice!( Array_T, VkClearValue ) && isClearValueType!T ) {
 
@@ -572,14 +574,14 @@ auto ref set( Array_T, T )(
 ///     depth           = the depth clear value
 ///     stencil         = optional stencil clear value, defaults to 0
 /// Returns: reference to clear_vaues for function chaining
-auto ref set( Array_T, UINT32_T )(
-    ref Array_T     clear_values,
-    uint32_t        index,
-    float           depth,
-    UINT32_T        stencil = 0,
-    string          file = __FILE__,
-    size_t          line = __LINE__,
-    string          func = __FUNCTION__
+ref Array_T set( Array_T, UINT32_T )(
+    return ref Array_T  clear_values,
+    uint32_t            index,
+    float               depth,
+    UINT32_T            stencil = 0,
+    string              file = __FILE__,
+    size_t              line = __LINE__,
+    string              func = __FUNCTION__
 
     ) if( isDataArrayOrSlice!( Array_T, VkClearValue ) && is(  UINT32_T : uint32_t )) {
 
@@ -595,13 +597,13 @@ auto ref set( Array_T, UINT32_T )(
 ///     index           = array index as well as framebuffer attachment index of attachment to apply this clear values
 ///     clear_value = the VkClearValue clear value
 /// Returns: reference to clear_vaues for function chaining
-auto ref set( Array_T )(
-    ref Array_T     clear_values,
-    uint32_t        index,
-    VkClearValue    clear_value,
-    string          file = __FILE__,
-    size_t          line = __LINE__,
-    string          func = __FUNCTION__
+ref Array_T set( Array_T )(
+    return ref Array_T  clear_values,
+    uint32_t            index,
+    VkClearValue        clear_value,
+    string              file = __FILE__,
+    size_t              line = __LINE__,
+    string              func = __FUNCTION__
 
     ) if( isDataArrayOrSlice!( Array_T, VkClearValue )) {
 
@@ -620,15 +622,7 @@ auto ref set( Array_T )(
 ///     b               = blue clear value
 ///     a               = alpha clear value
 /// Returns: reference to clear_vaues for function chaining
-auto ref add( Array_T, T )(
-    ref Array_T     clear_values,
-    T               r,
-    T               g,
-    T               b,
-    T               a
-
-    ) if( isDataArray!( Array_T, VkClearValue ) && isClearValueType!T ) {
-
+ref Array_T add( Array_T, T )( return ref Array_T  clear_values, T r, T g, T b, T a ) if( isDataArray!( Array_T, VkClearValue ) && isClearValueType!T ) {
     T[4] rgba = [ r, g, b, a ];
     return add( clear_values, rgba );
 }
@@ -640,7 +634,7 @@ auto ref add( Array_T, T )(
 ///     clear_values    = clear values array which will be mutated
 ///     rgba            = the rgba clear value as array or four component math vector
 /// Returns: reference to clear_vaues for function chaining
-auto ref add( Array_T, T )( ref Array_T clear_values, T[4] rgba ) if( isDataArray!( Array_T, VkClearValue ) && isClearValueType!T ) {
+ref Array_T add( Array_T, T )( return ref Array_T clear_values, T[4] rgba ) if( isDataArray!( Array_T, VkClearValue ) && isClearValueType!T ) {
     VkClearValue clear_value;
          static if( is( T == float ))    clear_value.color.float32 = rgba;
     else static if( is( T == int32_t ))  clear_value.color.int32   = rgba;
@@ -656,7 +650,7 @@ auto ref add( Array_T, T )( ref Array_T clear_values, T[4] rgba ) if( isDataArra
 ///     depth           = the depth clear value
 ///     stencil         = optional stencil clear value, defaults to 0
 /// Returns: reference to clear_vaues for function chaining
-auto ref add( Array_T, UINT32_T )( ref Array_T clear_values, float depth, UINT32_T stencil = 0 ) if( isDataArray!( Array_T, VkClearValue ) && is( UINT32_T : uint32_t )) {
+ref Array_T add( Array_T, UINT32_T )( return ref Array_T clear_values, float depth, UINT32_T stencil = 0 ) if( isDataArray!( Array_T, VkClearValue ) && is( UINT32_T : uint32_t )) {
     VkClearValue clear_value = { depthStencil : VkClearDepthStencilValue( depth, stencil ) };
     return add( clear_values, clear_value );
 }
@@ -666,19 +660,23 @@ auto ref add( Array_T, UINT32_T )( ref Array_T clear_values, float depth, UINT32
 /// Params:
 ///     clear_values    = clear values array which will be mutated
 /// Returns: reference to clear_vaues for function chaining
-auto ref add( Array_T )( ref Array_T clear_values, VkClearValue clear_value ) if( isDataArray!( Array_T, VkClearValue )) {
+ref Array_T add( Array_T )( return ref Array_T clear_values, VkClearValue clear_value ) if( isDataArray!( Array_T, VkClearValue )) {
     clear_values.append( clear_value );
     return clear_values;
 }
 
 
 
+//////////////////////////////////
+// RenderPass Begin Info Helper //
+//////////////////////////////////
+
 /// attach clear values to a VkRenderPassBeginInfo, the clear values are not consumed and must be kept alive
 /// Params:
 ///     render_pass_bi  = the begin info struct to which clear value get attached
 ///     clear_values    = clear values array which will be attached
 /// Returns: render_pass_bi reference for function chaining
-auto ref clearValues( Array_T )( ref VkRenderPassBeginInfo render_pass_bi, ref Array_T clear_values ) if( isDataArrayOrSlice!( Array_T, VkClearValue )) {
+ref VkRenderPassBeginInfo clearValues( Array_T )( return ref VkRenderPassBeginInfo render_pass_bi, ref Array_T clear_values ) if( isDataArrayOrSlice!( Array_T, VkClearValue )) {
     render_pass_bi.pClearValues     = clear_values.ptr;
     render_pass_bi.clearValueCount  = clear_values.length.toUint;
     return render_pass_bi;
@@ -693,7 +691,7 @@ auto ref clearValues( Array_T )( ref VkRenderPassBeginInfo render_pass_bi, ref A
 ///     render_pass_bi  = the begin info struct for which the render area offset is specified
 ///     offset          = the offset of the render area
 /// Returns: render_pass_bi reference for function chaining
-auto ref renderAreaOffset( ref VkRenderPassBeginInfo render_pass_bi, VkOffset2D offset ) {
+ref VkRenderPassBeginInfo renderAreaOffset( return ref VkRenderPassBeginInfo render_pass_bi, VkOffset2D offset ) {
     render_pass_bi.renderArea.offset = offset;
     return render_pass_bi;
 }
@@ -707,7 +705,7 @@ auto ref renderAreaOffset( ref VkRenderPassBeginInfo render_pass_bi, VkOffset2D 
 ///     x               = the offset of the render area in x
 ///     y               = the offset of the render area in y
 /// Returns: render_pass_bi reference for function chaining
-auto ref renderAreaOffset( ref VkRenderPassBeginInfo render_pass_bi, int32_t x, int32_t y ) {
+ref VkRenderPassBeginInfo renderAreaOffset( return ref VkRenderPassBeginInfo render_pass_bi, int32_t x, int32_t y ) {
     return renderAreaOffset( render_pass_bi, VkOffset2D( x, y ));
 }
 
@@ -719,7 +717,7 @@ auto ref renderAreaOffset( ref VkRenderPassBeginInfo render_pass_bi, int32_t x, 
 ///     render_pass_bi  = the begin info struct for which the render area extent is specified
 ///     extent          = the extent of the render area
 /// Returns: render_pass_bi reference for function chaining
-auto ref renderAreaExtent( ref VkRenderPassBeginInfo render_pass_bi, VkExtent2D extent ) {
+ref VkRenderPassBeginInfo renderAreaExtent( return ref VkRenderPassBeginInfo render_pass_bi, VkExtent2D extent ) {
     render_pass_bi.renderArea.extent = extent;
     return render_pass_bi;
 }
@@ -733,7 +731,7 @@ auto ref renderAreaExtent( ref VkRenderPassBeginInfo render_pass_bi, VkExtent2D 
 ///     width   = the width of the render area
 ///     height  = the height of the render area
 /// Returns: render_pass_bi reference for function chaining
-auto ref renderAreaExtent( ref VkRenderPassBeginInfo render_pass_bi, uint32_t width, uint32_t height ) {
+ref VkRenderPassBeginInfo renderAreaExtent( return ref VkRenderPassBeginInfo render_pass_bi, uint32_t width, uint32_t height ) {
     return renderAreaExtent( render_pass_bi, VkExtent2D( width, height ));
 }
 
@@ -745,7 +743,7 @@ auto ref renderAreaExtent( ref VkRenderPassBeginInfo render_pass_bi, uint32_t wi
 ///     render_pass_bi  = the begin info struct for which the render area is specified
 ///     area            = the render area
 /// Returns: render_pass_bi reference for function chaining
-auto ref renderArea( ref VkRenderPassBeginInfo render_pass_bi, VkRect2D area ) {
+ref VkRenderPassBeginInfo renderArea( return ref VkRenderPassBeginInfo render_pass_bi, VkRect2D area ) {
     render_pass_bi.renderArea = area;
     return render_pass_bi;
 }
@@ -759,7 +757,7 @@ auto ref renderArea( ref VkRenderPassBeginInfo render_pass_bi, VkRect2D area ) {
 ///     offset          = the offset of the render area
 ///     extent          = the extent of the render area
 /// Returns: render_pass_bi reference for function chaining
-auto ref renderArea( ref VkRenderPassBeginInfo render_pass_bi, VkOffset2D offset, VkExtent2D extent ) {
+ref VkRenderPassBeginInfo renderArea( return ref VkRenderPassBeginInfo render_pass_bi, VkOffset2D offset, VkExtent2D extent ) {
     return renderArea( render_pass_bi, VkRect2D( offset, extent ));
 }
 
@@ -774,11 +772,15 @@ auto ref renderArea( ref VkRenderPassBeginInfo render_pass_bi, VkOffset2D offset
 ///     width           = the width of the render area
 ///     height          = the height of the render area
 /// Returns: render_pass_bi reference for function chaining
-auto ref renderArea( ref VkRenderPassBeginInfo render_pass_bi, int32_t x, int32_t y, uint32_t width, uint32_t height ) {
+ref VkRenderPassBeginInfo renderArea( return ref VkRenderPassBeginInfo render_pass_bi, int32_t x, int32_t y, uint32_t width, uint32_t height ) {
     return renderArea( render_pass_bi, VkRect2D( VkOffset2D( x, y ), VkExtent2D( width, height )));
 }
 
 
+
+////////////////////////
+// Framebuffer Helper //
+////////////////////////
 
 /// construct one VkFramebuffer
 /// Params:
@@ -789,7 +791,7 @@ auto ref renderArea( ref VkRenderPassBeginInfo render_pass_bi, int32_t x, int32_
 ///     layers      = framebuffer layers, for 3D image attachments
 ///     image_views = these will be attached to each of the VkFramebuffer(s) attachments 0 .. first_image_views.length
 /// Returns: a constructed VkFraemebuffer
-auto createFramebuffer(
+VkFramebuffer createFramebuffer(
     ref Vulkan      vk,
     VkRenderPass    render_pass,
     uint32_t        width,
@@ -818,7 +820,6 @@ auto createFramebuffer(
 }
 
 
-
 /// construct one VkFramebuffer, convenience function with implicit layers argument of 1
 /// Params:
 ///     vk          = Vulkan state struct holding the device through which this resource is created
@@ -827,7 +828,7 @@ auto createFramebuffer(
 ///     height      = framebuffer height, this is not(!) the render area height
 ///     image_views = these will be attached to each of the VkFramebuffer(s) attachments 0 .. first_image_views.length
 /// Returns: a constructed VkFraemebuffer
-auto createFramebuffer( Array_T )(
+VkFramebuffer createFramebuffer(
     ref Vulkan      vk,
     VkRenderPass    render_pass,
     uint32_t        width,
@@ -839,7 +840,6 @@ auto createFramebuffer( Array_T )(
     ) {
     return vk.createFramebuffer( render_pass, width, height, 1, image_views, file, line, func );
 }
-
 
 
 /// construct multiple VkFramebuffer, which are stored in out_buffers argument
@@ -917,7 +917,6 @@ VkResult createFramebuffers(
 
     return VK_SUCCESS;
 }
-
 
 
 /// construct multiple VkFramebuffer, which are stored in out_buffers argument
