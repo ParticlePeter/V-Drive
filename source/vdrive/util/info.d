@@ -12,18 +12,6 @@ import erupted;
 
 
 
-// print new line
-void println() @nogc nothrow { printf( "\n" ); }
-
-
-// print char n count
-void printRepeat( size_t MAX_CHAR_COUNT )( char c, size_t count ) @nogc nothrow {
-    char[ MAX_CHAR_COUNT ] repeat;
-    repeat[] = c;
-    if( MAX_CHAR_COUNT < count ) count = MAX_CHAR_COUNT;
-    printf( "%.*s", count, repeat.ptr );
-}
-
 
 // TODO(pp): get rid of the GC with @nogc, remove to!string requirement
 // TODO(pp): extract function for listing available enums of possible enums
@@ -197,6 +185,23 @@ void printTypeInfo( T, size_t buffer_size = 256 )(
     }
     if( newline ) println;
 }
+
+
+
+
+
+// print new line
+void println() { printf( "\n" ); }
+
+
+// print char n count
+void printRepeat( size_t MAX_CHAR_COUNT )( char c, size_t count ) {
+    char[ MAX_CHAR_COUNT ] repeat;
+    repeat[] = c;
+    if( MAX_CHAR_COUNT < count ) count = MAX_CHAR_COUNT;
+    printf( "%.*s", cast( int )count, repeat.ptr );
+}
+
 
 // From D Cookbok p. 216
 // use this to get and evalueate the member data
