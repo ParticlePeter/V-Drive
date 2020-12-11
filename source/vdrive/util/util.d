@@ -137,9 +137,9 @@ void printHelper(
     ref Log_Info    log_info,
     const( char )*  msg_end
     ) nothrow @nogc {
-    printf( "    File     : %s\n", log_info.file.ptr );
-    printf( "    Line     : %d\n", log_info.line );
-    printf( "    Func     : %s\n", log_info.func.ptr );
+    printf( "    File     : %s\n",   log_info.file.ptr );
+    printf( "    Line     : %llu\n", log_info.line );
+    printf( "    Func     : %s\n",   log_info.func.ptr );
     if( message ) {
         printf(  "    Message  : %s", message );
         if( msg_end ) printf( "%s", msg_end );
@@ -224,7 +224,7 @@ void printHelper(
     buffer[ file.length ] = '\0';
 
     printf( "    File     : %s\n", buffer.ptr );
-    printf( "    Line     : %d\n", line );
+    printf( "    Line     : %llu\n", line );
 
     memcpy( buffer.ptr, func.ptr, func.length );
     buffer[ func.length ] = '\0';
@@ -238,10 +238,6 @@ void printHelper(
 
     printf( "==============\n\n" );
 }
-
-
-
-
 
 
 
