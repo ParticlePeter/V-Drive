@@ -13,7 +13,6 @@ import erupted;
 
 
 
-// TODO(pp): get rid of the GC with @nogc, remove to!string requirement
 // TODO(pp): extract function for listing available enums of possible enums
 void printTypeInfo( T, size_t buffer_size = 256 )(
     T       info,
@@ -25,19 +24,14 @@ void printTypeInfo( T, size_t buffer_size = 256 )(
 
     // struct name
     import std.conv : to;
-    //import std.array : replicate;
-
-    //import core.stdc.string : strncpy, memset;
-            //if( strncmp( properties.layerName.ptr, layer.ptr, layer.length ) == 0 ) {
-            //  return properties.implementationVersion;
 
     char[ buffer_size ] buffer = void;
 
     if ( printStructName ) {
-        buffer[ 0 .. T.stringof.length ] = T.stringof;    //    strncpy( buffer.ptr, T.stringof.ptr, T.stringof.length );
+        buffer[ 0 .. T.stringof.length ] = T.stringof;
         buffer[ T.stringof.length ] = '\0';
         printf( "%s\n", buffer.ptr );
-        buffer[ 0 .. T.stringof.length ] = '=';           //    memset( buffer.ptr, '=', T.stringof.length );
+        buffer[ 0 .. T.stringof.length ] = '=';
         printf( "%s\n", buffer.ptr );
     }
 
@@ -59,12 +53,11 @@ void printTypeInfo( T, size_t buffer_size = 256 )(
     size_t max( size_t a, size_t b ) { return a < b ? b : a; }
     foreach( member_name; __traits( allMembers, T )) {
         alias member = printInfoHelper!( __traits( getMember, T, member_name ));
-        //static if( is( member )) {
-            max_name_length = max( max_name_length, member_name.stringof.length );
-            max_type_length = max( max_type_length, alias_type_length( __traits( getMember, info, member_name )));
-        //}
+        max_name_length = max( max_name_length, member_name.stringof.length );
+        max_type_length = max( max_type_length, alias_type_length( __traits( getMember, info, member_name )));
     }
     max_type_length += 2;       // space to member name
+    max_name_length &= ~1;
 
 
     // pretty print attributes
