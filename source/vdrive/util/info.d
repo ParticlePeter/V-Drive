@@ -1,7 +1,6 @@
 module vdrive.util.info;
 
 import core.stdc.stdio : printf;
-import std.exception : enforce;
 
 import vdrive.util.util;
 import vdrive.util.array;
@@ -11,11 +10,12 @@ import vdrive.state;
 import erupted;
 
 
+nothrow @nogc:
 
-
+// TODO(pp): merge with lbmd.settings to serialize with and without export attributes and to stdout or file
 // TODO(pp): extract function for listing available enums of possible enums
 void printTypeInfo( T, size_t buffer_size = 256 )(
-    T       info,
+    ref T   info,
     bool    printStructName = true,
     string  indent = "",
     size_t  max_type_length = 0,
@@ -42,7 +42,7 @@ void printTypeInfo( T, size_t buffer_size = 256 )(
 
     // need this template as non aliased types are shorter than aliased, but aliased are printed later
     immutable string[8] integral_alias_types = [ "uint64_t", "uint32_t", "uint16_t", "uint8_t", "int64_t", "int32_t", "int16_t", "int8_t" ];
-    size_t alias_type_length( T )( T ) {
+    size_t alias_type_length( T )( ref T ) {
         static      if( is( T == uint16_t ) || is( T == uint32_t ) || is( T == uint64_t )) return 8;
         else static if( is( T ==  int16_t ) || is( T ==  int32_t ) || is( T ==  int64_t ) || is( T ==  ubyte )) return 7;
         else static if( is( T ==  int8_t )) return 6;
@@ -61,120 +61,139 @@ void printTypeInfo( T, size_t buffer_size = 256 )(
 
 
     // pretty print attributes
-    import std.string : leftJustify;
     import std.traits : isFloatingPoint, isPointer;
 
-    void print( char* buffer_ptr, string type, string name = "", string data = "", string assign = " : ", string line = "\n" ) {
-        buffer_ptr[ 0..max_type_length ] = type.leftJustify( max_type_length, ' ' );  buffer_ptr += max_type_length;
-        buffer_ptr[ 0..max_name_length ] = name.leftJustify( max_name_length, ' ' );  buffer_ptr += max_name_length;
-        buffer_ptr[ 0..assign.length ] = assign;                                      buffer_ptr += assign.length;
-        buffer_ptr[ 0..data.length ] = data;                                          buffer_ptr += data.length;
-        buffer_ptr[ 0..line.length ] = line;
-        buffer_ptr[ line.length ] = '\0';
-        printf( "%s", buffer.ptr );
+    void print( T )( char* buffer_ptr, T data, string name = "", string assign = " : ", string line = "\n" ) {
+
+        import core.stdc.string : memcpy, memset;
+        char* leftJustify( char* ptr, string str, size_t num ) {
+            buffer_ptr[ 0 .. str.length ] = str;        //  memcpy( ptr,  str.ptr, str.length );
+            buffer_ptr[ str.length .. num ] = ' ';      //  memset( ptr + str.length, ' ', num - str.length );
+            return  ptr + num;
+        }
+
+        string typeAlias( T )() {
+                 static if( is( T == uint64_t ))  return integral_alias_types[0];
+            else static if( is( T == uint32_t ))  return integral_alias_types[1];
+            else static if( is( T == uint16_t ))  return integral_alias_types[2];
+            else static if( is( T ==  uint8_t ))  return integral_alias_types[3];
+            else static if( is( T ==  int64_t ))  return integral_alias_types[4];
+            else static if( is( T ==  int32_t ))  return integral_alias_types[5];
+            else static if( is( T ==  int16_t ))  return integral_alias_types[6];
+            else static if( is( T ==   int8_t ))  return integral_alias_types[7];
+            else return T.stringof;
+        }
+
+        buffer_ptr = leftJustify( buffer_ptr, typeAlias!T, max_type_length );
+        buffer_ptr = leftJustify( buffer_ptr, name, max_name_length );
+        buffer_ptr[ 0 ] = '\0';
+
+             static if( is( T == uint64_t ))  printf( "%s : %llu\n", buffer.ptr, data );
+        else static if( is( T == uint32_t ))  printf( "%s : %u\n",   buffer.ptr, data );
+        else static if( is( T == uint16_t ))  printf( "%s : %u\n",   buffer.ptr, data );
+        else static if( is( T ==  uint8_t ))  printf( "%s : %u\n",   buffer.ptr, data );
+        else static if( is( T ==  int64_t ))  printf( "%s : %lli\n", buffer.ptr, data );
+        else static if( is( T ==  int32_t ))  printf( "%s : %i\n",   buffer.ptr, data );
+        else static if( is( T ==  int16_t ))  printf( "%s : %i\n",   buffer.ptr, data );
+        else static if( is( T ==   int8_t ))  printf( "%s : %i\n",   buffer.ptr, data );
+        else static if( isFloatingPoint!T )   printf( "%s : %f\n",   buffer.ptr, data );
+        else static if( isPointer!T ) {
+            if( data is null )  printf( "%s : null\n", buffer.ptr );
+            else                printf( "%s : %p\n",   buffer.ptr, data );
+        }
     }
+
 
     foreach( member_name; __traits( allMembers, T )) {
         alias member = printInfoHelper!( __traits( getMember, T, member_name ));
-        //static if( is( member )) {
-            auto  member_data = __traits( getMember, info, member_name );
-            alias member_type = typeof( member_data );
+        auto  member_data = __traits( getMember, info, member_name );
+        alias member_type = typeof( member_data );
 
-            auto buffer_ptr = buffer_indent;
-            buffer_ptr[ 0 ] = '\0';
-            //printf( "%s", buffer.ptr );
+        auto buffer_ptr = buffer_indent;
+        buffer_ptr[ 0 ] = '\0';
 
-            static if( is( member_type == enum )) {
+        /*
+        static if( is( member_type == enum )) {
 
-                buffer_ptr[ 0..member_type.stringof.length ] = member_type.stringof;
-                buffer_ptr[ member_type.stringof.length ] = '\0';
-                import core.stdc.string : strstr;
-                import std.traits : EnumMembers;
-                bool assigned = false;
-                int32_t last_used_value = int32_t.max;
-                if( strstr( buffer_ptr, "Flag" ) == null ) {
-                    foreach( enum_member; EnumMembers!member_type ) {
-                        // need to filter multiply assigned enum values _BEGIN_RANGE, _END_RANGE (_RANGE_SIZE only with string compare, avoiding!)
-                        // these are not API constructs but just implementor help
-                        if( member_data == enum_member && enum_member != last_used_value ) {
-                            print( buffer_ptr, member_type.stringof, member_name, enum_member.to!string );
-                            last_used_value = enum_member;
-                        }
+            buffer_ptr[ 0..member_type.stringof.length ] = member_type.stringof;
+            buffer_ptr[ member_type.stringof.length ] = '\0';
+            import core.stdc.string : strstr;
+            import std.traits : EnumMembers;
+            bool assigned = false;
+            int32_t last_used_value = int32_t.max;
+            if( strstr( buffer_ptr, "Flag" ) == null ) {
+                foreach( enum_member; EnumMembers!member_type ) {
+                    // need to filter multiply assigned enum values _BEGIN_RANGE, _END_RANGE (_RANGE_SIZE only with string compare, avoiding!)
+                    // these are not API constructs but just implementor help
+                    if( member_data == enum_member && enum_member != last_used_value ) {
+                        print( buffer_ptr, member_type.stringof, member_name, "enum_member.to!string" );
+                        last_used_value = enum_member;
                     }
-                } else {
-                    foreach( enum_member; EnumMembers!member_type ) {
-                        auto enum_member_string = enum_member.to!string;
-                        // need to filter the enum bellow _MAX_ENUM, as they are not API constructs but just implementor help
-                        if( member_data & enum_member && member_data != 0x7FFFFFFF ) {
-                            if ( !assigned ) {
-                                assigned = true;
-                                print( buffer_ptr, member_type.stringof, member_name, enum_member.to!string );
-                            } else {
-                                print( buffer_ptr, "", "", enum_member.to!string, " | " );
-                            }
-                        }
-                    }
-                    // if nothing was assigned, the enum would be skipped, hence print it with artificial NONE flag
-                    if( !assigned ) print( buffer_ptr, member_type.stringof, member_name, "NONE" );
-                }
-            }
-
-            //else static if( member_type!isPointer ) {}
-
-            else static if( is( member_type == struct ) || is( member_type == union )) {
-                print( buffer_ptr, member_type.stringof, "", "", "" );
-                member_data.printTypeInfo( false, "\t", max_type_length, max_name_length, false );
-            }
-
-            else static if( is( member_type : B[n], B, size_t n )) {
-                static if( is( B == struct ) || is( B == union )) {
-                    foreach( item; member_data ) {
-                        item.printTypeInfo( false, "\t", max_type_length, max_name_length, false );
-                    }
-                }
-            }
-
-            else print( buffer_ptr, member_type.stringof, member_name, member_data.to!string );
-
-            /*
-            else static if( is( member_type == uint64_t ))  print( buffer_ptr, "uint64_t", member_name, member_data.to!string );
-            else static if( is( member_type == uint32_t ))  print( buffer_ptr, "uint32_t", member_name, member_data.to!string );
-            else static if( is( member_type == uint16_t ))  print( buffer_ptr, "uint16_t", member_name, member_data.to!string );
-            else static if( is( member_type ==  uint8_t ))  print( buffer_ptr,  "uint8_t", member_name, member_data.to!string );
-            else static if( is( member_type ==  int64_t ))  print( buffer_ptr,  "int64_t", member_name, member_data.to!string );
-            else static if( is( member_type ==  int32_t ))  print( buffer_ptr,  "int32_t", member_name, member_data.to!string );
-            else static if( is( member_type ==  int16_t ))  print( buffer_ptr,  "int16_t", member_name, member_data.to!string );
-            else static if( is( member_type ==   int8_t ))  print( buffer_ptr,   "int8_t", member_name, member_data.to!string );
-
-            else static if( isFloatingPoint!member_type )   print( buffer_ptr, member_type.stringof, member_name, member_data.to!string );
-            else static if( isPointer!member_type )         print( buffer_ptr, member_type.stringof, member_name, member_data.to!string );
-                //if( member_data is null ) print( buffer_ptr, member_type.stringof, member_name, "null" );
-                //else                      print( buffer_ptr, member_type.stringof, member_name, member_data );
-
-            else static if( is( member_type : B[n], B, size_t n )) {
-                // arrays (strings)
-                static if( is( B : char )) {
-                    printf( "%s : %s\n", leftJustify( member_name, max_name_length, ' ' ).toStringz, member_data );
-                } else static if( is( B : uint32_t ) || is( B : uint64_t )) {
-                    printf( "%s : [ %u", leftJustify( member_name, max_name_length, ' ' ).toStringz, member_data[0]);
-                    foreach( v; 1..n )  printf( ", %u", member_data[v] );
-                    printf( " ]\n" );
-                } else static if( is( B :  int32_t ) || is( B :  int64_t )) {
-                    printf( "%s : [ %d", leftJustify( member_name, max_name_length, ' ' ).toStringz, member_data[0]);
-                    foreach( v; 1..n )  printf( ", %d", member_data[v] );
-                    printf( " ]\n" );
-                } else static if( isFloatingPoint!B ) {
-                    printf( "%s : [ %f", leftJustify( member_name, max_name_length, ' ' ).toStringz, member_data[0]);
-                    foreach( v; 1..n )  printf( ", %f", member_data[v] );
-                    printf( " ]\n" );
-                } else {    // printf numeric arrays
-                    printf( "%s : %s\n", leftJustify( member_name, max_name_length, ' ' ).toStringz, typeof( member_data ).stringof.toStringz );
                 }
             } else {
+                foreach( enum_member; EnumMembers!member_type ) {
+                    auto enum_member_string = " enum_member.to!string";
+                    // need to filter the enum bellow _MAX_ENUM, as they are not API constructs but just implementor help
+                    if( member_data & enum_member && member_data != 0x7FFFFFFF ) {
+                        if ( !assigned ) {
+                            assigned = true;
+                            print( buffer_ptr, member_type.stringof, member_name, " enum_member.to!string" );
+                        } else {
+                            print( buffer_ptr, "", "", " enum_member.to!string", " | " );
+                        }
+                    }
+                }
+                // if nothing was assigned, the enum would be skipped, hence print it with artificial NONE flag
+                if( !assigned ) print( buffer_ptr, member_type.stringof, member_name, "NONE" );
+            }
+        }
+
+        //else static if( member_type!isPointer ) {}
+
+        else*/ static if( is( member_type == struct ) || is( member_type == union )) {
+            print( buffer_ptr, member_type.stringof, "", "", "" );
+            member_data.printTypeInfo( false, "\t", max_type_length, max_name_length, false );
+        }
+
+        else static if( is( member_type : B[n], B, size_t n )) {
+            static if( is( B == struct ) || is( B == union )) {
+                foreach( item; member_data ) {
+                    item.printTypeInfo( false, "\t", max_type_length, max_name_length, false );
+                }
+            }
+        }
+
+        else print!member_type( buffer_ptr, member_data, member_name );
+
+        /*
+        else static if( is( member_type : B[n], B, size_t n )) {
+            // arrays (strings)
+            static if( is( B : char )) {
+                printf( "%s : %s\n", leftJustify( member_name, max_name_length, ' ' ).toStringz, member_data );
+            }
+            else static if( is( B : uint32_t ) || is( B : uint64_t )) {
+                printf( "%s : [ %u", leftJustify( member_name, max_name_length, ' ' ).toStringz, member_data[0]);
+                foreach( v; 1..n )  printf( ", %u", member_data[v] );
+                printf( " ]\n" );
+            }
+            else static if( is( B :  int32_t ) || is( B :  int64_t )) {
+                printf( "%s : [ %d", leftJustify( member_name, max_name_length, ' ' ).toStringz, member_data[0]);
+                foreach( v; 1..n )  printf( ", %d", member_data[v] );
+                printf( " ]\n" );
+            }
+            else static if( isFloatingPoint!B ) {
+                printf( "%s : [ %f", leftJustify( member_name, max_name_length, ' ' ).toStringz, member_data[0]);
+                foreach( v; 1..n )  printf( ", %f", member_data[v] );
+                printf( " ]\n" );
+            }
+            else {    // printf numeric arrays
                 printf( "%s : %s\n", leftJustify( member_name, max_name_length, ' ' ).toStringz, typeof( member_data ).stringof.toStringz );
             }
-            */
-        //}
+        } else {
+            printf( "%s : %s\n", leftJustify( member_name, max_name_length, ' ' ).toStringz, typeof( member_data ).stringof.toStringz );
+        }
+        */
+
     }
     if( newline ) println;
 }
