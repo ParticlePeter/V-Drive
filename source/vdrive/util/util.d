@@ -438,17 +438,20 @@ alias vkMajor = VK_VERSION_MAJOR;
 alias vkMinor = VK_VERSION_MINOR;
 alias vkPatch = VK_VERSION_PATCH;
 
-alias toUint = toUint32_t;
+alias toUint    = toUint32_t;
+alias toUint32  = toUint32_t;
 uint32_t toUint32_t( T )( T value ) if( __traits( isScalar, T )) {
     return cast( uint32_t )value;
 }
 
-alias toInt = toInt32_t;
+alias toInt     = toInt32_t;
+alias toInt32   = toInt32_t;
 int32_t toInt32_t( T )( T value ) if( __traits( isScalar, T )) {
     return cast( int32_t )value;
 }
 
-alias toUlong = toUint64_t;
+alias toUlong   = toUint64_t;
+alias toUint64  = toUint64_t;
 uint64_t toUint64_t( T )( T value ) if( __traits( isScalar, T )) {
     return cast( uint64_t )value;
 }
