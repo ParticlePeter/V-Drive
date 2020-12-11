@@ -5,8 +5,71 @@ import erupted;
 import vdrive.util;
 import vdrive.state;
 
-import core.stdc.stdio : printf;
+import core.stdc.stdio;
 import core.stdc.string : strlen;
+import core.stdc.stdlib : system;
+/// compare the timestamps of two files, implemented to be able to use nothrow @nogc
+/// currently only for Win as using OS specific API
+int compareModTime( stringz fileA, stringz fileB ) {
+    version( Windows ) {
+
+        import core.sys.windows.winbase;
+        WIN32_FILE_ATTRIBUTE_DATA fad = void;
+
+        if( !GetFileAttributesExA( fileA, GET_FILEEX_INFO_LEVELS.GetFileExInfoStandard, & fad ))
+            return int.max;
+        FILETIME modTimeA = fad.ftLastWriteTime;
+
+        if( !GetFileAttributesExA( fileB, GET_FILEEX_INFO_LEVELS.GetFileExInfoStandard, & fad ))
+            return int.max;
+        FILETIME modTimeB = fad.ftLastWriteTime;
+
+        return CompareFileTime( & modTimeA, & modTimeB );
+    }
+    else version( Posix ) {
+        /*
+        auto namez = name.tempCString();
+
+        static auto trustedStat(const(FSChar)* namez, ref stat_t buf) @trusted
+        {
+            return stat(namez, &buf);
+        }
+        stat_t statbuf = void;
+
+        static if (isNarrowString!R && is(Unqual!(ElementEncodingType!R) == char))
+            alias names = name;
+        else
+            string names = null;
+        cenforce(trustedStat(namez, statbuf) == 0, names, namez);
+
+        accessTime = statTimeToStdTime!'a'(statbuf);
+        modificationTime = statTimeToStdTime!'m'(statbuf);
+        */
+
+        return int.max;
+    }
+}
+
+
+/// read content of SpirV file (actually any file), implemented to be able to use nothrow @nogc
+strings readSpirV( const ref strings spir_path_s, ref stringb file_buffer ) {
+    FILE* file = spir_path_s.ptr.fopen( "rb" );
+
+    // checking if the file exist or not
+    if( file == null ) {
+        printf( "File %s not found!\n", spir_path_s.ptr );
+        return [];
+    }
+
+    file.fseek( 0, SEEK_END );  // jump to end
+    size_t size = file.ftell;   // tell us cursor position in bytes
+    file.fseek( 0, SEEK_SET );  // jump to start
+
+    file_buffer.length = size;
+    file_buffer.ptr.fread( 1, size, file );
+
+    return file_buffer.ptr[ 0 .. size ];
+}
 
 
 
