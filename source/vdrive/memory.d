@@ -12,9 +12,23 @@ import erupted;
 
 nothrow @nogc:
 
+
 //////////////////////////////
 // general memory functions //
 //////////////////////////////
+
+/// get the memory properties for a given physical device (gpu)
+VkPhysicalDeviceMemoryProperties memoryProperties( VkPhysicalDevice gpu ) {
+    VkPhysicalDeviceMemoryProperties memory_properties;
+    vkGetPhysicalDeviceMemoryProperties( gpu, & memory_properties );
+    return memory_properties;
+}
+
+/// get the memory properties of the Vulkan states internal physical device (vk.gpu)
+VkPhysicalDeviceMemoryProperties memoryProperties( ref Vulkan vk ) {
+    return vk.gpu.memoryProperties;
+}
+
 
 /// memory_type_bits is a bit-field where if bit i is set, it means that the VkMemoryType i
 /// of the VkPhysicalDeviceMemoryProperties structure satisfies the memory requirements.
@@ -125,7 +139,7 @@ void* mapMemory(
 
 
 /// Unmap allocated memory.
-ref Vulkan unmapMemory( ref Vulkan vk, VkDeviceMemory memory ) {
+ref Vulkan unmapMemory( ref return Vulkan vk, VkDeviceMemory memory ) {
     vk.device.vkUnmapMemory( memory );
     return vk;
 }
@@ -153,7 +167,7 @@ VkMappedMemoryRange createMappedMemoryRange(
 
 /// Flush a mapped memory range.
 ref Vulkan flushMappedMemoryRange(
-    ref Vulkan          vk,
+    ref return Vulkan   vk,
     VkDeviceMemory      memory,
     VkDeviceSize        offset  = 0,
     VkDeviceSize        size    = VK_WHOLE_SIZE,
@@ -170,7 +184,7 @@ ref Vulkan flushMappedMemoryRange(
 
 /// Flush a mapped memory range.
 ref Vulkan flushMappedMemoryRange(
-    ref Vulkan                      vk,
+    ref return Vulkan               vk,
     const ref VkMappedMemoryRange   mapped_memory_range,
     string                          file = __FILE__,
     size_t                          line = __LINE__,
@@ -184,7 +198,7 @@ ref Vulkan flushMappedMemoryRange(
 
 /// Flush multiple mapped memory ranges.
 ref Vulkan flushMappedMemoryRanges(
-    ref Vulkan                      vk,
+    ref return Vulkan               vk,
     const ref VkMappedMemoryRange[] mapped_memory_ranges,
     string                          file = __FILE__,
     size_t                          line = __LINE__,
@@ -198,7 +212,7 @@ ref Vulkan flushMappedMemoryRanges(
 
 /// Invalidate a mapped memory range.
 ref Vulkan invalidateMappedMemoryRange(
-    ref Vulkan          vk,
+    ref return Vulkan   vk,
     VkDeviceMemory      memory,
     VkDeviceSize        size    = VK_WHOLE_SIZE,
     VkDeviceSize        offset  = 0,
@@ -215,7 +229,7 @@ ref Vulkan invalidateMappedMemoryRange(
 
 /// Invalidate a mapped memory range.
 ref Vulkan invalidateMappedMemoryRange(
-    ref Vulkan                      vk,
+    ref return Vulkan               vk,
     const ref VkMappedMemoryRange   mapped_memory_range,
     string                          file = __FILE__,
     size_t                          line = __LINE__,
@@ -229,7 +243,7 @@ ref Vulkan invalidateMappedMemoryRange(
 
 /// Invalidate multiple mapped memory ranges.
 ref Vulkan invalidateMappedMemoryRanges(
-    ref Vulkan                      vk,
+    ref return Vulkan               vk,
     const ref VkMappedMemoryRange[] mapped_memory_ranges,
     string                          file = __FILE__,
     size_t                          line = __LINE__,
@@ -254,6 +268,7 @@ package template hasMemReqs( T ) {
 ///////////////////////////////////////
 
 struct Meta_Memory {
+    nothrow @nogc:
     mixin                   Vulkan_State_Pointer;
     private:
     VkDeviceMemory          device_memory;
@@ -372,13 +387,13 @@ struct Meta_Memory {
     /// but obey alignment constraints. Method accepts var args of Meta_Buffer, Meta_Image or Slices/Arrays of the same.
     auto ref allocateAndBind( Args... )( ref Args args, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
 
-        static foreach( i; 0 .. Args.length )
-            addRange!( Args[ i ] )( args[ i ], null, file, line, func );
+        foreach(  ref arg; args )
+            addRange( arg, null, file, line, func );
 
         allocate;
 
-        static foreach( i; 0 .. Args.length )
-            bind!( Args[ i ] )( args[ i ], file, line, func );
+        foreach(  ref arg; args )
+            bind( arg, file, line, func );
 
         return this;
     }
@@ -395,8 +410,8 @@ package mixin template Memory_Buffer_Image_Common() {
 
     /// map the underlying memory object and return the mapped memory pointer
     auto mapMemory(
-        VkDeviceSize        size    = 0,        // if 0, the device_memory_size will be used
         VkDeviceSize        offset  = 0,
+        VkDeviceSize        size    = 0,        // if 0, the device_memory_size will be used
         VkMemoryMapFlags    flags   = 0,        // for future use
         string              file    = __FILE__,
         size_t              line    = __LINE__,
@@ -406,10 +421,13 @@ package mixin template Memory_Buffer_Image_Common() {
         // we need to account for the buffer or image offset into its VkDeviceMemory
         static if( is( typeof( this ) == Meta_Memory )) VkDeviceSize combined_offset = offset;
         else                                            VkDeviceSize combined_offset = offset + device_memory_offset;
-        if( size == 0 ) size = memSize;    // use the attached memory size in this case
+
+        // use the passed in size only if it's greater 0, else the internal memory's size
+        VkDeviceSize data_size = size > 0 ? size : memSize;
         void* mapped_memory;
+
         vk.device
-            .vkMapMemory( device_memory, combined_offset, size, flags, & mapped_memory )
+            .vkMapMemory( device_memory, combined_offset, data_size, flags, & mapped_memory )
             .vkAssert( "Map Memory", file, line, func );
         return mapped_memory;
     }
@@ -434,11 +452,14 @@ package mixin template Memory_Buffer_Image_Common() {
     auto mapMemory(
         void[]              data,
         VkDeviceSize        offset  = 0,
+        VkDeviceSize        size    = 0,        // if 0, the passed in data's size will be used
         VkMemoryMapFlags    flags   = 0,        // for future use
         string              file    = __FILE__,
         size_t              line    = __LINE__,
         string              func    = __FUNCTION__
+
         ) {
+
         // if we want to map the memory of an underlying buffer or image,
         // we need to account for the buffer or image offset into its VkDeviceMemory
         static if( is( typeof( this ) == Meta_Memory )) VkDeviceSize combined_offset = offset;
@@ -450,8 +471,9 @@ package mixin template Memory_Buffer_Image_Common() {
         mapped_memory[ 0 .. data.length ] = data[];
 
         // required for the mapped memory flush
+        VkDeviceSize data_size = size > 0 ? size : data.length;
         VkMappedMemoryRange mapped_memory_range =
-            .createMappedMemoryRange( device_memory, data.length, combined_offset, file, line, func );
+            .createMappedMemoryRange( device_memory, combined_offset, data_size, file, line, func );
 
         // flush the mapped memory range so that its visible to the device memory space
         vk.device
@@ -541,12 +563,13 @@ package mixin template Memory_Buffer_Image_Common() {
     auto ref copyData(
         void[]              data,
         VkDeviceSize        offset  = 0,
+        VkDeviceSize        size    = 0,        // if 0, the passed in data's size will be used
         VkMemoryMapFlags    flags   = 0,        // for future use
         string              file    = __FILE__,
         size_t              line    = __LINE__,
         string              func    = __FUNCTION__
         ) {
-        mapMemory( data, offset, flags, file, line, func );   // this returns the memory pointer, and not the Meta_Struct
+        mapMemory( data, offset, size, flags, file, line, func );   // this returns the memory pointer, and not the Meta_Struct
         return unmapMemory;
     }
 }
@@ -575,7 +598,8 @@ mixin template Memory_Member() {
 
 
     auto memoryTypeIndex( VkMemoryPropertyFlags memory_property_flags ) {
-        return vk.memory_properties.memoryTypeIndex( memory_requirements, memory_property_flags );
+        auto mem_props = vk.memory_properties;
+        return mem_props.memoryTypeIndex( memory_requirements, memory_property_flags );
     }
 
 
