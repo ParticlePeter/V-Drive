@@ -83,16 +83,17 @@ ref Log_Info logInfo( string file = __FILE__, size_t line = __LINE__, string fun
 //
 
 /// check bool condition with optional message
-void vkAssert(
+VkResult vkAssert(
     VkResult        vk_result,
     ref Log_Info    log_info,   //    = logInfo,    // System does not work, carries 1 file line func too late.
     const( char )*  msg_end     = null
     ) nothrow @nogc {
     vk_result.vkAssert( null, logInfo, msg_end );
+    return vk_result;
 }
 
 /// check bool condition
-void vkAssert(
+VkResult vkAssert(
     VkResult        vk_result,
     const( char )*  message,
     ref Log_Info    log_info,   //    = logInfo,    // System does not work, carries 1 file line func too late.
@@ -104,6 +105,7 @@ void vkAssert(
         printHelper( message, logInfo, msg_end );
     }
     assert( vk_result == VK_SUCCESS );
+    return vk_result;
 }
 
 /// check bool condition with optional message
@@ -153,7 +155,7 @@ void printHelper(
 //
 
 /// check the correctness of a vulkan result with optional message
-void vkAssert(
+VkResult vkAssert(
     VkResult        vk_result,
     string          file = __FILE__,
     size_t          line = __LINE__,
@@ -161,10 +163,11 @@ void vkAssert(
     const( char )*  msg_end = null
     ) nothrow @nogc {
     vk_result.vkAssert( null, file, line, func, msg_end );
+    return vk_result;
 }
 
 /// check the correctness of a vulkan result with additinal message(s)
-void vkAssert(
+VkResult vkAssert(
     VkResult        vk_result,
     const( char )*  message,
     string          file = __FILE__,
@@ -178,6 +181,7 @@ void vkAssert(
         printHelper( message, file, line, func, msg_end );
     }
     assert( vk_result == VK_SUCCESS );
+    return vk_result;
 }
 
 /// check bool condition with optional message
@@ -317,6 +321,7 @@ void listVulkanProperty( Result_AT, alias vkFunc, Args... )( ref Result_AT resul
             if( count == 0 ) break;
             result.length( count, file, line, func );
             vk_result = vkFunc( args, & count, result.ptr );
+            vkAssert( vk_result != VK_INCOMPLETE, "VK_INCOMPLETE result detected!", file, line, func ); // check if everything went right
         } while( vk_result == VK_INCOMPLETE );
 
         vk_result.vkAssert( file, line, func ); // check if everything went right
