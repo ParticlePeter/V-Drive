@@ -382,7 +382,19 @@ template isDynamicResult( T ) { enum isDynamicResult = is( typeof( isDynamicResu
 private void isDynamicResultImpl( R, Q )( Dynamic_Result!( R, Q ) result ) {}
 
 
+struct Static_Result( Result_T, QT, uint Capacity ) {
+    alias   Query_T = QT;
+    alias   Array_T = Static_Array!( Result_T, Capacity );
+    alias   array this;
+    Query_T query;
+    Array_T array;
+}
 
+template isStaticResult( T ) { enum isStaticResult = is( typeof( isStaticResultImpl( T.init ))); }
+private void isStaticResultImpl( R, Q, uint C )( Static_Result!( R, Q, C ) result ) {}
+
+
+template isDynamicOrStaticResult( T ) { enum isDynamicOrStaticResult = isDynamicResult!T || isStaticResult!T; }
 
 //auto listVulkanProperty( Result_T, alias vkFunc, Args... )( ref Arena_Array arena, string file, size_t line, string func, Args args ) {
 //    alias Result_AT = Block_Array!( Result_T );

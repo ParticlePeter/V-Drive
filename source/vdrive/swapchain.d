@@ -119,7 +119,7 @@ auto ref listPresentModes( Result_T )(
     size_t          line = __LINE__,
     string          func = __FUNCTION__
 
-    ) if( isScratchResult!Result_T || isDynamicResult!Result_T ) {
+    ) if( isScratchResult!Result_T || isDynamicOrStaticResult!Result_T ) {
 
     // extract gpu member based on template argument
     static if( isScratchResult!Result_T )   auto gpu = present_modes.vk.gpu;
@@ -161,7 +161,10 @@ auto listPresentModes(
 
     ) {
 
-    auto present_modes = Dynamic_Result!( VkPresentModeKHR, VkPhysicalDevice )( gpu );
+    // Static_Result count should not be set to VK_PRESENT_MODE_RANGE_SIZE_KHR, as that count leaves out extension entries.
+    // It is more future proof to get the count of entries and subtract the four meta entries at the end of the enum
+    // using: __traits( allMembers, VkPresentModeKHR ).length - 4
+    auto present_modes = Static_Result!( VkPresentModeKHR, VkPhysicalDevice, __traits( allMembers, VkPresentModeKHR ).length - 4 )( gpu );
     listPresentModes!( typeof( present_modes ))( present_modes, surface, print_info, file, line, func );
     return present_modes.array.release;
 }
