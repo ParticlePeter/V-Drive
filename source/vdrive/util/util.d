@@ -328,7 +328,7 @@ void listVulkanProperty( Result_AT, alias vkFunc, Args... )( ref Result_AT resul
 
 /// general templated function to enumarate any vulkan property
 /// see usage in module surface or module util.info
-/// this overload uses a static (stack) stack memory, size passed in as template argument, as result
+/// this overload uses a static stack memory, size passed in as template argument, as result
 auto listVulkanProperty( int32_t size, Result_T, alias vkFunc, Args... )( string file, size_t line, string func, Args args ) {
     static assert( size > 0, "Size greate zero mandatory" );
     static if( size == int32_t.max )    alias Result_AT = Dynamic_Array!( Result_T );
@@ -340,7 +340,7 @@ auto listVulkanProperty( int32_t size, Result_T, alias vkFunc, Args... )( string
 
 
 /// general templated function to enumarate any vulkan property
-/// see usage in module surface or module util.info
+/// see usage in module swapchain or module util.info
 auto listVulkanProperty( Result_T, alias vkFunc, Args... )( string file, size_t line, string func, Args args ) {
     alias Result_AT = Dynamic_Array!( Result_T );
     Result_AT result;
