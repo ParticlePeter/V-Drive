@@ -240,6 +240,7 @@ enum Swapchain_Member_Copy : uint32_t {
     Queue       = 1,
     Extent      = 2,
     Format      = 4,
+    PresentMode = 8,
 };
 
 
@@ -262,10 +263,11 @@ struct Core_Swapchain_T( int32_t max_image_count, uint32_t member_copies = SMC.N
 
     VkSurfaceKHR    surface;
     VkSwapchainKHR  swapchain;
-    D_OR_S_ARRAY!(  VkImageView, max_image_count )      image_views;
-    static if( mc & SMC.Queue  )        VkQueue         present_queue;
-    static if( mc & SMC.Extent )        VkExtent2D      image_extent;
-    static if( mc & SMC.Format )        VkFormat        image_format;
+    D_OR_S_ARRAY!(  VkImageView, max_image_count )          image_views;
+    static if( mc & SMC.Queue  )        VkQueue             present_queue;
+    static if( mc & SMC.Extent )        VkExtent2D          image_extent;
+    static if( mc & SMC.Format )        VkFormat            image_format;
+    static if( mc & SMC.PresentMode )   VkPresentModeKHR    present_mode;
 
     auto image_count()                  { return image_views.length.toUint; }
 
@@ -360,7 +362,8 @@ struct Meta_Swapchain_T( int32_t max_image_count, uint member_copies = SMC.None 
                                                     out_core.swapchain      = resetHandle( swapchain );
                                                     out_core.image_views    = image_views.release;
         static if( mc & SMC.Extent  )               out_core.image_extent   = swapchain_ci.imageExtent;
-        static if( mc & SMC.Format  )               out_core.image_format   = swapchain_ci.imageFformat;
+        static if( mc & SMC.Format  )               out_core.image_format   = swapchain_ci.imageFormat;
+        static if( mc & SMC.PresentMode )           out_core.present_mode   = swapchain_ci.presentMode;
         static if( mc & SMC.Queue   )           if( out_core.present_queue.is_null_handle && !present_queue.is_null_handle )
                                                     out_core.present_queue  = resetHandle( present_queue );
 
