@@ -1,16 +1,12 @@
 module vdrive.state;
 
 import core.stdc.stdio : printf;
-import std.string : fromStringz;
-
-import erupted;
 
 import vdrive.util;
 
-// Todo(pp): enable
-//nothrow @nogc:
+import erupted;
 
-bool verbose = true;
+
 
 
 mixin template Vulkan_State_Pointer() {
@@ -50,6 +46,7 @@ struct Vulkan {
 template isVulkan( T ) { enum isVulkan = is( T == Vulkan ); }
 
 
+/// this struct is not in util.util to avoid dependency on state
 struct Scratch_Result( Result_T ) {
     private Vulkan* vk_ptr;
     alias           array this;
@@ -64,7 +61,7 @@ struct Scratch_Result( Result_T ) {
     ref Vulkan vk()         { return * vk_ptr; }
     bool isValid()          { return vk_ptr !is null; }
 
-    this( ref Vulkan vk, size_t count = 0 )   {
+    this( ref Vulkan vk, size_t count = 0 ) {
         vk_ptr = & vk;
         array = Array_T( vk.scratch );
         if( count > 0 ) {
@@ -173,8 +170,6 @@ template is_non_dispatch_handle( T ) {
     ||  is( T == VkDescriptorUpdateTemplateKHR )
     ||  is( T == VkDebugReportCallbackEXT )
     ||  is( T == VkDebugUtilsMessengerEXT )
-    ||  is( T == VkObjectTableNVX )
-    ||  is( T == VkIndirectCommandsLayoutNVX )
     ) {
         enum bool is_non_dispatch_handle = true;
     } else {
