@@ -10,11 +10,11 @@ import vdrive.util.util : vkAssert;
 /// Params:
 ///     vk = reference to a VulkanState struct
 ///     fence_create_flags = optional: only flag is VK_FENCE_CREATE_SIGNALED_BIT
-/// Returns: VkFence 
+/// Returns: VkFence
 auto createFence( ref Vulkan vk, VkFenceCreateFlags fence_create_flags = 0 ) {
     VkFenceCreateInfo fence_create_info = { flags : fence_create_flags };
     VkFence fence;
-    vkCreateFence( vk.device, &fence_create_info, vk.allocator, &fence ).vkAssert;
+    vkCreateFence( vk.device, & fence_create_info, vk.allocator, & fence ).vkAssert;
     return fence;
 }
 
@@ -24,11 +24,11 @@ auto createFence( ref Vulkan vk, VkFenceCreateFlags fence_create_flags = 0 ) {
 /// if this changes in a later release ( current v1.0.42 ) an optional parameter will be added
 /// Params:
 ///     vk = reference to a VulkanState struct
-/// Returns: VkSemaphore 
+/// Returns: VkSemaphore
 auto createSemaphore( ref Vulkan vk ) {
     VkSemaphoreCreateInfo semaphore_create_info;
     VkSemaphore semaphore;
-    vkCreateSemaphore( vk.device, &semaphore_create_info, vk.allocator, &semaphore ).vkAssert;
+    vkCreateSemaphore( vk.device, & semaphore_create_info, vk.allocator, & semaphore ).vkAssert;
     return semaphore;
 }
 
@@ -38,10 +38,10 @@ auto createSemaphore( ref Vulkan vk ) {
 /// if this changes in a later release ( current v1.0.42 ) an optional parameter will be added
 /// Params:
 ///     vk = reference to a VulkanState struct
-/// Returns: VkEvent 
+/// Returns: VkEvent
 auto createEvent( ref Vulkan vk ) {
     VkEventCreateInfo event_create_info;
     VkEvent event;
-    vkCreateEvent( vk.device, &event_create_info, vk.allocator, &event ).vkAssert;
+    vkCreateEvent( vk.device, & event_create_info, vk.allocator, & event ).vkAssert;
     return event;
 }
