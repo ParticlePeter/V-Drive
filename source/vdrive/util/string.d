@@ -11,6 +11,8 @@ import core.stdc.stdio  : printf;
 import core.stdc.string : memcpy;
 
 alias stringz = const( char )*;
+alias strings = const( char )[];
+alias stringb = Block_Array!char;
 
 
 
