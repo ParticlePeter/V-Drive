@@ -8,6 +8,11 @@ import vdrive.state;
 import core.stdc.stdio;
 import core.stdc.string : strlen;
 import core.stdc.stdlib : system;
+
+
+nothrow @nogc:
+
+
 /// compare the timestamps of two files, implemented to be able to use nothrow @nogc
 /// currently only for Win as using OS specific API
 int compareModTime( stringz fileA, stringz fileB ) {
@@ -105,10 +110,10 @@ VkShaderModule createShaderModule(
 
     if( ext != ".spv" ) {
 
-        spir_path.reserve( strlen( shader_path ) + 5 );           // we will append the new extension ".spv" + terminationg '\0'
+        spir_path.reserve( strlen( shader_path ) + 5 );             // we will append the new extension ".spv" + terminating '\0'
         spir_path.append( shader_path_s );
         spir_path[ $ - ext.length ] = '_';                          // substitute the . of .ext with _ to _ext
-        spir_path.append( ".spv" );                                 // append new extension .spv
+        spir_path.append( ".spv\0" );                               // append new extension .spv
 
         // assert that either the original or the newly composed path exist
         bool glsl_path_exists = shader_path_s.exists;               // check if the original file, which must be a glsl file, exists
@@ -117,25 +122,17 @@ VkShaderModule createShaderModule(
             "Neither path to glsl code nor path to corresponding spv exist: ",
             file, line, func, shader_path );
 
-        if( glsl_path_exists && spir_up_to_date ) {                 // if both files exists, check if the spir-v is up to date with the glsl source
-            import std.file : getTimes;                             // need to get the modification times of the files
-            import std.datetime : SysTime;                          // stored in comparable SysTimes
-            SysTime access_time, glsl_mod_time, spir_mod_time;      // access times are irrelevant
-            spir_path.data.getTimes( access_time, spir_mod_time );  // get spir-v file times (.spv)
-            shader_path_s.getTimes( access_time, glsl_mod_time );   // get glsl file times
-            spir_up_to_date = glsl_mod_time < spir_mod_time;        // set the spir_up_to_date value if glsl is newer than spir-v
-        }
+        if( glsl_path_exists && spir_up_to_date )                   // if both files exists, check if the spir-v is up to date with the glsl source
+            spir_up_to_date = compareModTime( shader_path, spir_path.ptr ) < 0;   // set the spir_up_to_date value if glsl is newer than spir-v
 
         if( !spir_up_to_date ) { // not using 'else', as spir_up_to_date might have changed in the if clause above
-            import std.process : execute;                           // use process execute to call glslangValidator
-            const(char)[][6] compile_glsl_args = [ "glslangValidator", "-V", "-w", "-o", spir_path.data, shader_path_s ];
-            auto compile_glsl = compile_glsl_args.execute;          // store in status struct
-            vkAssert( compile_glsl.status == 0,                     // assert that compilation went right, othervise include compilation error into assert message
-                "SPIR-V is not generated for failed compile or link : ",
-                file, line, func, compile_glsl.output.ptr
-            );
-            auto output_z = compile_glsl.output.toStringz;
-            printf( "Compiled: %s", output_z.ptr );                 // print output to signal that a shader has been (re)compiled
+            char[256] compile_glsl_command;
+            compile_glsl_command.ptr.sprintf( "glslangValidator -V -w -o %s %s", spir_path.ptr, shader_path );
+            auto compile_glsl = system( compile_glsl_command.ptr );
+
+            vkAssert( compile_glsl == 0,                            // assert that compilation went right, othervise include compilation error into assert message
+                "SPIR-V is not generated for failed compile or link : ", file, line, func/*, compile_glsl.output.ptr*/ );
+            printf( "Compiled: %s", shader_path );
         }
         shader_path_s = spir_path.data;                               // overwrite the string path parameter with the composed char array back into
     }
@@ -145,12 +142,8 @@ VkShaderModule createShaderModule(
         "Path to Spir-V does not exist: ",
         file, line, func, shader_path );
 
-    import std.conv : to;
-    import std.stdio : File;
-    auto shader_file = File( shader_path_s.to!string );
-    auto read_buffer = Block_Array!char( vk.scratch );
-    read_buffer.length = shader_file.size;
-    auto code = shader_file.rawRead( read_buffer.data );
+    auto file_buffer = Block_Array!char( vk.scratch );
+    auto code = readSpirV( shader_path_s, file_buffer );
 
     VkShaderModuleCreateInfo shader_module_create_info = {
         codeSize    : cast( uint32_t  )code.length,
@@ -171,6 +164,9 @@ VkShaderModule createShaderModule(
 
     return shader_module;
 }
+
+
+//nothrow @nogc:
 
 
 /// create a VkPipelineShaderStageCreateInfo acceptable for a pipeline state object (PSO)
