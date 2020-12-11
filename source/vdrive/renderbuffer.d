@@ -8,6 +8,8 @@ import vdrive.state;
 import erupted;
 
 
+nothrow @nogc:
+
 
 ///////////////////////////////////////
 // Meta_Subpass and Meta_Render_Pass //
@@ -19,7 +21,10 @@ private struct Meta_Subpass_T(
     int32_t color_ref_count,
     int32_t resolve_ref_count,
     int32_t preserve_ref_count,
+
     ) {
+
+    nothrow @nogc:
     alias ir_count = input_ref_count;
     alias cr_count = color_ref_count;
     alias rr_count = resolve_ref_count;
@@ -60,12 +65,14 @@ private void isRenderPassImpl( int32_t a, int32_t b, int32_t c, int32_t d, int32
 /// after construction so that the Meta_Descriptor_Layout can be reused
 /// after being reset
 struct Core_Render_Pass {
-    VkRenderPassBeginInfo           render_pass_bi;     // the actual render pass is stored in a member of this struct
-    ref VkRenderPass                render_pass() { return render_pass_bi.renderPass; }
+    nothrow @nogc:
+    VkRenderPassBeginInfo   render_pass_bi; // the actual render pass is stored in a member of this struct
+    ref VkRenderPass        render_pass() return {
+        return render_pass_bi.renderPass;
+    }
 
     /// query if internal VkRenderPass is null_handle
     bool is_null() { return render_pass_bi.renderPass.is_null_handle; }
-
 }
 
 
@@ -75,7 +82,7 @@ struct Core_Render_Pass {
 ///     core    = the wrapped VkDescriptorPool ( with it the VkDescriptorSet ) and the VkDescriptorSetLayout to destroy
 /// Returns: this reference for function chaining
 void destroy( ref Vulkan vk, ref Core_Render_Pass core ) {
-    vdrive.state.destroy( vk, core.render_pass );          // no nice syntax, vdrive.state.destroy overloads
+    vk.destroyHandle( core.render_pass );
 }
 
 
@@ -87,7 +94,11 @@ struct Meta_Render_Pass_T(
     int32_t max_color_ref_count,
     int32_t max_resolve_ref_count,
     int32_t max_preserve_ref_count,
+
     ) {
+
+    nothrow @nogc:
+
     mixin                           Vulkan_State_Pointer;
     ref VkRenderPass                render_pass() { return render_pass_bi.renderPass; }
     VkRenderPassBeginInfo           render_pass_bi;     // the actual render pass is stored in a member of this struct
@@ -121,8 +132,9 @@ struct Meta_Render_Pass_T(
     }
 
 
+
     void destroyResources() {
-        vk.device.vkDestroyRenderPass( render_pass, vk.allocator );
+        vk.destroyHandle( render_pass );
     }
 
 

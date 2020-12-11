@@ -9,6 +9,8 @@ import vdrive.buffer;
 import erupted;
 
 
+nothrow @nogc:
+
 
 mixin template Meta_Geometry_Alias_This() {
     this( ref Vulkan vk )   {   meta_geometry.meta_buffer.vk = vk;  }
@@ -26,6 +28,7 @@ struct Meta_Geometry_T(
 
     ) {
 
+    nothrow @nogc:
     this( ref Vulkan vk )   {  this.meta_buffer.vk = vk;  }
     alias                                               meta_buffer this;
     Meta_Buffer                                         meta_buffer;

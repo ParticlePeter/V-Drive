@@ -341,6 +341,7 @@ template isCharArray( A ) { enum isCharArray = isDataArrayOrSlice!( A, char ); }
  */
 
 
+/*
 /// Transforms the given `input` into snake_case
 /// This precomiled regex version does not work at compile time as regex uses malloc
 string snakeCase( const string input ) {
@@ -471,3 +472,4 @@ unittest {
     assert( "http_response_code".camelCase(true) == "HttpResponseCode" );
     assert( "http_response_code_xyz".camelCase(true) == "HttpResponseCodeXyz" );
 }
+*/

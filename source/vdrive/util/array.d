@@ -12,9 +12,12 @@ import core.stdc.stdio  : printf;
 import vdrive.util.util : Log_Info, vkAssert;
 
 
+nothrow @nogc:
+
 
 /// Dynamic Array, non-copyable to avoid unnecessary data duplication
 struct Dynamic_Array( T, ST = uint ) {
+    nothrow @nogc:
     alias   Val_T   = T;
     alias   Size_T  = ST;
     private Val_T*  Data        = null;
@@ -271,6 +274,7 @@ alias BLink = Block_Link;
 
 
 struct Arena_Array_T( ST = uint ) {   //, bool biderectional = false ) {
+    nothrow @nogc:
     alias                       Size_T = ST;
     DArray!( ubyte, Size_T )    Source;
     alias                       Source this;
@@ -395,6 +399,7 @@ alias AArray = Arena_Array;
 
 /// Dynamic Array, non-copyable to avoid unnecessary data duplication
 struct Block_Array( T, ST = uint ) {
+    nothrow @nogc:
     alias                   Val_T   = T;
     alias                   Size_T  = ST;
     alias                   Arena_T = Arena_Array_T!Size_T;
@@ -653,6 +658,7 @@ alias BArray = Block_Array;
 /// Static array mimicking a dynamic one. Data ends up on stack, and can not be reallocated
 /// the array has still a capacity and length of how many elements are in use
 struct Static_Array( T, uint Capacity, ST = uint ) {
+    nothrow @nogc:
     alias   Val_T   = T;
     alias   Size_T  = ST;
     private Val_T[ Capacity ]   Data;
@@ -758,6 +764,7 @@ alias SArray = Static_Array;
 /// it is useful in place where no data is required in meta structs
 /// but when (dummy) methods are required for static validation
 private struct Empty_Array( T, ST = uint ) {
+    nothrow @nogc:
     alias   Val_T   = T;
     alias   Size_T  = ST;
     //T[] data() { return null[0..0]; }

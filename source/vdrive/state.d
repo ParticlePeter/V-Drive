@@ -7,13 +7,14 @@ import vdrive.util;
 import erupted;
 
 
+nothrow @nogc:
 
 
 mixin template Vulkan_State_Pointer() {
+    nothrow @nogc:
     private Vulkan*         vk_ptr;
     alias                   vk this;
 
-    nothrow @nogc:
     this( ref Vulkan vk )               { vk_ptr = & vk; }
     ref Vulkan vk()                     { return * vk_ptr; }
     void vk( ref Vulkan vk )            { vk_ptr = & vk; }
@@ -24,6 +25,7 @@ mixin template Vulkan_State_Pointer() {
 
 // Todo(pp): rename to Vulkan_State, rename as well occurrences of: ///     vk = reference to a VulkanState struct
 struct Vulkan {
+    nothrow @nogc:
     const( VkAllocationCallbacks )*     allocator = null;
     VkInstance                          instance = VK_NULL_HANDLE;
     VkDevice                            device = VK_NULL_HANDLE;
@@ -48,6 +50,7 @@ template isVulkan( T ) { enum isVulkan = is( T == Vulkan ); }
 
 /// this struct is not in util.util to avoid dependency on state
 struct Scratch_Result( Result_T ) {
+    nothrow @nogc:
     private Vulkan* vk_ptr;
     alias           array this;
     alias           Array_T = Block_Array!Result_T;

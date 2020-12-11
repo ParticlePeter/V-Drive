@@ -8,6 +8,9 @@ import vdrive.state;
 import erupted;
 
 
+nothrow @nogc:
+
+
 ////////////////////////////////////////////
 // Meta_Graphics and Meta_Compute related //
 ////////////////////////////////////////////
@@ -113,6 +116,7 @@ VkPipelineCache createPipelineCache(
 /// after construction so that the Meta_Descriptor_Layout can be reused
 /// after being reset
 struct Core_Pipeline {
+    nothrow @nogc:
     VkPipeline              pipeline;
     VkPipelineLayout        pipeline_layout;
     bool is_null() { return pipeline.is_null_handle; }      // query if internal pso is null_handle
@@ -184,6 +188,7 @@ struct Meta_Graphics_T(
 
     ) {
 
+    nothrow @nogc:
     mixin                                               Vulkan_State_Pointer;
     VkPipeline                                          pipeline;
     VkPipelineCreateFlags                               pipeline_create_flags;

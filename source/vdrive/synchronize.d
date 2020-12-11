@@ -6,6 +6,9 @@ import vdrive.state;
 import vdrive.util.util : vkAssert;
 
 
+nothrow @nogc:
+
+
 /// create a VkFence
 /// Params:
 ///     vk = reference to a VulkanState struct

@@ -10,6 +10,8 @@ import erupted;
 import std.stdio;
 
 
+nothrow @nogc:
+
 
 ////////////////////////////
 // utility info functions //
@@ -158,7 +160,7 @@ auto ref listPresentModes( Result_T )(
 
             }
         }
-        writeln;
+        println;
     }
     return present_modes.array;
 }
@@ -286,6 +288,7 @@ alias   Core_Swapchain_Queue_Extent_T( uint ic )    = Core_Swapchain_T!( ic, SMC
 /// after construction so that the Meta_Image_Sampler_T can be reused
 /// after being reset.
 struct Core_Swapchain_T( int32_t max_image_count, uint32_t member_copies = SMC.None ) if( max_image_count > 0 ) {
+    nothrow @nogc:
     alias ic = max_image_count;
     alias mc = member_copies;
 
@@ -333,6 +336,7 @@ alias Meta_Swapchain_T( T ) = Meta_Swapchain_T!( T.ic, T.mc );
 /// the struct can travel through several methods and can be filled with necessary data
 /// first thing after creation of this struct must be the assignment of the address of a valid vulkan state struct
 struct Meta_Swapchain_T( int32_t max_image_count, uint member_copies = SMC.None )  if( max_image_count > 0 ) {
+    nothrow @nogc:
     alias ic = max_image_count;
     alias mc = member_copies;
 

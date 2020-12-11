@@ -45,16 +45,17 @@ enum LOG_CHAR_SIZE = 256;
 
 /// capture __FILE__, __LINE__, __FUNCTION__ into one struct converting it to printf friendly cstrings
 struct Log_Info {
+    nothrow @nogc:
+    size_t              line;
     char[LOG_CHAR_SIZE] file;
     char[LOG_CHAR_SIZE] func;
-    size_t              line;
-    this( string FUNC, string FILE = __FILE__, size_t LINE = __LINE__ ) nothrow @nogc {
+    this( string FUNC, string FILE = __FILE__, size_t LINE = __LINE__ ) {
         file[ 0 .. FILE.length ] = FILE[];  file[ FILE.length ] = '\0';
         func[ 0 .. FUNC.length ] = FUNC[];  func[ FUNC.length ] = '\0';
         line = LINE;
     }
 
-    ref Log_Info opCall( string FUNC, string FILE = __FILE__, size_t LINE = __LINE__ ) nothrow @nogc {
+    ref Log_Info opCall( string FUNC, string FILE = __FILE__, size_t LINE = __LINE__ ) return {
         file[ 0 .. FILE.length ] = FILE[];  file[ FILE.length ] = '\0';
         func[ 0 .. FUNC.length ] = FUNC[];  func[ FUNC.length ] = '\0';
         line = LINE;
@@ -427,11 +428,6 @@ template isDynamicOrStaticResult( T ) { enum isDynamicOrStaticResult = isDynamic
 //
 //    return result.release;
 //}
-
-
-
-
-nothrow:
 
 
 alias vkMajor = VK_VERSION_MAJOR;

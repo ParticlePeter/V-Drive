@@ -9,6 +9,8 @@ import vdrive.memory;
 import erupted;
 
 
+nothrow @nogc:
+
 
 /////////////////////////////////////////////
 // VkImage, VkImageView, VkSampler related //
@@ -171,7 +173,9 @@ VkImage createImage(
     string                  file    = __FILE__,
     size_t                  line    = __LINE__,
     string                  func    = __FUNCTION__
+
     ) {
+
     return vk.createImage(
         format, width, height, depth, mip_levels, array_layers, usage, samples,
         tiling, initial_layout, sharing_queue_family_indices, flags,
@@ -451,6 +455,7 @@ alias   Core_Image_Memory_T( uint vc, uint sc, uint mc = 0) = Core_Image_T!( vc,
 /// after construction so that the Meta_Image_Sampler_T can be reused
 /// after being reset.
 struct  Core_Image_T( uint view_count, uint sampler_count, uint member_copies = IMC.None ) {
+    nothrow @nogc:
     alias vc = view_count;
     alias sc = sampler_count;
     alias mc = member_copies;
@@ -517,6 +522,7 @@ alias   Meta_Image_T( T ) = Meta_Image_T!( T.vc, T.sc, T.mc );
 /// first thing after creation of this struct must be the assignment of the address of a
 /// valid vulkan state struct. VkImageView(s) and VkSampler(s) are statically optional.
 struct  Meta_Image_T( uint view_count, uint sampler_count, uint member_copies = IMC.None ) {
+    nothrow @nogc:
     alias                   vc = view_count;
     alias                   sc = sampler_count;
     alias                   mc = member_copies;
@@ -706,6 +712,7 @@ alias  Meta_IView = Meta_IView_T!1;
 /// Meta struct to configure and construct a VkImageView.
 /// Must be initialized with a Vulkan state struct.
 struct Meta_IView_T( uint32_t view_count ) {
+    nothrow @nogc:
     mixin Vulkan_State_Pointer;
     mixin IView_Member!view_count;
     alias construct = constructView;
@@ -716,6 +723,7 @@ alias Meta_Sampler = Meta_Sampler_T!1;
 /// Meta struct to configure and construct a VkSampler.
 /// Must be initialized with a Vulkan state struct.
 struct Meta_Sampler_T( uint32_t sampler_count ) {
+    nothrow @nogc:
     mixin Vulkan_State_Pointer;
     mixin Sampler_Member!sampler_count;
     alias construct = constructSampler;

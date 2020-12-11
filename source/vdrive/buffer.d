@@ -9,6 +9,8 @@ import vdrive.memory;
 import erupted;
 
 
+nothrow @nogc:
+
 
 ///////////////////////////////
 // VkBuffer and VkBufferView //
@@ -176,6 +178,7 @@ alias   Core_Buffer_Memory_T( uint vc, uint mc = 0) = Core_Buffer_T!( vc, BMC.Me
 /// after construction so that the Meta_Image_Sampler_T can be reused
 /// after being reset.
 struct  Core_Buffer_T( uint32_t view_count, uint32_t member_copies = BMC.None ) {
+    nothrow @nogc:
     alias vc = view_count;
     alias mc = member_copies;
 
@@ -234,6 +237,7 @@ alias   Meta_Buffer_T( T )      = Meta_Buffer_T!( T.vc, T.mc );
 /// and memSeize, which is the size of the memory range attached to the VkBuffer
 /// They might differ based on memory granularity and alignment, but both should be safe for memory mapping
 struct Meta_Buffer_T( uint32_t view_count, uint32_t member_copies = BMC.None ) {
+    nothrow @nogc:
     alias   vc = view_count;
     alias   mc = member_copies;
     mixin   Vulkan_State_Pointer;

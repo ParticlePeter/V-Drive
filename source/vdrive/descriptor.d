@@ -8,6 +8,8 @@ import vdrive.state;
 debug import core.stdc.stdio : printf;
 
 
+nothrow @nogc:
+
 
 /////////////////////
 // Descriptor Pool //
@@ -271,11 +273,13 @@ void destroy( ref Vulkan vk, ref Core_Descriptor core ) {
 /// must be initialized with a Vulkan state struct
 alias Meta_Descriptor_Layout = Meta_Descriptor_Layout_T!();
 struct Meta_Descriptor_Layout_T(
+
     int32_t set_layout_binding_count    = int32_t.max,
     int32_t immutable_sampler_count     = int32_t.max,
 
     ) {
 
+    nothrow @nogc:
     mixin                               Vulkan_State_Pointer;
     private VkDescriptorPool            m_descriptor_pool = VK_NULL_HANDLE;          // this must not be directly set able other than from module
     auto descriptor_pool()              { return m_descriptor_pool; }                // use getter function to get a copy
@@ -654,6 +658,7 @@ struct Descriptor_Update_T(
 
     ) {
 
+    nothrow @nogc:
     D_OR_S_ARRAY!( VkWriteDescriptorSet,    write_set_count )       write_descriptor_sets;          // write descriptor sets in case we want to update the set
     D_OR_S_ARRAY!( VkDescriptorImageInfo,   image_info_count )      image_infos;                    // slices of these three members ...
     D_OR_S_ARRAY!( VkDescriptorBufferInfo,  buffer_info_count )     buffer_infos;                   // ... can be associated with ...
@@ -1045,6 +1050,7 @@ struct Meta_Descriptor_T(
 
     ) {
 
+    nothrow @nogc:
     alias Layout_T = Meta_Descriptor_Layout_T!(
         set_layout_binding_count,
         immutable_sampler_count );
@@ -1513,6 +1519,7 @@ struct Meta_Descriptor_T(
 
 /// private struct to help store count of immutable samplers and starting index into immutable_samplers array
 private struct Pack_Index_And_Count {
+    nothrow @nogc:
     this( uint32_t dc ) { descriptor_count = dc; }
     union {
         uint32_t descriptor_count;
