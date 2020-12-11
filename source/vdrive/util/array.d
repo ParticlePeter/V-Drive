@@ -398,7 +398,7 @@ struct Block_Array( T, ST = uint ) {
     alias                   Val_T   = T;
     alias                   Size_T  = ST;
     alias                   Arena_T = Arena_Array_T!Size_T;
-    alias                   BLink_T =  BLink!Size_T;
+    alias                   BLink_T = BLink!Size_T;
 
     private BLink_T         Link;
     private Arena_T*        Arena   = null;
