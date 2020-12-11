@@ -83,20 +83,24 @@ strings readSpirV( const ref strings spir_path_s, ref stringb file_buffer ) {
 ///     vk = reference to a VulkanState struct
 ///     shader_path = the path to glsl or spir-v file
 /// Returns: VkShaderModule
-auto createShaderModule(
+VkShaderModule createShaderModule(
     ref Vulkan  vk,
     stringz     shader_path,
     string      file = __FILE__,
     size_t      line = __LINE__,
     string      func = __FUNCTION__
+
     ) {
+
     import std.file : exists;
     import std.path : extension;
 
-    import std.string : fromStringz;
-    auto shader_path_s = shader_path.fromStringz;
+    strings shader_path_s = shader_path.fromStringz;
 
-    auto ext = shader_path_s.extension;                             // get extension of path argument, must compile non .spv extension files
+    // assert that the passed in file exist
+    vkAssert( shader_path_s.exists, "Path to GLSL or Spir-V does not exist: ", file, line, func, shader_path );
+
+    strings ext = shader_path_s.extension;                          // get extension of path argument, must compile non .spv extension files
     auto spir_path = Block_Array!char( vk.scratch );                // temporary to compose shader_path_s to spir_v file if no changes occured
 
     if( ext != ".spv" ) {
@@ -179,7 +183,7 @@ auto createShaderModule(
 ///                         multiple entry points ( e.g. shader stages )
 ///     specialization_info = optionally set a VkSpecializationInfo for the shader module
 /// Returns: VkPipelineShaderStageCreateInfo
-auto createPipelineShaderStage(
+VkPipelineShaderStageCreateInfo createPipelineShaderStage(
     ref Vulkan                      vk,
     VkShaderStageFlagBits           shader_stage,
     VkShaderModule                  shader_module,
@@ -209,7 +213,7 @@ auto createPipelineShaderStage(
 ///                         multiple entry points ( e.g. shader stages )
 ///     specialization_info = optionally set a VkSpecializationInfo for the shader module
 /// Returns: VkPipelineShaderStageCreateInfo
-auto createPipelineShaderStage(
+VkPipelineShaderStageCreateInfo createPipelineShaderStage(
     ref Vulkan                      vk,
     VkShaderStageFlagBits           shader_stage,
     stringz                         shader_path,
@@ -238,7 +242,7 @@ auto createPipelineShaderStage(
 ///                         multiple entry points ( e.g. shader stages )
 ///     specialization_info = optionally set a VkSpecializationInfo for the shader module
 /// Returns: VkPipelineShaderStageCreateInfo
-auto createPipelineShaderStage(
+VkPipelineShaderStageCreateInfo createPipelineShaderStage(
     ref Vulkan                      vk,
     stringz                         shader_path,
     const( VkSpecializationInfo )*  specialization_info = null,
@@ -251,7 +255,6 @@ auto createPipelineShaderStage(
 
     // must convert to const(char)[] to be able to use extension function
     import std.path : extension;
-    import std.string : fromStringz;
     auto shader_path_s = shader_path.fromStringz;
     auto ext = shader_path_s.extension;        // get extension of path argument
     vkAssert( ext != ".spv",
