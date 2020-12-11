@@ -7,6 +7,40 @@ import core.stdc.stdio : printf;
 import core.stdc.string : memcpy;
 
 
+nothrow @nogc:
+
+
+// mixin template which creates to inner struct forwarding functions
+mixin template Forward_To_Inner_Struct( inner, string path, ignore... ) {
+
+    // helper template for skipping members
+    template skipper( string target ) { enum shouldSkip( string s ) = ( s == target ); }
+
+    import std.meta : anySatisfy;
+    static foreach( member; __traits( allMembers, inner )) {
+    //  enum skip = anySatisfy!( skipper!( member ).shouldSkip, ignore );       // evaluate if member is in ignore list, https://forum.dlang.org/post/hucredzrhbbjzcesjqbg@forum.dlang.org
+        static if( !anySatisfy!( skipper!( member ).shouldSkip, ignore ) && member != "sType" && member != "pNext" && member != "flags" ) {     // skip, also these
+            //import vdrive.util.string : snakeCaseCT;                          // convertor from camel to snake case
+            //enum member_snake = member.snakeCaseCT;                           // convert to snake case
+            //enum member_snake = member;
+            mixin( "\n" );                                                      // comment this if debugging and formating this template
+            mixin( "    /// Forward member " ~ member ~ " of inner " ~ inner.stringof ~ " as setter function to this.\n" );
+            mixin( "    /// Params:\n" );
+            mixin( "    /// \t" ~ member/*_snake*/ ~ " = the value forwarded to the inner struct\n" );
+            mixin( "    /// Returns: ref to this for function chaining\n" );
+            mixin( "auto ref " ~ member ~ "( " ~ typeof( __traits( getMember,  inner, member )).stringof ~ " " ~ member ~ " ) { " ~ path ~ "." ~ member ~ " = " ~ member ~ "; return this; }\n\n" );
+            mixin( "    /// forward member " ~ member ~ " of inner " ~ inner.stringof ~ " as getter function to this\n" );
+            mixin( "    /// Params:\n" );
+            mixin( "    /// Returns: copy of " ~ path ~ "." ~ member ~ "\n" );
+            mixin( "auto " ~ member ~ "() { return " ~ path ~ "." ~ member ~ "; }\n\n" );
+            //pragma( msg, result );
+        }
+    }
+}
+
+
+
+
 enum LOG_CHAR_SIZE = 256;
 
 /// capture __FILE__, __LINE__, __FUNCTION__ into one struct converting it to printf friendly cstrings
@@ -423,75 +457,6 @@ mixin template Dispatch_To_Inner_Struct( alias inner_struct ) {
             assert( 0, "Only one optional argument allowed for dispatching to inner struct: " ~ inner_struct.stringof );
         }
     }
-}
-
-
-// helper template for skipping members
-template skipper( string target ) { enum shouldSkip( string s ) = ( s == target ); }
-
-// function which creates to inner struct forwarding functions
-auto Forward_To_Inner_Struct( outer, inner, string path, ignore... )() {
-    // import helper template from std.meta to decide if member is found in ignore list
-    import std.meta : anySatisfy;
-    string result;
-    foreach( member; __traits( allMembers, inner )) {
-        // https://forum.dlang.org/post/hucredzrhbbjzcesjqbg@forum.dlang.org
-        enum skip = anySatisfy!( skipper!( member ).shouldSkip, ignore );       // evaluate if member is in ignore list
-        static if( !skip && member != "sType" && member != "pNext" && member != "flags" ) {     // skip, also these
-            import vdrive.util.string : snakeCaseCT;                            // convertor from camel to snake case
-            enum member_snake = member.snakeCaseCT;                             // convert to snake case
-            //enum result = "\n"                                                // enum string wich will be mixed in, use only for pragma( msg ) output
-            result ~= "\n"
-                ~ "/// forward member " ~ member ~ " of inner " ~ inner.stringof ~ " as setter function to " ~ outer.stringof ~ "\n"
-                ~ "/// Params:\n"
-                ~ "/// \tmeta = reference to a " ~ outer.stringof ~ " struct\n"
-                ~ "/// \t" ~ member_snake ~ " = the value forwarded to the inner struct\n"
-                ~ "/// Returns: the passed in Meta_Structure for function chaining\n"
-                ~ "auto ref " ~ member ~ "( ref " ~ outer.stringof ~ " meta, "
-                ~ typeof( __traits( getMember,  inner, member )).stringof ~ " " ~ member_snake ~ " ) {\n"
-                ~ "\t" ~ path ~ "." ~ member ~ " = " ~ member_snake ~ ";\n\treturn meta;\n}\n"
-                ~ "\n"
-                ~ "/// forward member " ~ member ~ " of inner " ~ inner.stringof ~ " as getter function to " ~ outer.stringof ~ "\n"
-                ~ "/// Params:\n"
-                ~ "/// \tmeta = reference to a " ~ outer.stringof ~ " struct\n"
-                ~ "/// Returns: copy of " ~ path ~ "." ~ member ~ "\n"
-                ~ "auto " ~ member ~ "( ref " ~ outer.stringof ~ " meta ) {\n"
-                ~ "\treturn " ~ path ~ "." ~ member ~ ";\n}\n\n";
-            //pragma( msg, result );
-        }
-    } return result;
-}
-
-
-// function which creates to inner struct forwarding functions
-auto Forward_To_Inner_Struct( inner, string path, ignore... )() {
-    // import helper template from std.meta to decide if member is found in ignore list
-    import std.meta : anySatisfy;
-    string result;                                                              // comment this if debugging and formating this template
-    foreach( member; __traits( allMembers, inner )) {
-        // https://forum.dlang.org/post/hucredzrhbbjzcesjqbg@forum.dlang.org
-        enum skip = anySatisfy!( skipper!( member ).shouldSkip, ignore );       // evaluate if member is in ignore list
-        static if( !skip && member != "sType" && member != "pNext" && member != "flags" ) {     // skip, also these
-            import vdrive.util.string : snakeCaseCT;                            // convertor from camel to snake case
-            enum member_snake = member.snakeCaseCT;                             // convert to snake case
-            //enum result = "\n"                                                // enum string wich will be mixed in, use only for pragma( msg ) output
-            result ~= "\n"                                                      // comment this if debugging and formating this template
-                ~ "    /// Forward member " ~ member ~ " of inner " ~ inner.stringof ~ " as setter function to this.\n"
-                ~ "    /// Params:\n"
-                ~ "    /// \t" ~ member_snake ~ " = the value forwarded to the inner struct\n"
-                ~ "    /// Returns: ref to this for function chaining\n"
-                ~ "    auto ref " ~ member ~ "( "
-                ~ typeof( __traits( getMember,  inner, member )).stringof ~ " " ~ member_snake ~ " ) {\n"
-                ~ "        " ~ path ~ "." ~ member ~ " = " ~ member_snake ~ ";\n        return this;\n    }\n"
-                ~ "\n"
-                ~ "    /// forward member " ~ member ~ " of inner " ~ inner.stringof ~ " as getter function to this\n"
-                ~ "    /// Params:\n"
-                ~ "    /// Returns: copy of " ~ path ~ "." ~ member ~ "\n"
-                ~ "    auto " ~ member ~ "() {\n"
-                ~ "        return " ~ path ~ "." ~ member ~ ";\n    }\n\n";
-            //pragma( msg, result );
-        }
-    } return result;
 }
 
 

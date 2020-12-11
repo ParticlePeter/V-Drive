@@ -384,7 +384,7 @@ struct Meta_Graphics_T(
     /// auto ref depthBiasClamp(          float            depth_bias_clamp );
     /// auto ref depthBiasSlopeFactor(    float            depth_bias_slope_factor );
     /// auto ref lineWidth(               float            line_width );
-    mixin( Forward_To_Inner_Struct!( VkPipelineRasterizationStateCreateInfo, "rasterization_state_ci" ));
+    mixin Forward_To_Inner_Struct!( VkPipelineRasterizationStateCreateInfo, "rasterization_state_ci" );
 
     auto ref depthBias( float constant_factor, float clamp, float slope_factor, VkBool32 enable = VK_TRUE ) {
         with( rasterization_state_ci ) {
@@ -408,7 +408,7 @@ struct Meta_Graphics_T(
     /// auto ref pSampleMask(           const( VkSampleMask )*  p_sample_mask );
     /// auto ref alphaToCoverageEnable( VkBool32                alpha_to_coverage_enable );
     /// auto ref alphaToOneEnable(      VkBool32                alpha_to_one_enable );
-    mixin( Forward_To_Inner_Struct!( VkPipelineMultisampleStateCreateInfo, "multisample_state_ci" ));
+    mixin Forward_To_Inner_Struct!( VkPipelineMultisampleStateCreateInfo, "multisample_state_ci" );
 
     auto ref multisampleShading( float min_sample_shading, const( VkSampleMask )* sample_mask = null, VkBool32 enable = VK_TRUE ) {
         with( multisample_state_ci ) {
@@ -439,7 +439,7 @@ struct Meta_Graphics_T(
     /// auto ref stencilTestEnable(     VkBool32     stencil_test_enable );
     /// auto ref minDepthBounds(        float        min_depth_bounds );
     /// auto ref maxDepthBounds(        float        max_depth_bounds );
-    mixin( Forward_To_Inner_Struct!( VkPipelineDepthStencilStateCreateInfo, "depth_stencil_state_ci", "front", "back" ));
+    mixin Forward_To_Inner_Struct!( VkPipelineDepthStencilStateCreateInfo, "depth_stencil_state_ci", "front", "back" );
 
     auto ref depthState( VkCompareOp compare_op = VK_COMPARE_OP_LESS_OR_EQUAL, VkBool32 write_enable = VK_TRUE, VkBool32 test_enable = VK_TRUE ) {
         with( depth_stencil_state_ci ) {
@@ -516,7 +516,7 @@ struct Meta_Graphics_T(
     /// auto ref logicOpEnable(  VkBool32   logic_op_enable );
     /// auto ref logicOp(        VkLogicOp  logic_op );
     /// auto ref blendConstants( float[4]   blend_constants );
-    mixin( Forward_To_Inner_Struct!( VkPipelineColorBlendStateCreateInfo, "color_blend_state_ci", "attachmentCount", "pAttachments" ));
+    mixin Forward_To_Inner_Struct!( VkPipelineColorBlendStateCreateInfo, "color_blend_state_ci", "attachmentCount", "pAttachments" );
 
     auto ref colorBlendLogicOp( VkLogicOp logic_op, VkBool32 enable = VK_TRUE ) {
         with( color_blend_state_ci ) {

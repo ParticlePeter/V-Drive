@@ -391,7 +391,7 @@ struct Meta_Swapchain_T( int32_t max_image_count, uint member_copies = SMC.None 
 
 
     // forward members of Meta_Swapchain.swapchain_ci to setter and getter functions
-    mixin( Forward_To_Inner_Struct!( VkSwapchainCreateInfoKHR, "swapchain_ci", "imageSharingMode", "queueFamilyIndexCount", "pQueueFamilyIndices" ));
+    mixin Forward_To_Inner_Struct!( VkSwapchainCreateInfoKHR, "swapchain_ci", "imageSharingMode", "queueFamilyIndexCount", "pQueueFamilyIndices" );
 
 
     /// Specify the sharing queue families and implicitly the sharing mode, which defaults to VK_SHARING_MODE_EXCLUSIVE.
