@@ -13,6 +13,7 @@ public import vdrive.pipeline;
 public import vdrive.validate;
 public import vdrive.swapchain;
 public import vdrive.descriptor;
+public import vdrive.initialize;
 public import vdrive.synchronize;
 public import vdrive.renderbuffer;
 
