@@ -8,7 +8,7 @@ import std.algorithm;
 import std.regex;
 
 import core.stdc.stdio  : printf;
-import core.stdc.string : memcpy;
+import core.stdc.string : memcpy, strlen;
 
 alias stringz = const( char )*;
 alias strings = const( char )[];
@@ -77,6 +77,12 @@ auto toStringz( S )(
     DArray!char result;
     value.toStringz( result, append_data, file, line, func );
     return result.release;
+}
+
+
+
+strings fromStringz( stringz str ) {
+    return str[ 0 .. str.strlen ];
 }
 
 
