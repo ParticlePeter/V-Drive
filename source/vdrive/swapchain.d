@@ -105,6 +105,21 @@ auto filterSurfaceFormats( Array_T )(
 
 
 
+/// Select surface format from passed in prefered formats, optionally select the first available if prefered cannot be found.
+VkSurfaceFormatKHR selectSurfaceFormat( ref Vulkan vk, VkSurfaceKHR surface, VkFormat[] include_formats, bool first_available_as_fallback = true ) {
+    auto surface_formats = Surface_Formats_Result( vk );
+    return listSurfaceFormats( surface_formats, surface, false ).filterSurfaceFormats( include_formats, first_available_as_fallback );
+}
+
+
+
+/// Query whether a specific surface format is available
+bool hasSurfaceFormat( ref Vulkan vk, VkSurfaceKHR surface, VkFormat surface_format ) {
+    return selectSurfaceFormat( vk, surface, ( & surface_format )[ 0 .. 1 ], false ) != VkSurfaceFormatKHR( VK_FORMAT_MAX_ENUM, VK_COLORSPACE_SRGB_NONLINEAR_KHR );
+}
+
+
+
 /// Result type to list presentation modes using Vulkan_State scratch memory
 alias List_Present_Modes_Result = Scratch_Result!VkPresentModeKHR;
 
@@ -189,6 +204,19 @@ auto  filterPresentModes( Array_T )(
     // if first_available_as_fallback is false and no present mode can be filtered this returns an non existing present mode
     return first_available_as_fallback && present_modes.length > 0 ? present_modes[0] : VK_PRESENT_MODE_MAX_ENUM_KHR;
 }
+
+
+
+/// Select presentation mode from passed in prefered modes, optionally select the first available if prefered cannot be found.
+auto ref selectPresentMode( ref Vulkan vk, VkSurfaceKHR surface, VkPresentModeKHR[] include_modes, bool first_available_as_fallback = true ) {
+    auto present_modes = List_Present_Modes_Result( vk );
+    return listPresentModes( present_modes, surface, false ).filter( include_modes, first_available_as_fallback );
+}
+
+
+/// Query whether a specific present mode is available
+bool hasPresentMode( ref Vulkan vk, VkSurfaceKHR surface, VkPresentModeKHR present_mode ) {
+    return selectPresentMode( vk, surface, ( & present_mode )[ 0 .. 1 ], false ) != VK_PRESENT_MODE_MAX_ENUM_KHR;
 }
 
 
@@ -373,24 +401,15 @@ struct Meta_Swapchain_T( int32_t max_image_count, uint member_copies = SMC.None 
 
     /// Select surface format from passed in prefered formats, optionally select the first available if prefered cannot be found.
     auto ref selectSurfaceFormat( VkFormat[] include_formats, bool first_available_as_fallback = true, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
-        // assert that meta struct is initialized with a valid vulkan state pointer
-        vkAssert( isValid, "Vulkan state not assigned", file, line, func );
-
-        // store available surface formats temporarily in an util.array : Static_Array with max length of count of all VkFormat and filter with the requested include_formats
-        auto surface_formats = List_Surface_Formats_Result( vk );
-        surface_format = listSurfaceFormats( surface_formats, surface, false ).filter( include_formats );
+        vkAssert( isValid, "Vulkan state not assigned", file, line, func );     // assert that meta struct is initialized with a valid vulkan state pointer
+        surface_format = vk.selectSurfaceFormat( surface, include_formats, first_available_as_fallback );
         return this;
     }
 
 
     /// Select presentation mode from passed in prefered modes, optionally select the first available if prefered cannot be found.
     auto ref selectPresentMode( VkPresentModeKHR[] include_modes, bool first_available_as_fallback = true, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
-        // assert that meta struct is initialized with a valid vulkan state pointer
-        vkAssert( isValid, "Vulkan state not assigned", file, line, func );
-
-        // store available present modes temporarily in an util.array : Static_Array with max length of count of all VkPresentModeKHR and filter with the requested include_modes
-        auto prsent_modes = List_Present_Modes_Result( vk );
-        presentMode = listPresentModes( prsent_modes, surface, false ).filter( include_modes );
+        presentMode = vk.selectPresentMode( surface, include_modes, first_available_as_fallback );
         return this;
     }
 
