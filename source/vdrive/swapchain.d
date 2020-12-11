@@ -18,7 +18,7 @@ import std.stdio;
 
 
 /// Result type to list surface formats using Vulkan_State scratch memory
-alias List_Surface_Formats_Result = Scratch_Result!VkSurfaceFormatKHR;
+alias Surface_Formats_Result = Scratch_Result!VkSurfaceFormatKHR;
 
 
 
@@ -80,9 +80,8 @@ auto filterSurfaceFormats( Array_T )(
     ) if( isDataArray!( Array_T, VkSurfaceFormatKHR ) || is( Array_T : VkSurfaceFormatKHR[] )) {
 
     // if this function returns surfac_format.format == VK_FORMAT_MAX_ENUM this means that no requested format could be found
-    auto result_format = first_available_as_fallback && surface_formats.length > 0 ?
-        surface_formats[0] :
-        VkSurfaceFormatKHR( VK_FORMAT_MAX_ENUM, VK_COLORSPACE_SRGB_NONLINEAR_KHR );
+    auto result_format = first_available_as_fallback && surface_formats.length > 0
+        ? surface_formats[0] : VkSurfaceFormatKHR( VK_FORMAT_MAX_ENUM, VK_COLORSPACE_SRGB_NONLINEAR_KHR );
 
     // All formats are available, pick the first requested
     if( surface_formats.length == 1 && result_format.format == VK_FORMAT_UNDEFINED ) {
@@ -100,6 +99,7 @@ auto filterSurfaceFormats( Array_T )(
         }
     }
 
+    // if this function returns surfac_format.format == VK_FORMAT_MAX_ENUM this means that no requested format could be found
     return result_format;
 }
 
@@ -174,14 +174,11 @@ auto listPresentModes(
 /// filter presentation modes
 alias filter = filterPresentModes;
 auto  filterPresentModes( Array_T )(
-    ref Array_T present_modes,
-    VkPresentModeKHR[] include_modes,
+    ref Array_T         present_modes,
+    VkPresentModeKHR[]  include_modes,
     bool first_available_as_fallback = true
 
     ) if( isDataArray!( Array_T, VkPresentModeKHR ) || is( Array_T : VkPresentModeKHR[] )) {
-
-    // if first_available_as_fallback is false and no present mode can be filtered this returns an non existing present mode
-    auto result_mode = first_available_as_fallback && present_modes.length > 0 ? present_modes[0] : VK_PRESENT_MODE_MAX_ENUM_KHR;
 
     // few are available, search for the first match
     foreach( include_mode; include_modes )
@@ -189,7 +186,9 @@ auto  filterPresentModes( Array_T )(
             if( present_mode == include_mode )
                 return include_mode;
 
-    return result_mode;
+    // if first_available_as_fallback is false and no present mode can be filtered this returns an non existing present mode
+    return first_available_as_fallback && present_modes.length > 0 ? present_modes[0] : VK_PRESENT_MODE_MAX_ENUM_KHR;
+}
 }
 
 
@@ -275,15 +274,15 @@ struct Core_Swapchain_T( int32_t max_image_count, uint32_t member_copies = SMC.N
 
 
 /// Bulk destroy the resources belonging to this meta struct.
-void destroy( CORE )( ref Vulkan vk, ref CORE core, bool destroy_surface = true, bool destroy_image_view = true ) if( isCoreSwapchain!CORE ) {
-    vk.destroyHandle( core.swapchain );
+void destroy( CORE )( ref Vulkan vk, ref CORE core, bool destroy_surface = true, bool destroy_swapchain = true, bool destroy_image_view = true ) if( isCoreSwapchain!CORE ) {
 
     if( destroy_image_view ) {
              static if( core.ic == 1 )  { if( !core.image_view.is_null_handle ) vk.destroyHandle( core.image_view ); }
         else static if( core.ic  > 1 )  { foreach( ref v; core.image_views )  if( !v.is_null_handle ) vk.destroyHandle( v ); }
     }
 
-    vk.destroyHandle( core.swapchain );
+    if( destroy_swapchain )
+        vk.destroyHandle( core.swapchain );
 
     if( destroy_surface )
         vk.destroyHandle( core.surface );
@@ -317,10 +316,10 @@ struct Meta_Swapchain_T( int32_t max_image_count, uint member_copies = SMC.None 
     auto surface_ptr()      { return & swapchain_ci.surface; }
 
     // convenience to get the swapchain image count
-    auto image_count()       { return image_views.length.toUint; }
+    auto image_count()      { return image_views.length.toUint; }
 
     // convenience to get VkSurfaceFormatKHR from VkSwapchainCreateInfoKHR.imageFormat and .imageColorSpace and set vice versa
-    auto surface_format()    { return VkSurfaceFormatKHR( swapchain_ci.imageFormat, swapchain_ci.imageColorSpace ); }
+    auto surface_format()   { return VkSurfaceFormatKHR( swapchain_ci.imageFormat, swapchain_ci.imageColorSpace ); }
     void surface_format( VkSurfaceFormatKHR surface_format ) {
         swapchain_ci.imageFormat = surface_format.format;
         swapchain_ci.imageColorSpace = surface_format.colorSpace;
