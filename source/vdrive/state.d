@@ -32,13 +32,19 @@ struct Vulkan {
     VkInstance                          instance = VK_NULL_HANDLE;
     VkDevice                            device = VK_NULL_HANDLE;
     VkPhysicalDevice                    gpu = VK_NULL_HANDLE;
-    VkPhysicalDeviceMemoryProperties    memory_properties;
 
     VkDebugReportCallbackEXT            debug_report_callback = VK_NULL_HANDLE;
     VkDebugUtilsMessengerEXT            debug_utils_messenger = VK_NULL_HANDLE;
 
     import vdrive.util.array;
     Arena_Array                         scratch;
+
+    // get the memory properties of the this gpu
+    // Todo(pp): the memory properties print uints instead of enum flags, fix this
+    VkPhysicalDeviceMemoryProperties    memory_properties() {
+        vkAssert( !gpu.is_null );
+        return gpu.listMemoryProperties( false );
+    }
 }
 
 template isVulkan( T ) { enum isVulkan = is( T == Vulkan ); }
