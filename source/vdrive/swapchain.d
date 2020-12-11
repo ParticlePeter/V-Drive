@@ -31,7 +31,7 @@ auto ref listSurfaceFormats( Result_T )(
     size_t          line = __LINE__,
     string          func = __FUNCTION__
 
-    ) if( isScratchResult!Result_T || isDynamicResult!Result_T ) {
+    ) if( isScratchResult!Result_T || isDynamicOrStaticResult!Result_T ) {
 
     // extract gpu member based on template argument
     static if( isScratchResult!Result_T )   auto gpu = result.vk.gpu;
