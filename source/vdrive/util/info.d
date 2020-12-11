@@ -46,17 +46,17 @@ void printTypeInfo( T, size_t buffer_size = 256 )(
     char[ buffer_size ] buffer = void;
 
     if ( printStructName ) {
-        buffer[ 0..T.stringof.length ] = T.stringof;    //strncpy( buffer.ptr, T.stringof.ptr, T.stringof.length );
+        buffer[ 0 .. T.stringof.length ] = T.stringof;    //    strncpy( buffer.ptr, T.stringof.ptr, T.stringof.length );
         buffer[ T.stringof.length ] = '\0';
         printf( "%s\n", buffer.ptr );
-        buffer[ 0..T.stringof.length ] = '=';           //memset( buffer.ptr, '=', T.stringof.length );
+        buffer[ 0 .. T.stringof.length ] = '=';           //    memset( buffer.ptr, '=', T.stringof.length );
         printf( "%s\n", buffer.ptr );
     }
 
     // indent the buffer and store a pointer position;
     auto buffer_indent = buffer.ptr;
     buffer_indent[ 0 ] = '\t';                      buffer_indent += 1;
-    buffer_indent[ 0..indent.length ] = indent;   buffer_indent += indent.length;
+    buffer_indent[ 0 .. indent.length ] = indent;   buffer_indent += indent.length;
 
     // need this template as non aliased types are shorter than aliased, but aliased are printed later
     immutable string[8] integral_alias_types = [ "uint64_t", "uint32_t", "uint16_t", "uint8_t", "int64_t", "int32_t", "int16_t", "int8_t" ];
@@ -257,6 +257,7 @@ private void inspect( T )( T info, string before = "" ) {
 private template isStringT( T )         { enum isStringT        = is( T == string ) || is( T : const( char )* ) || is( T : char[] ); }
 private template isVkOrGpu( T )         { enum isVkOrGpu        = is( T == Vulkan ) || is( T == VkPhysicalDevice ); }
 private template isVkOrInstance( T )    { enum isVkOrInstance   = is( T == Vulkan ) || is( T == VkInstance ); }
+
 
 
 
@@ -618,6 +619,8 @@ auto listPhysicalDevices( VkInstance instance, bool print_info = true, string fi
 // flags to determine if and which gpu properties should be printed
 enum GPU_Info_Flags { none = 0, name, properties, limits = 4, sparse_properties = 8 };
 
+
+
 // returns gpu properties and can also print the properties, limits and sparse properties
 // the passed in Result_Type (Scratch or Dynamic) is only for string z conversion purpose
 auto listProperties(
@@ -681,7 +684,7 @@ auto listProperties( VkPhysicalDevice gpu, GPU_Info_Flags gpu_info, ref Arena_Ar
 // returns the physical device features of a certain physical device
 auto listFeatures( VkPhysicalDevice gpu, bool print_info = true ) {
     VkPhysicalDeviceFeatures features;
-    vkGetPhysicalDeviceFeatures( gpu, &features );
+    vkGetPhysicalDeviceFeatures( gpu, & features );
     if( print_info )
         printTypeInfo( features );
     return features;
@@ -690,7 +693,7 @@ auto listFeatures( VkPhysicalDevice gpu, bool print_info = true ) {
 // returns gpu memory properties
 auto listMemoryProperties( VkPhysicalDevice gpu, bool print_info = true ) {
     VkPhysicalDeviceMemoryProperties memory_properties;
-    vkGetPhysicalDeviceMemoryProperties( gpu, &memory_properties );
+    vkGetPhysicalDeviceMemoryProperties( gpu, & memory_properties );
     if( print_info )
         printTypeInfo( memory_properties );
     return memory_properties;
@@ -698,12 +701,12 @@ auto listMemoryProperties( VkPhysicalDevice gpu, bool print_info = true ) {
 
 
 // returns if the physical device does support presentations
-auto presentSupport( ref VkPhysicalDevice gpu, VkSurfaceKHR surface ) {
+auto presentSupport( ref VkPhysicalDevice gpu, VkSurfaceKHR surface, bool print_info = true ) {
     uint32_t queue_family_property_count;
     vkGetPhysicalDeviceQueueFamilyProperties( gpu, & queue_family_property_count, null );
     VkBool32 present_supported;
     foreach( family_index; 0..queue_family_property_count ) {
-        vkGetPhysicalDeviceSurfaceSupportKHR( gpu, family_index, surface, &present_supported );
+        vkGetPhysicalDeviceSurfaceSupportKHR( gpu, family_index, surface, & present_supported );
         if( present_supported ) {
             return true;
         }
@@ -739,13 +742,13 @@ auto ref listQueues( Result_T )(
     if( print_info ) {
         foreach( q, ref queue; queue_family_properties.data ) {
             println;
-            printf( "Queue Family %d\n", q );
+            printf( "Queue Family %lu\n", cast( int )q );
             printf( "\tQueues in Family         : %d\n", queue.queueCount );
             printf( "\tQueue timestampValidBits : %d\n", queue.timestampValidBits );
 
             if( surface != VK_NULL_HANDLE ) {
                 VkBool32 present_supported;
-                vkGetPhysicalDeviceSurfaceSupportKHR( gpu, q.toUint, surface, &present_supported );
+                vkGetPhysicalDeviceSurfaceSupportKHR( gpu, q.toUint, surface, & present_supported );
                 printf( "\tPresentation supported   : %d\n", present_supported );
             }
 
