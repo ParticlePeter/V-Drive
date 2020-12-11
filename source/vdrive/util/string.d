@@ -319,7 +319,8 @@ unittest {
 
 
 
-template isCharArray( A ) { enum isCharArray = isDataArray!A && is( A.Val_T == char ); }
+template isCharArray( A ) { enum isCharArray = isDataArrayOrSlice!( A, char ); }
+
 
 
 
