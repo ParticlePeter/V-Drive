@@ -474,7 +474,7 @@ struct Meta_Render_Pass_T(
 
 
         // use the new subpass_descriptions array to create the VkRenderPass
-        VkRenderPassCreateInfo render_pass_create_info = {
+        VkRenderPassCreateInfo render_pass_ci = {
             attachmentCount : attachment_descriptions.length.toUint,
             pAttachments    : attachment_descriptions.ptr,
             subpassCount    : subpass_descriptions.length.toUint,
@@ -483,7 +483,7 @@ struct Meta_Render_Pass_T(
             pDependencies   : subpass_dependencies.ptr,
         };
 
-        vkCreateRenderPass( device, & render_pass_create_info, allocator, & render_pass_bi.renderPass ).vkAssert;
+        vkCreateRenderPass( device, & render_pass_ci, allocator, & render_pass_bi.renderPass ).vkAssert;
         return this;
     }
 

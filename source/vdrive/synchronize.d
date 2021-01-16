@@ -12,12 +12,12 @@ nothrow @nogc:
 /// create a VkFence
 /// Params:
 ///     vk = reference to a VulkanState struct
-///     fence_create_flags = optional: only flag is VK_FENCE_CREATE_SIGNALED_BIT
+///     fence_cf = optional: only flag is VK_FENCE_CREATE_SIGNALED_BIT
 /// Returns: VkFence
-auto createFence( ref Vulkan vk, VkFenceCreateFlags fence_create_flags = 0 ) {
-    VkFenceCreateInfo fence_create_info = { flags : fence_create_flags };
+auto createFence( ref Vulkan vk, VkFenceCreateFlags fence_cf = 0 ) {
+    VkFenceCreateInfo fence_ci = { flags : fence_cf };
     VkFence fence;
-    vkCreateFence( vk.device, & fence_create_info, vk.allocator, & fence ).vkAssert;
+    vkCreateFence( vk.device, & fence_ci, vk.allocator, & fence ).vkAssert;
     return fence;
 }
 
@@ -29,9 +29,9 @@ auto createFence( ref Vulkan vk, VkFenceCreateFlags fence_create_flags = 0 ) {
 ///     vk = reference to a VulkanState struct
 /// Returns: VkSemaphore
 auto createSemaphore( ref Vulkan vk ) {
-    VkSemaphoreCreateInfo semaphore_create_info;
+    VkSemaphoreCreateInfo semaphore_ci;
     VkSemaphore semaphore;
-    vkCreateSemaphore( vk.device, & semaphore_create_info, vk.allocator, & semaphore ).vkAssert;
+    vkCreateSemaphore( vk.device, & semaphore_ci, vk.allocator, & semaphore ).vkAssert;
     return semaphore;
 }
 
@@ -43,8 +43,8 @@ auto createSemaphore( ref Vulkan vk ) {
 ///     vk = reference to a VulkanState struct
 /// Returns: VkEvent
 auto createEvent( ref Vulkan vk ) {
-    VkEventCreateInfo event_create_info;
+    VkEventCreateInfo event_ci;
     VkEvent event;
-    vkCreateEvent( vk.device, & event_create_info, vk.allocator, & event ).vkAssert;
+    vkCreateEvent( vk.device, & event_ci, vk.allocator, & event ).vkAssert;
     return event;
 }

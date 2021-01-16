@@ -139,13 +139,13 @@ void setDebugName(
     size_t          line = __LINE__,
     string          func = __FUNCTION__
     ) {
-    VkDebugUtilsObjectNameInfoEXT debug_utils_object_name_info = {
+    VkDebugUtilsObjectNameInfoEXT debug_utils_object_ni = {
         objectType      : object_type,
         objectHandle    : object_handle,
         pObjectName     : object_name,
     };
 
-    vk.device.vkSetDebugUtilsObjectNameEXT( & debug_utils_object_name_info ).vkAssert( "Debug Name", file, line, func, object_name );
+    vk.device.vkSetDebugUtilsObjectNameEXT( & debug_utils_object_ni ).vkAssert( "Debug Name", file, line, func, object_name );
 }
 
 

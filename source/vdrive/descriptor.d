@@ -64,7 +64,7 @@ auto createDescriptorPool(
 
     ) {
 
-    VkDescriptorPoolCreateInfo pool_create_info = {
+    VkDescriptorPoolCreateInfo pool_ci = {
         flags           : create_flags,
         maxSets         : max_sets,
         poolSizeCount   : descriptor_pool_sizes.length.toUint,
@@ -72,7 +72,7 @@ auto createDescriptorPool(
     };
 
     VkDescriptorPool descriptor_pool;
-    vk.device.vkCreateDescriptorPool( & pool_create_info, vk.allocator, & descriptor_pool ).vkAssert( null, file, line, func );
+    vk.device.vkCreateDescriptorPool( & pool_ci, vk.allocator, & descriptor_pool ).vkAssert( null, file, line, func );
     return descriptor_pool;
 }
 
@@ -116,7 +116,7 @@ auto createSetLayout(
 
 /// create VkDescriptorSetLayout from one VkDescriptorSetLayoutBinding
 /// parameters are the same as those of a VkDescriptorSetLayoutBinding but missing immutable_samplers
-/// instead set_layout_create_flags for the set layout is provided
+/// instead set_layout_cf ( _create_flags ) for the set layout is provided
 /// in the case of one layout binding set layout immutable samplers and
 /// VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR are mutually exclusive
 /// internally one VkDescriptorSetLayoutBinding is created and passed to vkCreateDescriptorSetLayout
@@ -125,7 +125,7 @@ auto createSetLayout(
 ///     binding = binding index of the layout
 ///     descriptor_count = count of the descriptors in case of an array of descriptors
 ///     shader_stage_flags = shader stages where the descriptor can be used
-///     set_layout_create_flags = only one flag available: VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR
+///     set_layout_cf = only one flag available: VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR
 /// Returns: VkDescriptorSetLayout
 auto createSetLayout(
     ref Vulkan          vk,
@@ -133,7 +133,7 @@ auto createSetLayout(
     VkDescriptorType    descriptor_type,
     uint32_t            descriptor_count,
     VkShaderStageFlags  shader_stage_flags,
-    VkDescriptorSetLayoutCreateFlags set_layout_create_flags,
+    VkDescriptorSetLayoutCreateFlags set_layout_cf,
     string              file = __FILE__,
     size_t              line = __LINE__,
     string              func = __FUNCTION__
@@ -142,7 +142,7 @@ auto createSetLayout(
 
     const VkDescriptorSetLayoutBinding[1] set_layout_bindings = [
         VkDescriptorSetLayoutBinding( binding, descriptor_type, descriptor_count, shader_stage_flags, null ) ];
-    return vk.createSetLayout( set_layout_bindings, set_layout_create_flags, file, line, func );
+    return vk.createSetLayout( set_layout_bindings, set_layout_cf, file, line, func );
 }
 
 
@@ -150,27 +150,27 @@ auto createSetLayout(
 /// Params:
 ///     vk = reference to a VulkanState struct
 ///     set_layout_bindings = to specify the multi binding set layout
-///     set_layout_create_flags = only one flag available: VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR
+///     set_layout_cf = only one flag available: VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR
 /// Returns: VkDescriptorSetLayout
 auto createSetLayout(
     ref Vulkan                              vk,
     const VkDescriptorSetLayoutBinding[]    set_layout_bindings,
-    VkDescriptorSetLayoutCreateFlags        set_layout_create_flags = 0,
+    VkDescriptorSetLayoutCreateFlags        set_layout_cf = 0,
     string                                  file = __FILE__,
     size_t                                  line = __LINE__,
     string                                  func = __FUNCTION__
 
     ) {
 
-    VkDescriptorSetLayoutCreateInfo descriptor_set_layout_create_info = {
-        flags           : set_layout_create_flags,
+    VkDescriptorSetLayoutCreateInfo descriptor_set_layout_ci = {
+        flags           : set_layout_cf,
         bindingCount    : set_layout_bindings.length.toUint,
         pBindings       : set_layout_bindings.ptr,
     };
 
     VkDescriptorSetLayout descriptor_set_layout;
     vk.device.vkCreateDescriptorSetLayout(
-        & descriptor_set_layout_create_info,
+        & descriptor_set_layout_ci,
         vk.allocator, & descriptor_set_layout ).vkAssert( null, file, line, func );
     return descriptor_set_layout;
 }
@@ -192,7 +192,7 @@ auto allocateSet(
 
     ) {
 
-    VkDescriptorSetAllocateInfo descriptor_allocate_info = {
+    VkDescriptorSetAllocateInfo descriptor_ai = {
         descriptorPool      : descriptor_pool,
         descriptorSetCount  : 1,
         pSetLayouts         : & descriptor_set_layout,
@@ -200,7 +200,7 @@ auto allocateSet(
 
     VkDescriptorSet descriptor_set;
     vk.device
-        .vkAllocateDescriptorSets( & descriptor_allocate_info, & descriptor_set )
+        .vkAllocateDescriptorSets( & descriptor_ai, & descriptor_set )
         .vkAssert( null, file, line, func );
     return descriptor_set;
 }
@@ -222,14 +222,14 @@ auto allocateSet(
 
     ) {
 
-    VkDescriptorSetAllocateInfo descriptor_allocate_info = {
+    VkDescriptorSetAllocateInfo descriptor_ai = {
         descriptorPool      : descriptor_pool,
         descriptorSetCount  : descriptor_sets_layouts.length.toUint,
         pSetLayouts         : descriptor_sets_layouts.ptr,
     };
     auto descriptor_sets = sizedArray!VkDescriptorSet( descriptor_sets_layouts.length );
     vk.device
-        .vkAllocateDescriptorSets( & descriptor_allocate_info, descriptor_sets.ptr )
+        .vkAllocateDescriptorSets( & descriptor_ai, descriptor_sets.ptr )
         .vkAssert( null, file, line, func );
     return descriptor_sets;
 }
@@ -247,9 +247,9 @@ auto allocateSet(
 /// after construction so that the Meta_Descriptor_Layout can be reused
 /// after being reset
 struct Core_Descriptor {
-    VkDescriptorPool        descriptor_pool;
-    VkDescriptorSetLayout   descriptor_set_layout;
-    VkDescriptorSet         descriptor_set;
+    VkDescriptorPool        descriptor_pool;        alias pool       = descriptor_pool;
+    VkDescriptorSetLayout   descriptor_set_layout;  alias set_layout = descriptor_set_layout;
+    VkDescriptorSet         descriptor_set;         alias set        = descriptor_set;
 }
 
 
@@ -527,10 +527,10 @@ struct Meta_Descriptor_Layout_T(
     /// from the so far specified descriptor set layout bindings and optional immutable samplers
     /// Params:
     ///     meta = reference to a Meta_Descriptor_Layout struct
-    ///     set_layout_create_flags = optional, only one flag available: VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR
+    ///     set_layout_cf = optional, only one flag available: VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR
     /// Returns: the passed in Meta_Structure for function chaining
     auto ref createSetLayout(
-        VkDescriptorSetLayoutCreateFlags    set_layout_create_flags = 0,
+        VkDescriptorSetLayoutCreateFlags    set_layout_cf = 0,
         string                              file = __FILE__,
         size_t                              line = __LINE__,
         string                              func = __FUNCTION__
@@ -551,7 +551,7 @@ struct Meta_Descriptor_Layout_T(
             }
         }
 
-        descriptor_set_layout = vk.createSetLayout( set_layout_bindings.data, set_layout_create_flags, file, line, func );
+        descriptor_set_layout = vk.createSetLayout( set_layout_bindings.data, set_layout_cf, file, line, func );
         return this;
     }
 
@@ -561,10 +561,10 @@ struct Meta_Descriptor_Layout_T(
     /// created before allocating in this function
     /// Params:
     ///     meta = reference to a Meta_Descriptor_Layout struct
-    ///     descriptor_pool_create_flags = optional, only one flag available: VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT
+    ///     descriptor_pool_cf = optional, only one flag available: VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT
     /// Returns: the passed in Meta_Structure for function chaining
     auto ref allocateSet(
-        VkDescriptorPoolCreateFlags descriptor_pool_create_flags = 0,
+        VkDescriptorPoolCreateFlags descriptor_pool_cf = 0,
         string                      file = __FILE__,
         size_t                      line = __LINE__,
         string                      func = __FUNCTION__
@@ -600,7 +600,7 @@ struct Meta_Descriptor_Layout_T(
         }
 
         // create the descriptor m_descriptor_pool, pool_size_index now represents the count of used m_descriptor_pool sizes
-        m_descriptor_pool = vk.createDescriptorPool( descriptor_pool_sizes[ 0 .. pool_size_index ], 1, descriptor_pool_create_flags );
+        m_descriptor_pool = vk.createDescriptorPool( descriptor_pool_sizes[ 0 .. pool_size_index ], 1, descriptor_pool_cf );
 
         // forward to next overload
         return allocateSet( descriptor_pool, file, line, func );
@@ -611,7 +611,7 @@ struct Meta_Descriptor_Layout_T(
     /// from an external VkDescriptorPool, must have sufficient descriptor memory
     /// Params:
     ///     meta = reference to a Meta_Descriptor_Layout struct
-    ///     descriptor_pool_create_flags = optional, only one flag available: VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT
+    ///     descriptor_pool_cf = optional, only one flag available: VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT
     /// Returns: the passed in Meta_Structure for function chaining
     auto ref allocateSet(
         VkDescriptorPool            descriptor_pool,
@@ -1449,33 +1449,33 @@ struct Meta_Descriptor_T(
     /// calls Meta_Descriptor_Layout allocateSet() and Meta_Descriptor_Layout attachSet()
     /// Params:
     ///     meta = reference to a Meta_Descriptor struct
-    ///     descriptor_pool_create_flags = = optional, only one flag available: VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT
+    ///     descriptor_pool_cf = = optional, only one flag available: VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT
     /// Returns: the passed in Meta_Structure for function chaining
     auto ref construct(
-        VkDescriptorPoolCreateFlags descriptor_pool_create_flags = 0,
+        VkDescriptorPoolCreateFlags descriptor_pool_cf = 0,
         string                      file = __FILE__,
         size_t                      line = __LINE__,
         string                      func = __FUNCTION__
 
         ) {
 
-        descriptor_layout.allocateSet( descriptor_pool_create_flags, file, line, func );
+        descriptor_layout.allocateSet( descriptor_pool_cf, file, line, func );
         descriptor_update.attachSet( descriptor_set ).update( vk );
         return this;
     }
 
 
     /// construct the managed Vulkan objects, convenience function
-    /// calls Meta_Meta_Descriptor_Layout createSetLayout() with param set_layout_create_flags
+    /// calls Meta_Meta_Descriptor_Layout createSetLayout() with param set_layout_cf
     /// Meta_Descriptor_Layout allocateSet() and Meta_Descriptor_Layout attachSet()
     /// Params:
     ///     meta = reference to a Meta_Descriptor struct
-    ///     set_layout_create_flags = only one flag available: VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR
-    ///     descriptor_pool_create_flags = optional, only one flag available: VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT
+    ///     set_layout_cf = only one flag available: VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR
+    ///     descriptor_pool_cf = optional, only one flag available: VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT
     /// Returns: the passed in Meta_Structure for function chaining
     auto ref construct(
-        VkDescriptorSetLayoutCreateFlags    set_layout_create_flags,
-        VkDescriptorPoolCreateFlags         descriptor_pool_create_flags = 0,
+        VkDescriptorSetLayoutCreateFlags    set_layout_cf,
+        VkDescriptorPoolCreateFlags         descriptor_pool_cf = 0,
         string                              file = __FILE__,
         size_t                              line = __LINE__,
         string                              func = __FUNCTION__
@@ -1483,24 +1483,24 @@ struct Meta_Descriptor_T(
         ) {
 
         descriptor_layout
-            .createSetLayout( set_layout_create_flags, file, line, func )
-            .allocateSet( descriptor_pool_create_flags, file, line, func );
+            .createSetLayout( set_layout_cf, file, line, func )
+            .allocateSet( descriptor_pool_cf, file, line, func );
         descriptor_update.attachSet( descriptor_set ).update( vk );
         return this;
     }
 
     /// construct the managed Vulkan objects, convenience function
-    /// calls Meta_Meta_Descriptor_Layout createSetLayout() with param set_layout_create_flags
+    /// calls Meta_Meta_Descriptor_Layout createSetLayout() with param set_layout_cf
     /// Meta_Descriptor_Layout allocateSet() with param descriptor_pool and
     /// Meta_Descriptor_Layout attachSet()
     /// Params:
     ///     meta = reference to a Meta_Descriptor struct
     ///     descriptor_pool = external VkDescriptorPool from which the descriptors will be allocated
-    ///     set_layout_create_flags = optional, only one flag available: VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR
+    ///     set_layout_cf = optional, only one flag available: VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR
     /// Returns: the passed in Meta_Structure for function chaining
     auto ref construct(
         VkDescriptorPool                    descriptor_pool,
-        VkDescriptorSetLayoutCreateFlags    set_layout_create_flags = 0,
+        VkDescriptorSetLayoutCreateFlags    set_layout_cf = 0,
         string                              file = __FILE__,
         size_t                              line = __LINE__,
         string                              func = __FUNCTION__
@@ -1508,7 +1508,7 @@ struct Meta_Descriptor_T(
         ) {
 
         descriptor_layout
-            .createSetLayout( set_layout_create_flags, file, line, func )
+            .createSetLayout( set_layout_cf, file, line, func )
             .allocateSet( descriptor_pool, file, line, func );
         descriptor_update.attachSet( descriptor_set ).update( vk );
         return this;

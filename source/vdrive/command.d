@@ -14,39 +14,39 @@ nothrow @nogc:
 VkCommandPool createCommandPool(
     ref Vulkan                  vk,
     uint32_t                    queue_family_index,
-    VkCommandPoolCreateFlags    command_pool_create_flags = 0,
+    VkCommandPoolCreateFlags    command_pool_cf = 0,
     string                      file = __FILE__,
     size_t                      line = __LINE__,
     string                      func = __FUNCTION__
 
     ) {
 
-    VkCommandPoolCreateInfo command_pool_create_info = {
-        flags               : command_pool_create_flags,
+    VkCommandPoolCreateInfo command_pool_ci = {
+        flags               : command_pool_cf,
         queueFamilyIndex    : queue_family_index,
     };
 
     VkCommandPool command_pool;
-    vk.device.vkCreateCommandPool( & command_pool_create_info, vk.allocator, & command_pool ).vkAssert( "Create Command Pool", file, line, func );
+    vk.device.vkCreateCommandPool( & command_pool_ci, vk.allocator, & command_pool ).vkAssert( "Create Command Pool", file, line, func );
     return command_pool;
 }
 
 
-VkCommandBuffer allocateCommandBuffer( ref Vulkan vk, VkCommandPool command_pool, VkCommandBufferLevel command_buffer_level ) {
-    VkCommandBufferAllocateInfo command_buffer_allocation_info = {
+VkCommandBuffer allocateCommandBuffer( ref Vulkan vk, VkCommandPool command_pool, VkCommandBufferLevel command_buffer_level = VK_COMMAND_BUFFER_LEVEL_PRIMARY ) {
+    VkCommandBufferAllocateInfo command_buffer_ai = {
         commandPool         : command_pool,
         level               : command_buffer_level,
         commandBufferCount  : 1,
     };
 
     VkCommandBuffer command_buffer;
-    vkAllocateCommandBuffers( vk.device, & command_buffer_allocation_info, & command_buffer ).vkAssert;
+    vkAllocateCommandBuffers( vk.device, & command_buffer_ai, & command_buffer ).vkAssert;
     return command_buffer;
 }
 
 
-auto allocateCommandBuffers( ref Vulkan vk, VkCommandPool command_pool, VkCommandBufferLevel command_buffer_level, size_t command_buffer_count ) {
-    VkCommandBufferAllocateInfo command_buffer_allocation_info = {
+auto allocateCommandBuffers( ref Vulkan vk, VkCommandPool command_pool, size_t command_buffer_count, VkCommandBufferLevel command_buffer_level = VK_COMMAND_BUFFER_LEVEL_PRIMARY ) {
+    VkCommandBufferAllocateInfo command_buffer_ai = {
         commandPool         : command_pool,
         level               : command_buffer_level,
         commandBufferCount  : command_buffer_count.toUint,
@@ -54,18 +54,18 @@ auto allocateCommandBuffers( ref Vulkan vk, VkCommandPool command_pool, VkComman
 
     import vdrive.util.array;
     auto command_buffers = sizedArray!VkCommandBuffer( command_buffer_count );
-    vkAllocateCommandBuffers( vk.device, & command_buffer_allocation_info, command_buffers.ptr ).vkAssert;
+    vkAllocateCommandBuffers( vk.device, & command_buffer_ai, command_buffers.ptr ).vkAssert;
     return command_buffers;
 }
 
 
-void allocateCommandBuffers( ref Vulkan vk, VkCommandPool command_pool, VkCommandBufferLevel command_buffer_level, VkCommandBuffer[] command_buffers ) {
-    VkCommandBufferAllocateInfo command_buffer_allocation_info = {
+void allocateCommandBuffers( ref Vulkan vk, VkCommandPool command_pool, VkCommandBuffer[] command_buffers, VkCommandBufferLevel command_buffer_level = VK_COMMAND_BUFFER_LEVEL_PRIMARY ) {
+    VkCommandBufferAllocateInfo command_buffer_ai = {
         commandPool         : command_pool,
         level               : command_buffer_level,
         commandBufferCount  : command_buffers.length.toUint,
     };
-    vkAllocateCommandBuffers( vk.device, & command_buffer_allocation_info, command_buffers.ptr ).vkAssert;
+    vkAllocateCommandBuffers( vk.device, & command_buffer_ai, command_buffers.ptr ).vkAssert;
 }
 
 
@@ -76,9 +76,9 @@ VkCommandBufferBeginInfo createCmdBufferBI( VkCommandBufferUsageFlags command_bu
 
 
 alias vdBeginCommandBuffer = beginCommandBuffer;
-void beginCommandBuffer( ref VkCommandBuffer out_cmd_buffer, VkCommandBufferUsageFlags command_buffer_usage_flags = 0, const( void )* pNext = null ) {
+void beginCommandBuffer( ref VkCommandBuffer cmd_buffer, VkCommandBufferUsageFlags command_buffer_usage_flags = 0, const( void )* pNext = null ) {
     VkCommandBufferBeginInfo cmd_buffer_bi = { flags : command_buffer_usage_flags, pNext : pNext };
-    out_cmd_buffer.vkBeginCommandBuffer( & cmd_buffer_bi );
+    cmd_buffer.vkBeginCommandBuffer( & cmd_buffer_bi );
 }
 
 
@@ -88,44 +88,47 @@ void cmdDispatch( ref VkCommandBuffer cmd_buffer, uint32_t[3] group_count ) {
 }
 
 
-// this function cannot forward the command buffer array overload, as we need a living address
+alias SubmitInfo = queueSubmitInfo;
 VkSubmitInfo queueSubmitInfo(
-    const ref VkCommandBuffer   command_buffer,
-    VkSemaphore[]               wait_semaphores = [],
-    VkPipelineStageFlags[]      wait_dest_stage_masks = [],
-    VkSemaphore[]               signal_semaphores = []
+    const ref VkCommandBuffer       command_buffer,
+    const VkSemaphore[]             wait_semaphores         = null,
+    const VkPipelineStageFlags[]    wait_dest_stage_masks   = null,
+    const VkSemaphore[]             signal_semaphores       = null,
 
     ) {
-
+    //*
+    return queueSubmitInfo(( & command_buffer )[ 0 .. 1 ], wait_semaphores, wait_dest_stage_masks, signal_semaphores );
+    /*/
     VkSubmitInfo submit_info = {
-        waitSemaphoreCount      : cast( uint32_t )wait_semaphores.length,
+        waitSemaphoreCount      : wait_semaphores.length.toUint,
         pWaitSemaphores         : wait_semaphores.ptr,
         pWaitDstStageMask       : wait_dest_stage_masks.ptr,    //wait_stage_mask.ptr,
         commandBufferCount      : 1,
         pCommandBuffers         : & command_buffer,
-        signalSemaphoreCount    : cast( uint32_t )signal_semaphores.length,
+        signalSemaphoreCount    : signal_semaphores.length.toUint,
         pSignalSemaphores       : signal_semaphores.ptr,
     };
 
     return submit_info;
+    //*/
 }
 
 
 VkSubmitInfo queueSubmitInfo(
-    VkCommandBuffer[]       command_buffers,
-    VkSemaphore[]           wait_semaphores = [],
-    VkPipelineStageFlags[]  wait_dest_stage_masks = [],
-    VkSemaphore[]           signal_semaphores = []
+    const VkCommandBuffer[]         command_buffers,
+    const VkSemaphore[]             wait_semaphores         = null,
+    const VkPipelineStageFlags[]    wait_dest_stage_masks   = null,
+    const VkSemaphore[]             signal_semaphores       = null,
 
     ) {
 
     VkSubmitInfo submit_info = {
-        waitSemaphoreCount      : cast( uint32_t )wait_semaphores.length,
+        waitSemaphoreCount      : wait_semaphores.length.toUint,
         pWaitSemaphores         : wait_semaphores.ptr,
         pWaitDstStageMask       : wait_dest_stage_masks.ptr,    //wait_stage_mask.ptr,
-        commandBufferCount      : cast( uint32_t )command_buffers.length,
+        commandBufferCount      : command_buffers.length.toUint,
         pCommandBuffers         : command_buffers.ptr,
-        signalSemaphoreCount    : cast( uint32_t )signal_semaphores.length,
+        signalSemaphoreCount    : signal_semaphores.length.toUint,
         pSignalSemaphores       : signal_semaphores.ptr,
     };
 
@@ -133,17 +136,17 @@ VkSubmitInfo queueSubmitInfo(
 }
 
 
-
+alias Submit = queueSubmit;
 void queueSubmit(
-    VkQueue                     queue,
-    const ref VkCommandBuffer   command_buffer,
-    VkSemaphore[]               wait_semaphores = [],
-    VkPipelineStageFlags[]      wait_dest_stage_masks = [],
-    VkSemaphore[]               signal_semaphores = [],
-    VkFence                     fence = VK_NULL_HANDLE,
-    string                      file = __FILE__,
-    size_t                      line = __LINE__,
-    string                      func = __FUNCTION__
+    VkQueue                         queue,
+    const ref VkCommandBuffer       command_buffer,
+    const VkSemaphore[]             wait_semaphores         = null,
+    const VkPipelineStageFlags[]    wait_dest_stage_masks   = null,
+    const VkSemaphore[]             signal_semaphores       = null,
+    VkFence                         fence = VK_NULL_HANDLE,
+    string                          file = __FILE__,
+    size_t                          line = __LINE__,
+    string                          func = __FUNCTION__
 
     ) {
 
@@ -156,15 +159,15 @@ void queueSubmit(
 
 
 void queueSubmit(
-    VkQueue                     queue,
-    VkCommandBuffer[]           command_buffers,
-    VkSemaphore[]               wait_semaphores = [],
-    VkPipelineStageFlags[]      wait_dest_stage_masks = [],
-    VkSemaphore[]               signal_semaphores = [],
-    VkFence                     fence = VK_NULL_HANDLE,
-    string                      file = __FILE__,
-    size_t                      line = __LINE__,
-    string                      func = __FUNCTION__
+    VkQueue                         queue,
+    const VkCommandBuffer[]         command_buffers,
+    const VkSemaphore[]             wait_semaphores         = null,
+    const VkPipelineStageFlags[]    wait_dest_stage_masks   = null,
+    const VkSemaphore[]             signal_semaphores       = null,
+    VkFence                         fence = VK_NULL_HANDLE,
+    string                          file = __FILE__,
+    size_t                          line = __LINE__,
+    string                          func = __FUNCTION__
 
     ) {
 

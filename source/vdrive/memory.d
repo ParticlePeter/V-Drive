@@ -106,14 +106,14 @@ VkDeviceMemory allocateMemory(
     ) {
 
     // construct a memory allocation info from arguments
-    VkMemoryAllocateInfo memory_allocate_info = {
+    VkMemoryAllocateInfo memory_ai = {
         allocationSize  : allocation_size,
         memoryTypeIndex : memory_type_index,
     };
 
     // allocate device memory
     VkDeviceMemory device_memory;
-    vkAllocateMemory( vk.device, & memory_allocate_info, vk.allocator, & device_memory ).vkAssert( "Allocate Memory", file, line, func );
+    vkAllocateMemory( vk.device, & memory_ai, vk.allocator, & device_memory ).vkAssert( "Allocate Memory", file, line, func );
 
     return device_memory;
 }

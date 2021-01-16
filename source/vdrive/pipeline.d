@@ -24,7 +24,7 @@ VkPipelineLayout createPipelineLayout(
     size_t                  line    = __LINE__,
     string                  func    = __FUNCTION__
     ) {
-    VkPipelineLayoutCreateInfo pipeline_layout_create_info = {
+    VkPipelineLayoutCreateInfo pipeline_layout_ci = {
         setLayoutCount                  : descriptor_set_layouts.length.toUint,
         pSetLayouts                     : descriptor_set_layouts.ptr,
         pushConstantRangeCount          : push_constant_ranges.length.toUint,
@@ -32,7 +32,7 @@ VkPipelineLayout createPipelineLayout(
     };
 
     VkPipelineLayout pipeline_layout;
-    vk.device.vkCreatePipelineLayout( & pipeline_layout_create_info, vk.allocator, & pipeline_layout ).vkAssert( "Pipeline Layout", file, line, func );
+    vk.device.vkCreatePipelineLayout( & pipeline_layout_ci, vk.allocator, & pipeline_layout ).vkAssert( "Pipeline Layout", file, line, func );
     return pipeline_layout;
 }
 
@@ -191,7 +191,7 @@ struct Meta_Graphics_T(
     nothrow @nogc:
     mixin                                               Vulkan_State_Pointer;
     VkPipeline                                          pipeline;
-    VkPipelineCreateFlags                               pipeline_create_flags;
+    VkPipelineCreateFlags                               pipeline_cf;
     D_OR_S_ARRAY!( VkPipelineShaderStageCreateInfo,     shader_stage_count )            shader_stages;
 
     D_OR_S_ARRAY!( VkVertexInputBindingDescription,     binding_description_count )     vertex_input_binding_descriptions;
@@ -209,10 +209,10 @@ struct Meta_Graphics_T(
     VkPipelineColorBlendStateCreateInfo                 color_blend_state_ci   = { blendConstants : [ 0, 0, 0, 0 ] };
     D_OR_S_ARRAY!( VkPipelineColorBlendAttachmentState, color_blend_state_count )       color_blend_states;
 
-    //VkPipelineDynamicStateCreateInfo                  dynamic_state_create_info;
+    //VkPipelineDynamicStateCreateInfo                  dynamic_state_ci;
     D_OR_S_ARRAY!( VkDynamicState,                      dynamic_state_count )           dynamic_states;
 
-    //VkPipelineLayoutCreateInfo                        pipeline_layout_create_info
+    //VkPipelineLayoutCreateInfo                        pipeline_layout_ci
     VkPipelineLayout                                    pipeline_layout;
     D_OR_S_ARRAY!( VkDescriptorSetLayout,               descriptor_set_layout_count )   descriptor_set_layouts;
     D_OR_S_ARRAY!( VkPushConstantRange,                 push_constant_range_count )     push_constant_ranges;
@@ -273,8 +273,8 @@ struct Meta_Graphics_T(
     ///////////////////////////
     // pipeline create flags //
     ///////////////////////////
-    auto ref pipelineCreateFlags( VkPipelineCreateFlags pipeline_create_flags ) {
-        this.pipeline_create_flags = pipeline_create_flags;
+    auto ref pipelineCreateFlags( VkPipelineCreateFlags pipeline_cf ) {
+        this.pipeline_cf = pipeline_cf;
         return this;
     }
 
@@ -283,14 +283,14 @@ struct Meta_Graphics_T(
     //////////////////////////////
     // shader stage create info //
     //////////////////////////////
-    auto ref addShaderStageCreateInfo( VkPipelineShaderStageCreateInfo shader_stage_create_info ) {
-        shader_stages.append = shader_stage_create_info;
+    auto ref addShaderStageCreateInfo( VkPipelineShaderStageCreateInfo shader_stage_ci ) {
+        shader_stages.append = shader_stage_ci;
         return this;
     }
 
-    auto ref addShaderStageCreateInfo( VkPipelineShaderStageCreateInfo[] shader_stage_create_infos ) {
-        foreach( ref shader_stage_create_info; shader_stage_create_infos )
-            shader_stages.append = shader_stage_create_info;
+    auto ref addShaderStageCreateInfo( VkPipelineShaderStageCreateInfo[] shader_stage_cis ) {
+        foreach( ref shader_stage_ci; shader_stage_cis )
+            shader_stages.append = shader_stage_ci;
         return this;
     }
 
@@ -632,19 +632,19 @@ struct Meta_Graphics_T(
 
     /// disable pipeline optimization
     auto ref disableOptimization() {
-        pipeline_create_flags |= VK_PIPELINE_CREATE_DISABLE_OPTIMIZATION_BIT;
+        pipeline_cf |= VK_PIPELINE_CREATE_DISABLE_OPTIMIZATION_BIT;
         return this;
     }
 
     /// allow that this piplein can have derivative pipleines
     auto ref allowDerivatives() {
-        pipeline_create_flags |= VK_PIPELINE_CREATE_ALLOW_DERIVATIVES_BIT;
+        pipeline_cf |= VK_PIPELINE_CREATE_ALLOW_DERIVATIVES_BIT;
         return this;
     }
 
     /// general variant for setting flags
     auto ref pipelineCeateFlags( VkPipelineCreateFlags flags ) {
-        pipeline_create_flags = flags;
+        pipeline_cf = flags;
         return this;
     }
 
@@ -663,18 +663,18 @@ struct Meta_Graphics_T(
         // assert that meta struct is initialized with a valid vulkan state pointer
         vkAssert( isValid, "Meta_Struct not initialized with a vulkan state pointer", file, line, func );
 
-        VkPipelineVertexInputStateCreateInfo vertex_input_state_create_info = {
+        VkPipelineVertexInputStateCreateInfo vertex_input_state_ci = {
             vertexBindingDescriptionCount   : vertex_input_binding_descriptions.length.toUint,
             pVertexBindingDescriptions      : vertex_input_binding_descriptions.ptr,
             vertexAttributeDescriptionCount : vertex_input_attribute_descriptions.length.toUint,
             pVertexAttributeDescriptions    : vertex_input_attribute_descriptions.ptr,
         };
 
-        VkPipelineTessellationStateCreateInfo tessellation_state_create_info = {
+        VkPipelineTessellationStateCreateInfo tessellation_state_ci = {
             patchControlPoints              : tesselation_patch_control_points,
         };
 
-        VkPipelineViewportStateCreateInfo viewport_state_create_info = {
+        VkPipelineViewportStateCreateInfo viewport_state_ci = {
             viewportCount                   : viewports.length.toUint,
             pViewports                      : viewports.ptr,
             scissorCount                    : scissors.length.toUint,
@@ -688,7 +688,7 @@ struct Meta_Graphics_T(
         color_blend_state_ci.pAttachments     = color_blend_states.ptr;
 
 
-        VkPipelineDynamicStateCreateInfo dynamic_state_create_info = {
+        VkPipelineDynamicStateCreateInfo dynamic_state_ci = {
             dynamicStateCount               : dynamic_states.length.toUint,
             pDynamicStates                  : dynamic_states.ptr,
         };
@@ -700,18 +700,18 @@ struct Meta_Graphics_T(
 
         // create the pipeline object
         VkGraphicsPipelineCreateInfo pipeline_ci = {
-            flags               :   pipeline_create_flags,
+            flags               :   pipeline_cf,
             stageCount          :   shader_stages.length.toUint,
             pStages             :   shader_stages.ptr,
-            pVertexInputState   : & vertex_input_state_create_info,
+            pVertexInputState   : & vertex_input_state_ci,
             pInputAssemblyState : & input_assembly_state_ci,
-            pTessellationState  :   tesselation_patch_control_points > 0 ? & tessellation_state_create_info : null,  // assume inputAssembly = VK_PRIMITIVE_TOPOLOGY_PATCH_LIST
-            pViewportState      : & viewport_state_create_info,
+            pTessellationState  :   tesselation_patch_control_points > 0 ? & tessellation_state_ci : null,  // assume inputAssembly = VK_PRIMITIVE_TOPOLOGY_PATCH_LIST
+            pViewportState      : & viewport_state_ci,
             pRasterizationState : & rasterization_state_ci,
             pMultisampleState   : & multisample_state_ci,
             pDepthStencilState  : & depth_stencil_state_ci,
             pColorBlendState    : & color_blend_state_ci,
-            pDynamicState       : & dynamic_state_create_info,
+            pDynamicState       : & dynamic_state_ci,
             layout              :   this.pipeline_layout,
             renderPass          :   render_pass,
             subpass             :   subpass,
@@ -809,8 +809,8 @@ struct Meta_Compute_T(
     //////////////////////////////
     // shader stage create info //
     //////////////////////////////
-    auto ref shaderStageCreateInfo( VkPipelineShaderStageCreateInfo shader_stage_create_info ) {
-        pipeline_ci.stage = shader_stage_create_info;
+    auto ref shaderStageCreateInfo( VkPipelineShaderStageCreateInfo shader_stage_ci ) {
+        pipeline_ci.stage = shader_stage_ci;
         return this;
     }
 
@@ -877,7 +877,9 @@ struct Meta_Compute_T(
         string              file    = __FILE__,
         size_t              line    = __LINE__,
         string              func    = __FUNCTION__
+
         ) {
+
         // assert that meta struct is initialized with a valid vulkan state pointer
         vkAssert( isValid, "Meta_Struct not initialized with a vulkan state pointer", file, line, func );
 
