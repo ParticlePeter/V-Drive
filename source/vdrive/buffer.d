@@ -297,7 +297,7 @@ struct Meta_Buffer_T( uint32_t view_count, uint32_t member_copies = BMC.None ) {
         static if( mc & BMC.Mem_Range )     out_core.mem_range  = createMappedMemoryRange;  // VkMappedMemoryRange has all the properties listed next line.
         else {
             static if( mc & BMC.Offset )    out_core.offset     = device_memory_offset;
-            static if( mc & BMC.Memory )    out_core.memory     = resetMemory;
+            static if( mc & BMC.Memory )    out_core.memory     = device_memory;
             static if( mc & BMC.Size )      out_core.size       = bufferSize;
         }
         return out_core;
@@ -321,7 +321,7 @@ struct Meta_Buffer_T( uint32_t view_count, uint32_t member_copies = BMC.None ) {
         static if( mc & BMC.Mem_Range )     out_core.mem_range  = createMappedMemoryRange;  // VkMappedMemoryRange has all the properties listed next line.
         else {
             static if( mc & BMC.Offset )    out_core.offset     = device_memory_offset;
-            static if( mc & BMC.Memory )    out_core.memory     = resetMemory;
+            static if( mc & BMC.Memory )    out_core.memory     = device_memory;
             static if( mc & BMC.Size )      out_core.size       = bufferSize;
         }
 
