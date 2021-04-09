@@ -137,19 +137,19 @@ void destroy( ref Vulkan vk, ref Core_Pipeline core ) {
 /// mixin methods common Meta_Graphics and Meta_Compute
 private mixin template Meta_Pipeline_Common() {
 
-    /// add VkDescriptorSetLayout to either Meta_Graphics or Meta_Pipeline, use alias addDescriptorSetLayout instead
+    /// add VkDescriptorSetLayout to either Meta_Graphics or Meta_Pipeline
     auto ref addDescriptorSetLayout( VkDescriptorSetLayout descriptor_set_layout ) {
         descriptor_set_layouts.append = descriptor_set_layout;
         return this;
     }
 
-    /// add VkPushConstantRange to either Meta_Graphics or Meta_Pipeline, use alias addPushConstantRangeImpl instead
+    /// add VkPushConstantRange to either Meta_Graphics or Meta_Pipeline
     auto ref addPushConstantRange( VkPushConstantRange push_constant_range ) {
         push_constant_ranges.append = push_constant_range;
         return this;
     }
 
-    /// add VkPushConstantRange to either Meta_Graphics or Meta_Pipeline, use alias addPushConstantRangeImpl instead
+    /// add VkPushConstantRange to either Meta_Graphics or Meta_Pipeline
     auto ref addPushConstantRange( VkShaderStageFlags stage_flags, size_t offset, size_t size ) {
         return addPushConstantRange( VkPushConstantRange( stage_flags, offset.toUint, size.toUint ));
     }
