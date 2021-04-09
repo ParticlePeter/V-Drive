@@ -45,9 +45,10 @@ VkPipelineLayout createPipelineLayout(
     size_t                  line    = __LINE__,
     string                  func    = __FUNCTION__
     ) {
-    VkDescriptorSetLayout[1]    descriptor_set_layouts  = [ descriptor_set_layout ];
-    VkPushConstantRange[1]      push_constant_ranges    = [ push_constant_range ];
-    return createPipelineLayout( vk, descriptor_set_layouts, push_constant_ranges, file, line, func );
+    return vk.createPipelineLayout(
+        ( & descriptor_set_layout )[ 0 .. 1 ],
+        ( & push_constant_ranges  )[ 0 .. 1 ],
+        file, line, func );
 }
 
 /// overload to simplify VkPipelineLayout construction
@@ -59,8 +60,8 @@ VkPipelineLayout createPipelineLayout(
     size_t                  line    = __LINE__,
     string                  func    = __FUNCTION__
     ) {
-    VkDescriptorSetLayout[1]    descriptor_set_layouts  = [ descriptor_set_layout ];
-    return createPipelineLayout( vk, descriptor_set_layouts, push_constant_ranges, file, line, func );
+    return vk.createPipelineLayout(
+        ( & descriptor_set_layout )[ 0 .. 1 ], push_constant_ranges, file, line, func );
 }
 
 /// overload to simplify VkPipelineLayout construction
@@ -71,8 +72,8 @@ VkPipelineLayout createPipelineLayout(
     size_t                  line    = __LINE__,
     string                  func    = __FUNCTION__
     ) {
-    VkPushConstantRange[1]      push_constant_ranges    = [ push_constant_range ];
-    return createPipelineLayout( vk, [], push_constant_ranges, file, line, func );
+    return vk.createPipelineLayout(
+        ( & push_constant_range )[ 0 .. 1 ], file, line, func );
 }
 
 /// overload to simplify VkPipelineLayout construction
@@ -83,7 +84,8 @@ VkPipelineLayout createPipelineLayout(
     size_t                  line    = __LINE__,
     string                  func    = __FUNCTION__
     ) {
-    return createPipelineLayout( vk, [], push_constant_ranges, file, line, func );
+    return vk.createPipelineLayout(
+        VkDescriptorSetLayout[].init, push_constant_ranges, file, line, func );    // second argument cannot be null due other matching overload
 }
 
 
