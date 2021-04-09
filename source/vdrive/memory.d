@@ -409,7 +409,7 @@ struct Meta_Memory {
 package mixin template Memory_Buffer_Image_Common() {
 
     /// map the underlying memory object and return the mapped memory pointer
-    auto mapMemory(
+    void* mapMemory(
         VkDeviceSize        offset  = 0,
         VkDeviceSize        size    = 0,        // if 0, the device_memory_size will be used
         VkMemoryMapFlags    flags   = 0,        // for future use
@@ -449,7 +449,7 @@ package mixin template Memory_Buffer_Image_Common() {
 
 
     /// map the underlying memory object, copy the provided data into it and return the mapped memory pointer
-    auto mapMemory(
+    void* mapMemory(
         void[]              data,
         VkDeviceSize        offset  = 0,
         VkDeviceSize        size    = 0,        // if 0, the passed in data's size will be used
@@ -467,7 +467,7 @@ package mixin template Memory_Buffer_Image_Common() {
 
         // the same combined_offset logic is applied in the function bellow, so we must pass
         // the original offset to not apply the Meta_Buffer or Meta_Image.device_memory_offset twice
-        auto mapped_memory = vk.mapMemory( device_memory, combined_offset, data.length, flags, file, line, func );
+        void* mapped_memory = vk.mapMemory( device_memory, combined_offset, data.length, flags, file, line, func );
         mapped_memory[ 0 .. data.length ] = data[];
 
         // required for the mapped memory flush
