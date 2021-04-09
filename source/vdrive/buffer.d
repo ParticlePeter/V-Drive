@@ -382,7 +382,6 @@ struct Meta_Buffer_T( uint32_t view_count, uint32_t member_copies = BMC.None ) {
     /// Check if all Vulkan resources are null, not available for multi buffer view.
          static if( vc == 0 ) alias is_null = is_buffer_null;
     else static if( vc == 1 ) bool  is_null() { return is_buffer_null && is_view_null; }
-
 }
 
 

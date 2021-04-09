@@ -167,7 +167,7 @@ auto ref listPresentModes( Result_T )(
 
 
 
-/// list presentation modes, allocates heap memory
+/// list presentation modes, uses stack memory
 auto listPresentModes(
     VkPhysicalDevice    gpu,
     VkSurfaceKHR        surface,
