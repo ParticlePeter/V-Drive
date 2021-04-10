@@ -14,6 +14,10 @@ alias stringz = const( char )*;
 alias strings = const( char )[];
 alias stringb = Block_Array!char;
 
+alias string_z = const( char )*;
+alias string_s = const( char )[];
+alias string_b = Block_Array!char;
+
 
 
 nothrow @nogc:
@@ -326,6 +330,7 @@ unittest {
 
 
 template isCharArray( A ) { enum isCharArray = isDataArrayOrSlice!( A, char ); }
+template isStringT( T )   { enum isStringT = is( T == string ) || is( T : const( char )* ) || is( T : char[] ); }
 
 
 
