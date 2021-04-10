@@ -23,19 +23,19 @@ mixin template Vulkan_State_Pointer() {
 }
 
 
-// Todo(pp): rename to Vulkan_State, rename as well occurrences of: ///     vk = reference to a VulkanState struct
+// Todo(pp): rename to Core_Context, rename as well occurrences of: ///     vk = reference to a VulkanState struct
 struct Vulkan {
     nothrow @nogc:
-    const( VkAllocationCallbacks )*     allocator = null;
-    VkInstance                          instance = VK_NULL_HANDLE;
-    VkDevice                            device = VK_NULL_HANDLE;
-    VkPhysicalDevice                    gpu = VK_NULL_HANDLE;
+    const( VkAllocationCallbacks )* allocator = null;
+    VkInstance                      instance = VK_NULL_HANDLE;
+    VkDevice                        device = VK_NULL_HANDLE;
+    VkPhysicalDevice                gpu = VK_NULL_HANDLE;
 
-    VkDebugReportCallbackEXT            debug_report_callback = VK_NULL_HANDLE;
-    VkDebugUtilsMessengerEXT            debug_utils_messenger = VK_NULL_HANDLE;
+    VkDebugUtilsMessengerEXT        debug_utils_messenger = VK_NULL_HANDLE;
+    VkDebugReportCallbackEXT        debug_report_callback = VK_NULL_HANDLE;
 
     import vdrive.util.array;
-    Arena_Array                         scratch;
+    Arena_Array                     scratch;
 
     // get the memory properties of the this gpu
     // Todo(pp): the memory properties print uints instead of enum flags, fix this
