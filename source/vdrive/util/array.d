@@ -186,7 +186,7 @@ struct Dynamic_Array( T, ST = uint ) {
 
 
     // append slice of elements, return the append result for further manipulation
-    T[] append( S )( S[] stuff, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) if( is( S : T )) {
+    Val_T[] append( S )( S[] stuff, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) if( is( S : T )) {
         if( Capacity < Count + cast( Size_T )( stuff.length ))
             reserve( growCapacity( Count + stuff.length ), file, line, func );
         auto start = Count;
@@ -500,8 +500,7 @@ struct Block_Array( T, ST = uint ) {
 
 
     // append slice of elements, return the append result for further manipulation
-    T[] append( S )( S[] stuff, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) if( is( S : T )) {
-        foreach( s; stuff[ 1 .. $ ] )
+    Val_T[] append( S )( S[] stuff, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) if( is( S : T )) {
 
         // we prepare the following vars in case of appending this to this
         auto stuff_length = stuff.length;
@@ -678,11 +677,9 @@ struct Static_Array( T, uint Capacity, ST = uint ) {
 
 
     // properties
-    //Size_T  length()    { return Count; }
     Size_T  opDollar()  { return Count; }
     Size_T  capacity()  { return Capacity; }
     bool    empty()     { return Count == 0; }
-    Val_T*  ptr()       { return Count == 0 ? null : Data.ptr; }
     void    clear()     { Count = 0; }
 
     inout( Val_T )* ptr()       inout { return Count == 0 ? null : Data.ptr; }
