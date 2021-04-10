@@ -13,6 +13,18 @@ import core.stdc.stdlib : system;
 nothrow @nogc:
 
 
+/// Check if a file exist using fopen() function
+bool exists( stringz filename ) {
+    // try to open file to read
+    FILE* file = fopen( filename, "r" );
+    if( file != null ) {
+        fclose( file );
+        return true;
+    }
+    return false;
+}
+
+
 /// compare the timestamps of two files, implemented to be able to use nothrow @nogc
 /// currently only for Win as using OS specific API
 int compareModTime( stringz fileA, stringz fileB ) {
@@ -63,7 +75,8 @@ strings readSpirV( const ref strings spir_path_s, ref stringb file_buffer ) {
     // checking if the file exist or not
     if( file == null ) {
         printf( "File %s not found!\n", spir_path_s.ptr );
-        return [];
+
+        return null;
     }
 
     file.fseek( 0, SEEK_END );  // jump to end
