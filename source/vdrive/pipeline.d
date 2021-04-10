@@ -47,7 +47,7 @@ VkPipelineLayout createPipelineLayout(
     ) {
     return vk.createPipelineLayout(
         ( & descriptor_set_layout )[ 0 .. 1 ],
-        ( & push_constant_ranges  )[ 0 .. 1 ],
+        ( & push_constant_range   )[ 0 .. 1 ],
         file, line, func );
 }
 
