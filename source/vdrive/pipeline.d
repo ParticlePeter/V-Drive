@@ -345,6 +345,10 @@ struct Meta_Graphics_T(
         return addViewport( offset.x, offset.y, extent.width, extent.height, min_depth, max_depth );
     }
 
+    auto ref addViewport( VkExtent2D extent, float min_depth = 0, float max_depth = 1 ) {
+        return addViewport( 0, 0, extent.width, extent.height, min_depth, max_depth );
+    }
+
     auto ref addViewport( VkRect2D rect, float min_depth = 0, float max_depth = 1 ) {
         return addViewport( rect.offset.x, rect.offset.y, rect.extent.width, rect.extent.height, min_depth, max_depth );
     }
@@ -355,6 +359,10 @@ struct Meta_Graphics_T(
 
     auto ref addScissors( VkOffset2D offset, VkExtent2D extent ) {
         return addScissors( VkRect2D( offset, extent ));
+    }
+
+    auto ref addScissors( VkExtent2D extent ) {
+        return addScissors( VkRect2D( VkOffset2D( 0, 0 ), extent ));
     }
 
     auto ref addScissors( VkRect2D rect ) {
@@ -368,6 +376,10 @@ struct Meta_Graphics_T(
 
     auto ref addViewportAndScissors( VkOffset2D offset, VkExtent2D extent, float min_depth = 0, float max_depth = 1 ) {
         return addViewport( offset, extent, min_depth, max_depth ).addScissors( offset, extent );
+    }
+
+    auto ref addViewportAndScissors( VkExtent2D extent, float min_depth = 0, float max_depth = 1 ) {
+        return addViewport( VkOffset2D( 0, 0 ), extent, min_depth, max_depth ).addScissors( VkOffset2D( 0, 0 ), extent );
     }
 
     auto ref addViewportAndScissors( VkRect2D rect, float min_depth = 0, float max_depth = 1 ) {
