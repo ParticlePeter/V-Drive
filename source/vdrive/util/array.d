@@ -74,6 +74,8 @@ struct Dynamic_Array( T, ST = uint ) {
 
     // properties
     alias   data this;
+    alias   count = length;
+
     Val_T[] data()              { return Data[ 0 .. Count ]; }  // borrowed references, don't store resulting slice!
     Size_T  opDollar()  const   { return Count; }
     Size_T  capacity()  const   { return Capacity; }
@@ -422,6 +424,8 @@ struct Block_Array( T, ST = uint ) {
     //Size_T  length()  const { return Count; }
 
     inout( Val_T )*  ptr()      inout { return cast( inout( Val_T )* )( Arena.ptr + Link.Offset ); }
+    alias   count = length;
+
     inout( Size_T ) length()    inout { return Count; }
 
 
@@ -667,6 +671,8 @@ struct Static_Array( T, uint Capacity, ST = uint ) {
     // borrowed references, don't store resulting slice!
     alias   data this;
     Val_T[] data()      { return Data[ 0 .. Count ]; }
+    alias   count = length;
+
 
 
     // set desired length, which must not be greater then the array capacity
@@ -773,6 +779,8 @@ private struct Empty_Array( T, ST = uint ) {
 
 
     // properties
+    alias   count = length;
+
 //  Size_T  length()    const { return 0; }
     Size_T  capacity()  const { return 0; }
 //  Size_T  opDollar()  const { return 0; }
