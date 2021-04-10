@@ -110,16 +110,15 @@ VkShaderModule createShaderModule(
 
     ) {
 
-    import std.file : exists;
     import std.path : extension;
 
     strings shader_path_s = shader_path.fromStringz;
 
     // assert that the passed in file exist
-    vkAssert( shader_path_s.exists, "Path to GLSL or Spir-V does not exist: ", file, line, func, shader_path );
+    vkAssert( shader_path.exists, "Path to GLSL or Spir-V does not exist: ", file, line, func, shader_path );
 
     strings ext = shader_path_s.extension;                          // get extension of path argument, must compile non .spv extension files
-    auto spir_path = Block_Array!char( vk.scratch );                // temporary to compose shader_path_s to spir_v file if no changes occured
+    stringb spir_path = stringb( vk.scratch );                      // temporary to compose shader_path_s to spir_v file if no changes occured
 
     if( ext != ".spv" ) {
 
@@ -129,8 +128,8 @@ VkShaderModule createShaderModule(
         spir_path.append( ".spv\0" );                               // append new extension .spv
 
         // assert that either the original or the newly composed path exist
-        bool glsl_path_exists = shader_path_s.exists;               // check if the original file, which must be a glsl file, exists
-        bool spir_up_to_date = spir_path.data.exists;               // check if the spir file exists, if not we will compile it
+        bool glsl_path_exists = shader_path_s.ptr.exists;           // check if the original file, which must be a glsl file, exists
+        bool spir_up_to_date = spir_path.ptr.exists;                // check if the spir file exists, if not we will compile it
         vkAssert( glsl_path_exists || spir_up_to_date,
             "Neither path to glsl code nor path to corresponding spv exist: ",
             file, line, func, shader_path );
@@ -143,24 +142,48 @@ VkShaderModule createShaderModule(
             compile_glsl_command.ptr.sprintf( "glslangValidator -V -w -o %s %s", spir_path.ptr, shader_path );
             auto compile_glsl = system( compile_glsl_command.ptr );
 
-            vkAssert( compile_glsl == 0,                            // assert that compilation went right, othervise include compilation error into assert message
-                "SPIR-V is not generated for failed compile or link : ", file, line, func/*, compile_glsl.output.ptr*/ );
-            printf( "Compiled: %s", shader_path );
+            if( compile_glsl != 0 )                            // assert that compilation went right, othervise include compilation error into assert message
+                printf( "SPIR-V failed to compile or link: %s\n", shader_path ); //file, line, func/*, compile_glsl.output.ptr*/ );
+            else
+                printf( "Compiled: %s\n", shader_path );
         }
         shader_path_s = spir_path.data;                               // overwrite the string path parameter with the composed char array back into
     }
 
     // assert that the passed in or freshly compiled spir-v file exist
-    vkAssert( shader_path_s.exists,
+    vkAssert( shader_path_s.ptr.exists,
         "Path to Spir-V does not exist: ",
         file, line, func, shader_path );
 
     auto file_buffer = Block_Array!char( vk.scratch );
     auto code = readSpirV( shader_path_s, file_buffer );
 
-    VkShaderModuleCreateInfo shader_module_create_info = {
-        codeSize    : cast( uint32_t  )code.length,
-        pCode       : cast( uint32_t* )code.ptr,
+    return vk.createShaderModule( code, shader_path, file, line, func );
+}
+
+
+/// create a VkShaderModule from compiled shader code bytes
+/// such a byte stream can be created with: glslangValidator -V -x
+/// which outputs a ascii file with an uint array
+/// optionally a debug name can be passed in
+/// Params:
+///     vk = reference to a VulkanState struct
+///     compiled_shader = compiled shader bytes
+///     debug_name = optionally a debug name for VkDebugUtils extension
+/// Returns: VkShaderModule
+VkShaderModule createShaderModule(
+    ref Vulkan      vk,
+    const void[]    compiled_shader,
+    stringz         debug_name = null,
+    string          file = __FILE__,
+    size_t          line = __LINE__,
+    string          func = __FUNCTION__
+
+    ) {
+
+    VkShaderModuleCreateInfo shader_module_ci = {
+        codeSize    : compiled_shader.length,
+        pCode       : cast( const( uint32_t )* )compiled_shader.ptr,
     };
 
     VkShaderModule shader_module;
