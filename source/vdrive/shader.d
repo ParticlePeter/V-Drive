@@ -151,22 +151,19 @@ VkShaderModule createShaderModule(
     };
 
     VkShaderModule shader_module;
-    vk.device.vkCreateShaderModule( & shader_module_create_info, vk.allocator, & shader_module ).vkAssert( "Shader Module", file, line, func );
+    vk.device.vkCreateShaderModule( & shader_module_ci, vk.allocator, & shader_module ).vkAssert( "Shader Module", file, line, func );
 
     if( !vk.debug_utils_messenger.is_null ) {
-        const VkDebugUtilsObjectNameInfoEXT shader_module_name_info = {
+        const VkDebugUtilsObjectNameInfoEXT shader_module_ni = {
             objectType      : VK_OBJECT_TYPE_SHADER_MODULE,
             objectHandle    : shader_module.toUint64_t,
-            pObjectName     : shader_path,
+            pObjectName     : debug_name,
         };
-        vk.device.vkSetDebugUtilsObjectNameEXT( & shader_module_name_info ).vkAssert( "Shader Module Object Name", file, line, func );
+        vk.device.vkSetDebugUtilsObjectNameEXT( & shader_module_ni ).vkAssert( "Shader Module Object Name", file, line, func );
     }
 
     return shader_module;
 }
-
-
-//nothrow @nogc:
 
 
 /// create a VkPipelineShaderStageCreateInfo acceptable for a pipeline state object (PSO)
@@ -186,14 +183,14 @@ VkPipelineShaderStageCreateInfo createPipelineShaderStage(
     const( VkSpecializationInfo )*  specialization_info = null,
     stringz                         shader_entry_point = "main"
     ) {
-    VkPipelineShaderStageCreateInfo shader_stage_create_info = {
+    VkPipelineShaderStageCreateInfo shader_stage_ci = {
         stage               : shader_stage,
-        _module             : shader_module,
+        Module              : shader_module,
         pName               : shader_entry_point,         // shader entry point function name
         pSpecializationInfo : specialization_info,
     };
 
-    return shader_stage_create_info;
+    return shader_stage_ci;
 }
 
 
