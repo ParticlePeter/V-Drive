@@ -14,7 +14,7 @@ nothrow @nogc:
 
 
 /// Check if a file exist using fopen() function
-bool exists( stringz filename ) {
+bool exists( string_z filename ) {
     // try to open file to read
     FILE* file = fopen( filename, "r" );
     if( file != null ) {
@@ -27,7 +27,7 @@ bool exists( stringz filename ) {
 
 /// compare the timestamps of two files, implemented to be able to use nothrow @nogc
 /// currently only for Win as using OS specific API
-int compareModTime( stringz fileA, stringz fileB ) {
+int compareModTime( string_z fileA, string_z fileB ) {
     version( Windows ) {
 
         import core.sys.windows.winbase;
@@ -69,7 +69,7 @@ int compareModTime( stringz fileA, stringz fileB ) {
 
 
 /// read content of SpirV file (actually any file), implemented to be able to use nothrow @nogc
-strings readSpirV( const ref strings spir_path_s, ref stringb file_buffer ) {
+string_s readSpirV( const ref string_s spir_path_s, ref string_b file_buffer ) {
     FILE* file = spir_path_s.ptr.fopen( "rb" );
 
     // checking if the file exist or not
@@ -103,7 +103,7 @@ strings readSpirV( const ref strings spir_path_s, ref stringb file_buffer ) {
 /// Returns: VkShaderModule
 VkShaderModule createShaderModule(
     ref Vulkan  vk,
-    stringz     shader_path,
+    string_z    shader_path,
     string      file = __FILE__,
     size_t      line = __LINE__,
     string      func = __FUNCTION__
@@ -112,29 +112,29 @@ VkShaderModule createShaderModule(
 
     import std.path : extension;
 
-    strings shader_path_s = shader_path.fromStringz;
+    string_s shader_path_s = shader_path.fromStringz;
 
     // assert that the passed in file exist
     vkAssert( shader_path.exists, "Path to GLSL or Spir-V does not exist: ", file, line, func, shader_path );
 
-    strings ext = shader_path_s.extension;                          // get extension of path argument, must compile non .spv extension files
-    stringb spir_path = stringb( vk.scratch );                      // temporary to compose shader_path_s to spir_v file if no changes occured
+    string_s ext = shader_path_s.extension;                 // get extension of path argument, must compile non .spv extension files
+    string_b spir_path = string_b( vk.scratch );            // temporary to compose shader_path_s to spir_v file if no changes occured
 
     if( ext != ".spv" ) {
 
-        spir_path.reserve( strlen( shader_path ) + 5 );             // we will append the new extension ".spv" + terminating '\0'
+        spir_path.reserve( strlen( shader_path ) + 5 );     // we will append the new extension ".spv" + terminating '\0'
         spir_path.append( shader_path_s );
-        spir_path[ $ - ext.length ] = '_';                          // substitute the . of .ext with _ to _ext
-        spir_path.append( ".spv\0" );                               // append new extension .spv
+        spir_path[ $ - ext.length ] = '_';                  // substitute the . of .ext with _ to _ext
+        spir_path.append( ".spv\0" );                       // append new extension .spv
 
         // assert that either the original or the newly composed path exist
-        bool glsl_path_exists = shader_path_s.ptr.exists;           // check if the original file, which must be a glsl file, exists
-        bool spir_up_to_date = spir_path.ptr.exists;                // check if the spir file exists, if not we will compile it
+        bool glsl_path_exists = shader_path_s.ptr.exists;   // check if the original file, which must be a glsl file, exists
+        bool spir_up_to_date = spir_path.ptr.exists;        // check if the spir file exists, if not we will compile it
         vkAssert( glsl_path_exists || spir_up_to_date,
             "Neither path to glsl code nor path to corresponding spv exist: ",
             file, line, func, shader_path );
 
-        if( glsl_path_exists && spir_up_to_date )                   // if both files exists, check if the spir-v is up to date with the glsl source
+        if( glsl_path_exists && spir_up_to_date )           // if both files exists, check if the spir-v is up to date with the glsl source
             spir_up_to_date = compareModTime( shader_path, spir_path.ptr ) < 0;   // set the spir_up_to_date value if glsl is newer than spir-v
 
         if( !spir_up_to_date ) { // not using 'else', as spir_up_to_date might have changed in the if clause above
@@ -142,12 +142,12 @@ VkShaderModule createShaderModule(
             compile_glsl_command.ptr.sprintf( "glslangValidator -V -w -o %s %s", spir_path.ptr, shader_path );
             auto compile_glsl = system( compile_glsl_command.ptr );
 
-            if( compile_glsl != 0 )                            // assert that compilation went right, othervise include compilation error into assert message
+            if( compile_glsl != 0 )                         // assert that compilation went right, othervise include compilation error into assert message
                 printf( "SPIR-V failed to compile or link: %s\n", shader_path ); //file, line, func/*, compile_glsl.output.ptr*/ );
             else
                 printf( "Compiled: %s\n", shader_path );
         }
-        shader_path_s = spir_path.data;                               // overwrite the string path parameter with the composed char array back into
+        shader_path_s = spir_path.data;                     // overwrite the string path parameter with the composed char array back into
     }
 
     // assert that the passed in or freshly compiled spir-v file exist
@@ -174,7 +174,7 @@ VkShaderModule createShaderModule(
 VkShaderModule createShaderModule(
     ref Vulkan      vk,
     const void[]    compiled_shader,
-    stringz         debug_name = null,
+    string_z        debug_name = null,
     string          file = __FILE__,
     size_t          line = __LINE__,
     string          func = __FUNCTION__
@@ -217,7 +217,7 @@ VkPipelineShaderStageCreateInfo createPipelineShaderStage(
     VkShaderStageFlagBits           shader_stage,
     VkShaderModule                  shader_module,
     const( VkSpecializationInfo )*  specialization_info = null,
-    stringz                         shader_entry_point = "main"
+    string_z                        shader_entry_point = "main"
     ) {
     VkPipelineShaderStageCreateInfo shader_stage_ci = {
         stage               : shader_stage,
@@ -245,15 +245,15 @@ VkPipelineShaderStageCreateInfo createPipelineShaderStage(
 VkPipelineShaderStageCreateInfo createPipelineShaderStage(
     ref Vulkan                      vk,
     VkShaderStageFlagBits           shader_stage,
-    stringz                         shader_path,
+    string_z                        shader_path,
     const( VkSpecializationInfo )*  specialization_info = null,
-    stringz                         shader_entry_point = "main",
+    string_z                        shader_entry_point = "main",
     string                          file = __FILE__,
     size_t                          line = __LINE__,
     string                          func = __FUNCTION__
     ) {
-    return createPipelineShaderStage(
-        vk, shader_stage, vk.createShaderModule( shader_path, file, line, func ), specialization_info, shader_entry_point
+    return vk.createPipelineShaderStage(
+        shader_stage, vk.createShaderModule( shader_path, file, line, func ), specialization_info, shader_entry_point
     );
 }
 
@@ -273,9 +273,9 @@ VkPipelineShaderStageCreateInfo createPipelineShaderStage(
 /// Returns: VkPipelineShaderStageCreateInfo
 VkPipelineShaderStageCreateInfo createPipelineShaderStage(
     ref Vulkan                      vk,
-    stringz                         shader_path,
+    string_z                        shader_path,
     const( VkSpecializationInfo )*  specialization_info = null,
-    stringz                         shader_entry_point = "main",
+    string_z                        shader_entry_point = "main",
     string                          file = __FILE__,
     size_t                          line = __LINE__,
     string                          func = __FUNCTION__
@@ -306,8 +306,8 @@ VkPipelineShaderStageCreateInfo createPipelineShaderStage(
                Accepted Extensions  : .vert, .tesc, .tese, .geom, .frag, .comp\0";  // new line character is automatically added at the beginning of this message
         vkAssert( false, "Unknown Extension    : ", file, line, func, buffer.ptr );
     }
-    return createPipelineShaderStage(
-        vk, shader_stage, vk.createShaderModule( shader_path, file, line, func ), specialization_info, shader_entry_point
+    return vk.createPipelineShaderStage(
+        shader_stage, vk.createShaderModule( shader_path, file, line, func ), specialization_info, shader_entry_point
     );
 }
 
