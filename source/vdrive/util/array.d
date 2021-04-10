@@ -176,12 +176,12 @@ struct Dynamic_Array( T, ST = uint ) {
 
 
     // append single element, return the appended element for further manipulation
-    ref T append( S )( S stuff, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) if( is( S : Val_T )) {
+    Val_T* append( S )( S stuff, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) if( is( S : Val_T )) {
         if( Capacity == Count )
             reserve( growCapacity( Count + 1 ), file, line, func );
         Data[ Count ] = stuff;
         Count += 1;
-        return Data[ Count - 1 ];
+        return & Data[ Count - 1 ];
     }
 
 
@@ -489,13 +489,13 @@ struct Block_Array( T, ST = uint ) {
     }
 
 
-    // append single element, return the appended element for further manipulation
-    ref T append( S )( S stuff, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) if( is( S : T )) {
+    // append single element, return the address of the appended element for further manipulation. We cannot return a reference to the resulting array entry!
+    Val_T* append( S )( S stuff, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) if( is( S : T )) {
         if( Capacity <= Count )
             reserve( growCapacity( Count + 1 ), file, line, func );
         Count += 1;
         data[ Count - 1 ] = stuff;
-        return data[ Count - 1 ];
+        return & data[ Count - 1 ];
     }
 
 
@@ -725,11 +725,11 @@ struct Static_Array( T, uint Capacity, ST = uint ) {
 
 
     // append single element, return the appended element for further manipulation
-    ref Val_T append( S )( S stuff, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) if( is( S : Val_T )) {
+    Val_T* append( S )( S stuff, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) if( is( S : Val_T )) {
         vkAssert( Count < Capacity, file, line, func, "Memory not sufficient to append additional data!" );
         Data[ Count ] = stuff;
         Count += 1;
-        return Data[ $-1 ];
+        return & Data[ $ - 1 ];
     }
 
 
