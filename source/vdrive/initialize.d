@@ -66,16 +66,16 @@ auto initDevice( T )(
     }
 
     // arrange queue_families into VkdeviceQueueCreateInfos
-    auto queue_create_infos = Scratch_Result!VkDeviceQueueCreateInfo( vk, queue_families.length );
+    auto queue_cis = Scratch_Result!VkDeviceQueueCreateInfo( vk, queue_families.length );
     foreach( i, ref queue_family; queue_families ) {
-        queue_create_infos[i].queueFamilyIndex  = queue_family.family_index;
-        queue_create_infos[i].queueCount        = queue_family.queueCount;
-        queue_create_infos[i].pQueuePriorities  = queue_family.priorities;
+        queue_cis[i].queueFamilyIndex  = queue_family.family_index;
+        queue_cis[i].queueCount        = queue_family.queueCount;
+        queue_cis[i].pQueuePriorities  = queue_family.priorities;
     }
 
-    VkDeviceCreateInfo device_create_info = {
-        queueCreateInfoCount    : cast( uint32_t )queue_create_infos.length,
-        pQueueCreateInfos       : queue_create_infos.ptr,
+    VkDeviceCreateInfo device_ci = {
+        queueCreateInfoCount    : cast( uint32_t )queue_cis.length,
+        pQueueCreateInfos       : queue_cis.ptr,
         enabledExtensionCount   : cast( uint32_t )ppExtensionNames.length,
         ppEnabledExtensionNames : ppExtensionNames.ptr,
         enabledLayerCount       : cast( uint32_t )ppLayerNames.length,
@@ -84,7 +84,7 @@ auto initDevice( T )(
     };
 
     // create the device and load all device level Vulkan functions for the device
-    vk.gpu.vkCreateDevice( &device_create_info, null, &vk.device ).vkAssert( "Create Device, file, line, func" );
+    vk.gpu.vkCreateDevice( & device_ci, null, & vk.device ).vkAssert( "Create Device, file, line, func" );
     loadDeviceLevelFunctions( vk.device );
 
     return vk.device;
@@ -182,7 +182,7 @@ void initInstance( T )(
     }
 
     // Specify initialization of the vulkan instance
-    VkInstanceCreateInfo instance_create_info = {
+    VkInstanceCreateInfo instance_ci = {
         pApplicationInfo        : application_info_ptr,
         enabledExtensionCount   : cast( uint32_t )ppExtensionNames.length,
         ppEnabledExtensionNames : ppExtensionNames.ptr,
@@ -191,7 +191,7 @@ void initInstance( T )(
     };
 
     // Create the vulkan instance
-    vkCreateInstance( &instance_create_info, vk.allocator, &vk.instance ).vkAssert( "Instance Initialization", file, line, func );
+    vkCreateInstance( & instance_ci, vk.allocator, & vk.instance ).vkAssert( "Instance Initialization", file, line, func );
 
     // load all instance based functions from the instance
     loadInstanceLevelFunctions( vk.instance );
