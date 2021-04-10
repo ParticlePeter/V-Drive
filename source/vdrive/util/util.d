@@ -227,10 +227,12 @@ void printHelper(
     printf( "    File     : %s\n", buffer.ptr );
     printf( "    Line     : %llu\n", line );
 
-    memcpy( buffer.ptr, func.ptr, func.length );
-    buffer[ func.length ] = '\0';
+    if( func.length > 0 ) {
+        memcpy( buffer.ptr, func.ptr, func.length );
+        buffer[ func.length ] = '\0';
+        printf( "    Func     : %s\n", buffer.ptr );
+    }
 
-    printf( "    Func     : %s\n", buffer.ptr );
     if( message ) {
         printf(  "    Message  : %s", message );
         if( msg_end ) printf( "%s", msg_end );
@@ -481,7 +483,7 @@ mixin template Dispatch_To_Inner_Struct( alias inner_struct ) {
 // Enum utils
 //
 
-template EnumMemberCount( E ) if ( is( E == enum )) {
+template EnumMemberCount( E ) if( is( E == enum )) {
     enum EnumMemberCount = [ __traits(allMembers, E) ].length;
 }
 
