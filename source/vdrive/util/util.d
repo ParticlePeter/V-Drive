@@ -68,7 +68,7 @@ private Log_Info p_log_info;
 
 
 
-ref Log_Info logInfo( string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) nothrow @nogc {
+ref Log_Info logInfo( string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
     return p_log_info( func, file, line );
 }
 
@@ -88,7 +88,7 @@ VkResult vkAssert(
     VkResult        vk_result,
     ref Log_Info    log_info,   //    = logInfo,    // System does not work, carries 1 file line func too late.
     const( char )*  msg_end     = null
-    ) nothrow @nogc {
+    ) {
     vk_result.vkAssert( null, logInfo, msg_end );
     return vk_result;
 }
@@ -99,7 +99,7 @@ VkResult vkAssert(
     const( char )*  message,
     ref Log_Info    log_info,   //    = logInfo,    // System does not work, carries 1 file line func too late.
     const( char )*  msg_end     = null
-    ) nothrow @nogc {
+    ) {
     if( vk_result != VK_SUCCESS ) {
         printf( "\n! ERROR !\n==============\n" );
         printf( "    VkResult : %s\n", vk_result.toCharPtr );
@@ -114,7 +114,7 @@ void vkAssert(
     bool            assert_value,
     ref Log_Info    log_info,   //    = logInfo,    // System does not work, carries 1 file line func too late.
     const( char )*  msg_end     = null
-    ) nothrow @nogc {
+    ) {
     assert_value.vkAssert( null, logInfo, msg_end );
 }
 
@@ -124,7 +124,7 @@ void vkAssert(
     const( char )*  message,
     ref Log_Info    log_info,   //    = logInfo,
     const( char )*  msg_end     = null
-    ) nothrow @nogc {
+    ) {
     if( !assert_value ) {
         printf( "\n! ERROR !\n==============\n" );
         printHelper( message, log_info, msg_end );
@@ -137,7 +137,7 @@ void printHelper(
     const( char )*  message,
     ref Log_Info    log_info,
     const( char )*  msg_end
-    ) nothrow @nogc {
+    ) {
     printf( "    File     : %s\n",   log_info.file.ptr );
     printf( "    Line     : %llu\n", log_info.line );
     printf( "    Func     : %s\n",   log_info.func.ptr );
@@ -162,7 +162,7 @@ VkResult vkAssert(
     size_t          line = __LINE__,
     string          func = __FUNCTION__,
     const( char )*  msg_end = null
-    ) nothrow @nogc {
+    ) {
     vk_result.vkAssert( null, file, line, func, msg_end );
     return vk_result;
 }
@@ -175,7 +175,7 @@ VkResult vkAssert(
     size_t          line = __LINE__,
     string          func = __FUNCTION__,
     const( char )*  msg_end = null
-    ) nothrow @nogc {
+    ) {
     if( vk_result != VK_SUCCESS ) {
         printf( "\n! ERROR !\n==============\n" );
         printf( "    VkResult : %s\n", vk_result.toCharPtr );
@@ -192,7 +192,7 @@ void vkAssert(
     size_t          line = __LINE__,
     string          func = __FUNCTION__,
     const( char )*  msg_end = null
-    ) nothrow @nogc {
+    ) {
     assert_value.vkAssert( null, file, line, func, msg_end );
 }
 
@@ -204,7 +204,7 @@ void vkAssert(
     size_t          line = __LINE__,
     string          func = __FUNCTION__,
     const( char )*  msg_end = null
-    ) nothrow @nogc {
+    ) {
     if( !assert_value ) {
         printf( "\n! ERROR !\n==============\n" );
         printHelper( message, file, line, func, msg_end );
@@ -220,7 +220,7 @@ void printHelper(
     size_t line,
     string func,
     const( char )* msg_end
-    ) nothrow @nogc {
+    ) {
     memcpy( buffer.ptr, file.ptr, file.length );
     buffer[ file.length ] = '\0';
 
@@ -243,7 +243,7 @@ void printHelper(
 
 
 
-const( char )* toCharPtr( VkResult vk_result ) nothrow @nogc {
+const( char )* toCharPtr( VkResult vk_result ) {
     switch( vk_result ) {
         case VK_SUCCESS                             : return "VK_SUCCESS";
         case VK_NOT_READY                           : return "VK_NOT_READY";
