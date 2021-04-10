@@ -41,7 +41,8 @@ struct Vulkan {
     // Todo(pp): the memory properties print uints instead of enum flags, fix this
     VkPhysicalDeviceMemoryProperties    memory_properties() {
         vkAssert( !gpu.is_null );
-        return gpu.listMemoryProperties( false );
+        import vdrive.memory : memoryProperties;
+        return gpu.memoryProperties;
     }
 }
 
