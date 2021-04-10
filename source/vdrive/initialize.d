@@ -102,6 +102,7 @@ auto listExtensions( ref Vulkan vk, const( char )* layer, bool print_info = true
 
 /// list all available ( layer per ) instance / device extensions, allocates heap memory
 auto listExtensions( VkPhysicalDevice gpu, const( char )* layer, bool print_info = true, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+    // Todo(pp): try to get rid of Dynamic_Result, use Dynamic_Array instead, and get rid of .release method.
     auto result = Dynamic_Result!( VkExtensionProperties, VkPhysicalDevice )( gpu );
     listExtensions!( typeof( result ))( result, layer, print_info, file, line, func );
     return result.array.release;

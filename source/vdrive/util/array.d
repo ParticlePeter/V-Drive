@@ -25,6 +25,10 @@ struct Dynamic_Array( T, ST = uint ) {
     private Size_T  Capacity    = 0;
     private bool    Owns_Memory = true;
 
+
+    // disable copying
+    @disable this( this );
+
     // constructor with borrowed memory
     this( void[] borrowed ) {
         Data = cast( Val_T* )( borrowed.ptr );
@@ -32,17 +36,15 @@ struct Dynamic_Array( T, ST = uint ) {
         Owns_Memory = false;
     }
 
-
     // convenience constructor, initializes array with data
-    this( Val_T[] stuff, void[] borrowed = [] ) {
-        if( borrowed != [] ) {
+    this( Val_T[] stuff, void[] borrowed = null ) {
+        if( borrowed != null ) {
             Data = cast( Val_T* )( borrowed.ptr );
             Capacity = cast( Size_T )( borrowed.length / T.sizeof );
             Owns_Memory = false;
         }
         append( stuff );
     }
-
 
     // convenience constructor, possibly sets capacity and initializes array with count of init values
     this( Size_T count, Size_T capacity = 0, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
@@ -51,14 +53,12 @@ struct Dynamic_Array( T, ST = uint ) {
         length( count, true, file, line, func );  // initialize elements
     }
 
-
     // cannot be called from outside, used to move data (release, dup)
     private this( Val_T* data, Size_T count, Size_T capacity ) {
         Data        = data;
         Count       = count;
         Capacity    = capacity;
     }
-
 
     // free data on destruction
     ~this() {
@@ -68,51 +68,18 @@ struct Dynamic_Array( T, ST = uint ) {
     }
 
 
-    // disable copying
-    @disable this( this );
-
-
     // properties
-    alias   data this;
+    alias   data    this;
     alias   count = length;
 
     Val_T[] data()              { return Data[ 0 .. Count ]; }  // borrowed references, don't store resulting slice!
     Size_T  opDollar()  const   { return Count; }
     Size_T  capacity()  const   { return Capacity; }
     bool    empty()     const   { return Count == 0; }
-    void    clear()     { Count = 0; }
+    void    clear()             { Count = 0; }
 
     inout( Val_T )* ptr()       inout { return Data; }
     inout( Size_T ) length()    inout { return Count; }
-
-
-    // reset internal state
-    void reset( void[] borrowed = [] ) {
-        if( Owns_Memory && Data !is null ) {
-            free( Data );
-            Data = null;
-        }
-
-        if( borrowed == [] ) {
-            Owns_Memory = true;
-            Capacity = 0;
-            Data = null;
-        } else {
-            Owns_Memory = false;
-            Capacity = cast( Size_T )( borrowed.length );
-            Data = cast( Val_T* )( borrowed.ptr );
-        }
-
-        Count = 0;
-    }
-
-
-    // reset internal state
-    void reset( Val_T[] stuff, void[] borrowed = [] ) {
-        reset( borrowed );
-        length = stuff.length;
-        data[ 0 .. stuff.length ] = stuff[];
-    }
 
 
     // set desired length, resulting capacity might become larger than count
@@ -124,13 +91,11 @@ struct Dynamic_Array( T, ST = uint ) {
         static if( debug_arena ) if( Max_Count < Count ) Max_Count = Count;
     }
 
-
     // set desired length and if data should be initialized with default value, resulting capacity might become larger than count
     void length( size_t count, bool initialize, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
         if( initialize ) { Val_T t; length( count, t, file, line, func ); }
         else                        length( count, file, line, func );
     }
-
 
     // set desired length, resulting capacity might become larger than count and initialize each element
     void length( size_t count, ref Val_T initial, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
@@ -165,16 +130,9 @@ struct Dynamic_Array( T, ST = uint ) {
     @disable void opBinary( string op : "~" )( Val_T[] t ) {}
 
 
-    // customize appending single element
-    void opOpAssign( string op : "~" )( Val_T stuff ) {
-        return append( stuff );
-    }
-
-
-    // customize appending slice of elements
-    void opOpAssign( string op: "~" )( Val_T[] stuff ) {
-        return append( stuff );
-    }
+    // customize appending single element and slice of elements
+    void opOpAssign( string op : "~" )( Val_T   stuff ) { return append( stuff ); }
+    void opOpAssign( string op : "~" )( Val_T[] stuff ) { return append( stuff ); }
 
 
     // append single element, return the appended element for further manipulation
@@ -186,7 +144,6 @@ struct Dynamic_Array( T, ST = uint ) {
         return & Data[ Count - 1 ];
     }
 
-
     // append slice of elements, return the append result for further manipulation
     Val_T[] append( S )( S[] stuff, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) if( is( S : T )) {
         if( Capacity < Count + cast( Size_T )( stuff.length ))
@@ -195,26 +152,6 @@ struct Dynamic_Array( T, ST = uint ) {
         Count += stuff.length;
         Data[ start .. Count ] = stuff[];
         return Data[ start .. Count ];
-    }
-
-
-    // move data out of struct without copying the struct itself, works in tandem with private constructor
-    Dynamic_Array release() {
-        Val_T* data = Data;
-        Data = null;
-        return Dynamic_Array( data, Count, Capacity );
-    }
-
-
-    // duplicate the struct
-    Dynamic_Array dup( string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
-        if( Data is null )
-            return Dynamic_Array();
-        T* new_data = cast( T* )malloc( Capacity * T.sizeof );
-        static if( debug_alloc ) printf( "\n--------\nmalloc : %s : %u, %s\n--------\n\n", file, line, func.file.ptr, file, line, func.line, file, line, func.func.ptr );
-
-        memcpy( new_data, Data, Capacity * T.sizeof );
-        return Dynamic_Array( new_data, Count, Capacity );
     }
 
 
@@ -247,6 +184,56 @@ struct Dynamic_Array( T, ST = uint ) {
     }
 
 
+    // reset internal state
+    void reset( void[] borrowed = null ) {
+        if( Owns_Memory && Data !is null ) {
+            free( Data );
+            Data = null;
+        }
+
+        if( borrowed is null ) {
+            Owns_Memory = true;
+            Capacity = 0;
+            Data = null;
+        } else {
+            Owns_Memory = false;
+            Capacity = cast( Size_T )( borrowed.length );
+            Data = cast( Val_T* )( borrowed.ptr );
+        }
+
+        Count = 0;
+    }
+
+    // reset internal state
+    void reset( Val_T[] stuff, void[] borrowed = null ) {
+        reset( borrowed );
+        length = stuff.length;
+        data[ 0 .. stuff.length ] = stuff[];
+    }
+
+
+    // duplicate the struct
+    Dynamic_Array dup( string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+        if( Data is null )
+            return Dynamic_Array();
+        T* new_data = cast( T* )malloc( Capacity * T.sizeof );
+        static if( debug_alloc ) printf( "\n--------\nmalloc : %s : %u, %s\n--------\n\n", file, line, func.file.ptr, file, line, func.line, file, line, func.func.ptr );
+
+        memcpy( new_data, Data, Capacity * T.sizeof );
+        return Dynamic_Array( new_data, Count, Capacity );
+    }
+
+
+    // move data out of struct without copying the struct itself, works in tandem with private constructor
+    // Todo(pp): get rid of this method, we should not need it due to Return Value Optimization, which is NOT a copy
+    Dynamic_Array release() {
+        Val_T* data = Data;
+        Data = null;
+        return Dynamic_Array( data, Count, Capacity );
+    }
+
+
+    // for debugging and statistics
     static if( debug_arena ) {
         private   Size_T  Max_Count       = 0;
         private   Size_T  Max_Capacity    = 0;
@@ -275,6 +262,8 @@ struct Block_Link( ST = uint /*, bool bidirectional = false*/ ) {
 alias BLink = Block_Link;
 
 
+
+// Arena Array, to sub-allocate memory, with bookkeeping of Linked Block_Array(s)
 struct Arena_Array_T( ST = uint ) {   //, bool biderectional = false ) {
     nothrow @nogc:
     alias                       Size_T = ST;
@@ -283,7 +272,10 @@ struct Arena_Array_T( ST = uint ) {   //, bool biderectional = false ) {
     alias                       BLink_T = BLink!Size_T;
     private BLink_T*            Head = null;
     private BLink_T*            Tail = null;
-    //Block_Link                  List = { Offset : Size_T.max };
+
+
+    // disable copying
+    @disable this( this );
 
 
     private void attach( BLink_T* link, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
@@ -369,15 +361,8 @@ struct Arena_Array_T( ST = uint ) {   //, bool biderectional = false ) {
 
     }
 
-    // disable copying
-    @disable this( this );
 
-
-    // disable default constructor
-    //@disable this();
-
-
-
+    // for debugging and statistics
     static if( debug_arena ) {
         private Size_T Num_Links = 0;   Size_T num_links() { return Num_Links; }
         private Size_T Max_Links = 0;   Size_T max_links() { return Max_Links; }
@@ -414,18 +399,65 @@ struct Block_Array( T, ST = uint ) {
 
     Arena_T*                arena() { return Arena; }
 
-    // properties
-    alias   data        this;
-    Val_T[] data()      { return ptr()[ 0 .. Count ]; }       // borrowed references, don't store resulting slice!
-    void    clear()     { Count = 0; }
-    bool    empty()     const { return Count == 0; }
-    Size_T  capacity()  const { return Capacity(); }
-    Size_T  opDollar()  const { return Count; }
-    //Size_T  length()  const { return Count; }
 
-    inout( Val_T )*  ptr()      inout { return cast( inout( Val_T )* )( Arena.ptr + Link.Offset ); }
+    // disable copying
+    @disable this( this );
+
+    // disable default constructor, a Block_Array requires an Arena_Array as memory source
+    @disable this();
+
+    // must have an array to borrow from
+    this( ref Arena_T arena, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+        Arena = & arena;
+        Arena.attach( & Link );
+    }
+
+    // convenience constructors
+    this( ref Arena_T arena, T   stuff, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) { this( arena ); append( stuff ); }
+    this( ref Arena_T arena, T[] stuff, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) { this( arena ); append( stuff ); }
+
+    // cannot be called from outside
+    private this( Arena_T* arena, BLink_T* link, Size_T count ) {
+        Arena           = arena;
+        Link.Prev       = link.Prev;
+        Link.Next       = link.Next;
+        Link.Offset     = link.Offset;
+        Link.Size       = link.Size;
+        Count           = count;
+
+        if( Link.Prev !is null )
+            Link.Prev.Next = & Link;
+
+        if( Link.Next !is null )
+            Link.Next.Prev = & Link;
+
+        /*
+        // mark for not being detached from Arena
+        link.Offset = link.Size = Size_T.max;
+
+        // replace link in linked link list
+        Arena.replace( link, & Link );
+        */
+    }
+
+    // free data on destruction
+    ~this() {
+        if( Link.Offset != Size_T.max && Link.Size != Size_T.max )
+            Arena.detach( & Link );
+    }
+
+
+    // properties
+    alias   data    this;
     alias   count = length;
 
+    Val_T[] data()              { return ptr()[ 0 .. Count ]; } // borrowed references, don't store resulting slice!
+    bool    empty()     const   { return Count == 0; }
+    Size_T  capacity()  const   { return Capacity(); }
+    Size_T  opDollar()  const   { return Count; }
+    void    clear()             { Count = 0; }
+
+    inout( Val_T )* ptr()       inout { return cast( inout( Val_T )* )( Arena.ptr + Link.Offset ); }
     inout( Size_T ) length()    inout { return Count; }
 
 
@@ -438,13 +470,11 @@ struct Block_Array( T, ST = uint ) {
         Count = cast( Size_T )count;
     }
 
-
     // set desired length and if data should be initialized with default value, resulting capacity might become larger than count
     void length( size_t count, bool initialize, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
         if( initialize ) { T t; length( count, t, file, line, func ); }
         else                    length( count,    file, line, func );
     }
-
 
     // set desired length, resulting capacity might become larger than count and initialize each element
     void length( size_t count, ref T initial, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
@@ -458,7 +488,6 @@ struct Block_Array( T, ST = uint ) {
 
     // index access
     ref inout( Val_T ) opIndex( size_t i, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) inout {
-    //ref T opIndex( size_t i, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
         vkAssert( i < Count, file, line, func, "Array out of bounds!" );
         return ptr()[ i ];
     }
@@ -470,10 +499,9 @@ struct Block_Array( T, ST = uint ) {
     inout( Val_T )* ptr_back( string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) inout { return & opIndex( length - 1, file, line, func ); }
 
 
-
     // convenience first and last element access
-    ref T front()   { return ptr()[ 0 ]; }
-    ref T back()    { return ptr()[ Count - 1 ]; }
+    ref inout( Val_T ) front()  inout   { return ptr()[ 0 ]; }
+    ref inout( Val_T ) back()   inout   { return ptr()[ Count - 1 ]; }
 
 
     // disable concatenation
@@ -481,16 +509,9 @@ struct Block_Array( T, ST = uint ) {
     @disable void opBinary( string op : "~" )( T[] t ) {}
 
 
-    // customize appending single element
-    void opOpAssign( string op : "~" )( T stuff ) {
-        return append( stuff );
-    }
-
-
-    // customize appending slice of elements
-    void opOpAssign( string op: "~" )( T[] stuff ) {
-        return append( stuff );
-    }
+    // customize appending single element and slice of elements
+    void opOpAssign( string op : "~" )( Val_T   stuff ) { return append( stuff ); }
+    void opOpAssign( string op : "~" )( Val_T[] stuff ) { return append( stuff ); }
 
 
     // append single element, return the address of the appended element for further manipulation. We cannot return a reference to the resulting array entry!
@@ -501,7 +522,6 @@ struct Block_Array( T, ST = uint ) {
         data[ Count - 1 ] = stuff;
         return & data[ Count - 1 ];
     }
-
 
     // append slice of elements, return the append result for further manipulation
     Val_T[] append( S )( S[] stuff, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) if( is( S : T )) {
@@ -561,25 +581,23 @@ struct Block_Array( T, ST = uint ) {
 
 
     // reset internal state
-    void reset( T[] stuff = [], string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+    void reset( T[] stuff = null, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
         reset( Arena, stuff, file, line, func );
     }
 
     // reset internal state
-    void reset( ref Arena_T arena, T[] stuff = [], string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+    void reset( ref Arena_T arena, T[] stuff = null, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
         reset( & arena, stuff, file, line, func );
     }
 
     // reset internal state
-    void reset( Arena_T* arena, T[] stuff = [], string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+    void reset( Arena_T* arena, T[] stuff = null, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
         length( 0, file, line, func );
         Arena.detach( & Link );
         Arena = arena;
         Arena.attach( & Link );
         if( stuff.length > 0 ) append( stuff );
     }
-
-
 
 
     // duplicate the struct
@@ -592,69 +610,13 @@ struct Block_Array( T, ST = uint ) {
     }
 
 
-    // disable copying
-    @disable this( this );
-    //this( this ) {
-    //    printf( "Postblit!\n" );
+
+    //Block_Array release() {
+    //    return Block_Array( Arena, & Link, Count );
     //}
-
-
-    // disable default constructor
-    @disable this();
-
-
-    // must have an array to borrow from
-    this( ref Arena_T arena, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
-        Arena = & arena;
-        Arena.attach( & Link );
-    }
-
-
-    // convenience constructors
-    this( ref Arena_T arena, T   stuff, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) { this( arena ); append( stuff ); }
-    this( ref Arena_T arena, T[] stuff, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) { this( arena ); append( stuff ); }
-
-
-    // cannot be called from outside
-    private this( Arena_T* arena, BLink_T* link, Size_T count ) {
-        Arena           = arena;
-        Link.Prev       = link.Prev;
-        Link.Next       = link.Next;
-        Link.Offset     = link.Offset;
-        Link.Size       = link.Size;
-        Count           = count;
-
-        if( Link.Prev !is null )
-            Link.Prev.Next = & Link;
-
-        if( Link.Next !is null )
-            Link.Next.Prev = & Link;
-
-        /*
-        // mark for not being detached from Arena
-        link.Offset = link.Size = Size_T.max;
-
-        // replace link in linked link list
-        Arena.replace( link, & Link );
-        */
-    }
-
-
-    Block_Array release() {
-        return Block_Array( Arena, & Link, Count );
-    }
-
-
-
-    // free data on destruction
-    ~this() {
-        if( Link.Offset != Size_T.max && Link.Size != Size_T.max )
-            Arena.detach( & Link );
-    }
 }
 
 alias BArray = Block_Array;
-
 
 
 
@@ -668,11 +630,23 @@ struct Static_Array( T, uint Capacity, ST = uint ) {
     private Size_T Count        = 0;
 
 
-    // borrowed references, don't store resulting slice!
-    alias   data this;
-    Val_T[] data()      { return Data[ 0 .. Count ]; }
+    // convenience constructors
+    this( Val_T   stuff ) { append( stuff ); }
+    this( Val_T[] stuff ) { append( stuff ); }
+
+
+    // properties
+    alias   data    this;
     alias   count = length;
 
+    Val_T[] data()              { return Data[ 0 .. Count ]; }
+    Size_T  opDollar()  const   { return Count; }
+    Size_T  capacity()  const   { return Capacity; }
+    bool    empty()     const   { return Count == 0; }
+    void    clear()             { Count = 0; }
+
+    inout( Val_T )* ptr()       inout { return Count == 0 ? null : Data.ptr; }
+    inout( Size_T ) length()    inout { return Count; }
 
 
     // set desired length, which must not be greater then the array capacity
@@ -680,16 +654,6 @@ struct Static_Array( T, uint Capacity, ST = uint ) {
         vkAssert( count <= Capacity, file, line, func, "Memory not sufficient to set requested length!" );
         Count = cast( Size_T )count;
     }
-
-
-    // properties
-    Size_T  opDollar()  { return Count; }
-    Size_T  capacity()  { return Capacity; }
-    bool    empty()     { return Count == 0; }
-    void    clear()     { Count = 0; }
-
-    inout( Val_T )* ptr()       inout { return Count == 0 ? null : Data.ptr; }
-    inout( Size_T ) length()    inout { return Count; }
 
 
     // index access
@@ -706,8 +670,8 @@ struct Static_Array( T, uint Capacity, ST = uint ) {
 
 
     // convenience first and last element access
-    inout @property ref inout( Val_T ) front()  { return Data[ 0 ]; }
-    inout @property ref inout( Val_T ) back()   { return Data[ Count - 1 ]; }
+    inout ref inout( Val_T ) front()  { return Data[ 0 ]; }
+    inout ref inout( Val_T ) back()   { return Data[ Count - 1 ]; }
 
 
     // disable concatenation
@@ -715,16 +679,9 @@ struct Static_Array( T, uint Capacity, ST = uint ) {
     @disable void opBinary( string op : "~" )( Val_T[] stuff ) {}
 
 
-    // customize appending single element
-    void opOpAssign( string op : "~" )( Val_T stuff, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
-        return append( stuff, file, line, func );
-    }
-
-
-    // customize appending slice of elements
-    void opOpAssign( string op: "~" )( Val_T[] stuff, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
-        return append( stuff, file, line, func );
-    }
+    // customize appending single element and slice of elements
+    void opOpAssign( string op : "~" )( Val_T   stuff ) { return append( stuff ); }
+    void opOpAssign( string op : "~" )( Val_T[] stuff ) { return append( stuff ); }
 
 
     // append single element, return the appended element for further manipulation
@@ -734,7 +691,6 @@ struct Static_Array( T, uint Capacity, ST = uint ) {
         Count += 1;
         return & Data[ $ - 1 ];
     }
-
 
     // append slice of elements, return the append result for further manipulation
     Val_T[] append( S )( S[] stuff, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) if( is( S : Val_T )) {
@@ -746,17 +702,19 @@ struct Static_Array( T, uint Capacity, ST = uint ) {
     }
 
 
-    // micking Dynamic_Array.release, no
+    // reset internal state, just convenience
+    void reset() {
+        length = 0;
+    }
+
+
+    // mimicking Dynamic_Array.release
+    // Todo(pp): get rid of, see Todo at Dynamic_Array
     Static_Array release() {
         auto result = this;
         length = 0;
         return result;
     }
-
-
-    // convenience constructors
-    this( Val_T   stuff ) { append( stuff ); }
-    this( Val_T[] stuff ) { append( stuff ); }
 }
 
 alias SArray = Static_Array;
@@ -770,27 +728,26 @@ private struct Empty_Array( T, ST = uint ) {
     nothrow @nogc:
     alias   Val_T   = T;
     alias   Size_T  = ST;
-    //T[] data() { return null[0..0]; }
-
-    // set length, which must always be 1
-    void length( size_t count, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
-        vkAssert( count == 0, file, line, func, "One_Array.length can be set only to 0!" );
-    }
-
 
     // properties
     alias   count = length;
 
-//  Size_T  length()    const { return 0; }
+    Size_T  length()    const { return 0; }
     Size_T  capacity()  const { return 0; }
-//  Size_T  opDollar()  const { return 0; }
+    //Size_T  opDollar()  const { return 0; }
     bool    empty()     const { return true; }
-//  Val_T*  ptr()       { return null; }
+    Val_T*  ptr()       { return null; }
     void    clear()     {}
 
 
     inout( Val_T )* ptr()       inout { return null; }
     inout( Size_T ) length()    inout { return 0; }
+
+
+    // set length, which must always be 0
+    void length( size_t count, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+        vkAssert( count == 0, file, line, func, "One_Array.length can be set only to 0!" );
+    }
 
 
     inout( Val_T ) opIndex( size_t i, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) inout {
@@ -804,16 +761,16 @@ private struct Empty_Array( T, ST = uint ) {
     inout( Val_T )* ptr_at( size_t i, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) inout  { return null; }
     inout( Val_T )* ptr_back( string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) inout { return null; }
 
+
     //auto opSlice( size_t i, size_t j ) { return T[];}
-    //inout @property inout( T ) front() { vkAssert( false, "Empty_Struct has no data!"; return T(); }
-    //inout @property inout( T ) back()  { vkAssert( false, "Empty_Struct has no data!"; return T(); }
+    //inout inout( T ) front() { vkAssert( false, "Empty_Struct has no data!"; return T(); }
+    //inout inout( T ) back()  { vkAssert( false, "Empty_Struct has no data!"; return T(); }
 
 
     // assert on single element append
     void append( S )( S stuff, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) if( is( S : Val_T )) {
         vkAssert( false, file, line, func, "Empty_Array has no memory, no data can be appended or set!" );
     }
-
 
     // assert on multi element append
     void append( S )( S[] stuff, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) if( is( S : Val_T )) {
@@ -825,6 +782,14 @@ alias EArray = Empty_Array;
 
 
 
+/// sized array overload forwarding to Dynamic_Array
+auto sizedArray( T )( size_t size, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+    DArray!T array;
+    T initial = T.init;
+    array.length( size, initial, file, line, func );
+    return array;
+}
+
 /// sized array overload forwarding to D_OR_S_ARRAY template
 auto sizedArray( int max_length, T, ST = uint )( size_t length ) {
     alias   Size_T = ST;
@@ -833,9 +798,6 @@ auto sizedArray( int max_length, T, ST = uint )( size_t length ) {
         array.length = cast( Size_T )length;
     return array;
 }
-
-
-
 
 
 
@@ -870,11 +832,6 @@ template isDataArrayOrSlice( A, E ) { enum isDataArrayOrSlice = isDataArray!( A,
 
 
 
-
-
-
-
-
 /// template that creates a Dynamic, Static (mimicking dynamic), Empty, or DLang Static Array
 template D_OR_S_ARRAY( T, int count, ST = uint ) {
     alias   Size_T  = ST;
@@ -889,9 +846,4 @@ template D_OR_S_ARRAY( T, int count, ST = uint ) {
 
 
 
-auto sizedArray( T )( size_t size, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
-    DArray!T array;
-    T initial = T.init;
-    array.length( size, initial, file, line, func );
-    return array;
-}
+
