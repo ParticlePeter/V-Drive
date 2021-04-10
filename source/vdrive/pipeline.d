@@ -336,21 +336,21 @@ struct Meta_Graphics_T(
     ////////////////////////////////
     // viewport and scissor state //
     ////////////////////////////////
-    auto ref addViewport( float x, float y, float width, float height, float minDepth = 0, float maxDepth = 1 ) {
-        viewports.append = VkViewport( x, y, width, height, minDepth, maxDepth );
+    auto ref addViewport( float x, float y, float w, float h, float min_depth = 0, float max_depth = 1 ) {
+        viewports.append = VkViewport( x, y, w, h, min_depth, max_depth );
         return this;
     }
 
-    auto ref addViewport( VkOffset2D offset, VkExtent2D extent, float minDepth = 0, float maxDepth = 1 ) {
-        return addViewport( offset.x, offset.y, extent.width, extent.height, minDepth, maxDepth );
+    auto ref addViewport( VkOffset2D offset, VkExtent2D extent, float min_depth = 0, float max_depth = 1 ) {
+        return addViewport( offset.x, offset.y, extent.width, extent.height, min_depth, max_depth );
     }
 
-    auto ref addViewport( VkRect2D rect, float minDepth = 0, float maxDepth = 1 ) {
-        return addViewport( rect.offset.x, rect.offset.y, rect.extent.width, rect.extent.height, minDepth, maxDepth );
+    auto ref addViewport( VkRect2D rect, float min_depth = 0, float max_depth = 1 ) {
+        return addViewport( rect.offset.x, rect.offset.y, rect.extent.width, rect.extent.height, min_depth, max_depth );
     }
 
-    auto ref addScissors( int32_t x, int32_t y, uint32_t width, uint32_t height ) {
-        return addScissors( VkRect2D( VkOffset2D( x, y ), VkExtent2D( width, height )));
+    auto ref addScissors( int32_t x, int32_t y, uint32_t w, uint32_t h ) {
+        return addScissors( VkRect2D( VkOffset2D( x, y ), VkExtent2D( w, h )));
     }
 
     auto ref addScissors( VkOffset2D offset, VkExtent2D extent ) {
@@ -362,16 +362,16 @@ struct Meta_Graphics_T(
         return this;
     }
 
-    auto ref addViewportAndScissors( float x, float y, float width, float height, float minDepth = 0, float maxDepth = 1 ) {
-        return addViewport( x, y, width, height, minDepth, maxDepth ).addScissors( x.toInt32_t, y.toInt32_t, width.toInt32_t, height.toInt32_t );
+    auto ref addViewportAndScissors( float x, float y, float w, float h, float min_depth = 0, float max_depth = 1 ) {
+        return addViewport( x, y, w, h, min_depth, max_depth ).addScissors( x.toInt32_t, y.toInt32_t, w.toInt32_t, h.toInt32_t );
     }
 
-    auto ref addViewportAndScissors( VkOffset2D offset, VkExtent2D extent, float minDepth = 0, float maxDepth = 1 ) {
-        return addViewport( offset, extent, minDepth, maxDepth ).addScissors( offset, extent );
+    auto ref addViewportAndScissors( VkOffset2D offset, VkExtent2D extent, float min_depth = 0, float max_depth = 1 ) {
+        return addViewport( offset, extent, min_depth, max_depth ).addScissors( offset, extent );
     }
 
-    auto ref addViewportAndScissors( VkRect2D rect, float minDepth = 0, float maxDepth = 1 ) {
-        return addViewport( rect, minDepth, maxDepth ).addScissors( rect );
+    auto ref addViewportAndScissors( VkRect2D rect, float min_depth = 0, float max_depth = 1 ) {
+        return addViewport( rect, min_depth, max_depth ).addScissors( rect );
     }
 
 
