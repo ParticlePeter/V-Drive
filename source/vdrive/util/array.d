@@ -14,6 +14,9 @@ import vdrive.util.util : Log_Info, vkAssert;
 
 nothrow @nogc:
 
+//private const( char )* too_many_elements = "Too many elements specified for maximum capacity: ";
+private const( char )* mem_block_too_large = "Reserved memory too large for maximum capacity: ";
+
 
 /// Dynamic Array, non-copyable to avoid unnecessary data duplication
 struct Dynamic_Array( T, ST = uint ) {
@@ -47,17 +50,24 @@ struct Dynamic_Array( T, ST = uint ) {
     }
 
     // convenience constructor, possibly sets capacity and initializes array with count of init values
-    this( Size_T count, Size_T capacity = 0, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
-        if( count <= capacity )
+    this( size_t count, size_t capacity = 0, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+        // reserve specified capacity only if is larger then specified count, then fill with count elemnts
+        // otherwise reserve and resize exactly count of default initialized elements
+        if( capacity < count )
+            capacity = count;
+
+        if( capacity > 0 ) {
             reserve( capacity, file, line, func );
-        length( count, true, file, line, func );  // initialize elements
+            if( count > 0 )
+                length( count, true, file, line, func );
+        }
     }
 
     // cannot be called from outside, used to move data (release, dup)
-    private this( Val_T* data, Size_T count, Size_T capacity ) {
+    private this( Val_T* data, size_t count, size_t capacity ) {
         Data        = data;
-        Count       = count;
-        Capacity    = capacity;
+        Count       = cast( Size_T )count;
+        Capacity    = cast( Size_T )capacity;
     }
 
     // free data on destruction
@@ -164,6 +174,8 @@ struct Dynamic_Array( T, ST = uint ) {
 
     // reserve memory
     void reserve( size_t capacity, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+        vkAssert( capacity <= Size_T.max, mem_block_too_large, file, line, func, Size_T.stringof );
+
         if( capacity <= Capacity ) return;
         T* new_data = cast( T* )malloc( capacity * T.sizeof );          // mGui::MemAlloc( ... );
         static if( debug_alloc )
@@ -406,14 +418,25 @@ struct Block_Array( T, ST = uint ) {
     // disable default constructor, a Block_Array requires an Arena_Array as memory source
     @disable this();
 
-    // must have an array to borrow from
-    this( ref Arena_T arena, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+    // must have an arena array to borrow from, possibly sets capacity and initializes array with count of init values
+    this( ref Arena_T arena, size_t count = 0, size_t capacity = 0, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
         Arena = & arena;
         Arena.attach( & Link );
+
+        // reserve specified capacity only if is larger then specified count, then fill with count elemnts
+        // otherwise reserve and resize exactly count of default initialized elements
+        if( capacity < count )
+            capacity = count;
+
+        if( capacity > 0 ) {
+            reserve( capacity, file, line, func );
+            if( count > 0 )
+                length( count, true, file, line, func );
+        }
     }
 
     // convenience constructors
-    this( ref Arena_T arena, T   stuff, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) { this( arena ); append( stuff ); }
+    //this( ref Arena_T arena, T   stuff, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) { this( arena ); append( stuff ); }
     this( ref Arena_T arena, T[] stuff, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) { this( arena ); append( stuff ); }
 
     // cannot be called from outside
@@ -430,14 +453,6 @@ struct Block_Array( T, ST = uint ) {
 
         if( Link.Next !is null )
             Link.Next.Prev = & Link;
-
-        /*
-        // mark for not being detached from Arena
-        link.Offset = link.Size = Size_T.max;
-
-        // replace link in linked link list
-        Arena.replace( link, & Link );
-        */
     }
 
     // free data on destruction
@@ -562,6 +577,8 @@ struct Block_Array( T, ST = uint ) {
 
     // reserve memory
     void reserve( size_t capacity, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+        vkAssert( capacity <= Size_T.max, mem_block_too_large, file, line, func, Size_T.stringof );
+
         if( capacity <= Capacity ) return;                              // return if we have more capacity than requested
         Size_T new_block_size = cast( Size_T )( capacity * T.sizeof );  // compute new block size
 
