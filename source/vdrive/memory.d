@@ -653,28 +653,3 @@ mixin template Memory_Member() {
         return this;
     }
 }
-
-
-
-deprecated( "Use member method Meta_Memory.allocate instead" ) {
-    auto ref initMemory(
-        ref Meta_Memory         meta,
-        uint32_t                memory_type_index,
-        VkDeviceSize            allocation_size,
-        string                  file = __FILE__,
-        size_t                  line = __LINE__,
-        string                  func = __FUNCTION__
-        ) {
-        vkAssert( meta.isValid, "Vulkan state not assigned", file, line, func );     // assert that meta struct is initialized with a valid vulkan state pointer
-        meta.device_memory = allocateMemory( meta, allocation_size, memory_type_index, file, line, func );
-        meta.device_memory_size = allocation_size;
-        meta.memory_type_index = memory_type_index;
-        return meta;
-    }
-
-    auto createMemory( ref Vulkan vk, uint32_t memory_type_index, VkDeviceSize allocation_size ) {
-        Meta_Memory meta = vk;
-        meta.allocate( memory_type_index, allocation_size );
-        return meta;
-    }
-}
