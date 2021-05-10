@@ -453,39 +453,6 @@ auto listQueues( VkPhysicalDevice gpu, bool print_info = true, VkSurfaceKHR surf
 }
 
 
-deprecated( "Scratch_Result struct template is not necessary, as we now rely on zero copy RVO." ) {
-    alias listQueuesResult = Scratch_Result!VkQueueFamilyProperties;
-
-    /// list all available queue families and their queue count
-    auto ref listQueues( Result_T )(
-        ref Result_T    queue_family_properties,
-        bool            print_info = true,
-        VkSurfaceKHR    surface = VK_NULL_HANDLE,
-        string          file = __FILE__,
-        size_t          line = __LINE__,
-        string          func = __FUNCTION__
-
-        ) if( isScratchResult!Result_T || isDynamicResult!Result_T ) {
-
-        // extract gpu member based on template argument
-        static if( isScratchResult!Result_T )   auto gpu = queue_family_properties.vk.gpu;
-        else                                    auto gpu = queue_family_properties.query;
-
-        // Enumerate Queues
-        listVulkanProperty!( Result_T.Array_T, vkGetPhysicalDeviceQueueFamilyProperties, VkPhysicalDevice )( queue_family_properties, file, line, func, gpu );
-
-        if( print_info )  gpu.printQueueFamilyProperties( printQueueProperties.array, surface );  // log the info
-        return queue_family_properties;
-    }
-
-    //auto listQueues( VkPhysicalDevice gpu, bool print_info = true, VkSurfaceKHR surface = VK_NULL_HANDLE, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
-    //    auto result = Dynamic_Result!( VkQueueFamilyProperties, VkPhysicalDevice )( gpu );
-    //    listQueues!( typeof( result ))( result, print_info, surface, file, line, func );
-    //    return result.array.release;
-    //}
-}
-
-
 // Wraps a VkQueueFamilyProperties
 // adds a family index and a Static_Array!float priorities
 struct Queue_Family_T( uint Capacity, Size_T = uint ) {
