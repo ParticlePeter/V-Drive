@@ -331,7 +331,7 @@ void listVulkanProperty( Result_AT, alias vkFunc, Args... )( ref Result_AT resul
 
 /// general templated function to enumarate any vulkan property
 /// see usage in module surface or module util.info
-/// this overload uses a static stack memory, size passed in as template argument, as result
+/// this overload uses stack memory, size passed in as template argument, as result
 auto listVulkanProperty( int32_t size, Result_T, alias vkFunc, Args... )( string file, size_t line, string func, Args args ) {
     static assert( size > 0, "Size greate zero mandatory" );
     static if( size == int32_t.max )    alias Result_AT = Dynamic_Array!( Result_T );
@@ -373,32 +373,33 @@ auto listVulkanProperty( Result_T, alias vkFunc, Args... )( string file, size_t 
 //}
 
 
+deprecated( "Result struct templates are not necessary, as we now rely on zero copy RVO." ) {
+    struct Dynamic_Result( Result_T, QT ) {
+        alias   Query_T = QT;
+        alias   Array_T = Dynamic_Array!Result_T;
+        alias   array this;
+        Query_T query;
+        Array_T array;
+    }
 
-struct Dynamic_Result( Result_T, QT ) {
-    alias   Query_T = QT;
-    alias   Array_T = Dynamic_Array!Result_T;
-    alias   array this;
-    Query_T query;
-    Array_T array;
+    template isDynamicResult( T ) { enum isDynamicResult = is( typeof( isDynamicResultImpl( T.init ))); }
+    private void isDynamicResultImpl( R, Q )( Dynamic_Result!( R, Q ) result ) {}
+
+
+    struct Static_Result( Result_T, QT, uint Capacity ) {
+        alias   Query_T = QT;
+        alias   Array_T = Static_Array!( Result_T, Capacity );
+        alias   array this;
+        Query_T query;
+        Array_T array;
+    }
+
+    template isStaticResult( T ) { enum isStaticResult = is( typeof( isStaticResultImpl( T.init ))); }
+    private void isStaticResultImpl( R, Q, uint C )( Static_Result!( R, Q, C ) result ) {}
+
+
+    template isDynamicOrStaticResult( T ) { enum isDynamicOrStaticResult = isDynamicResult!T || isStaticResult!T; }
 }
-
-template isDynamicResult( T ) { enum isDynamicResult = is( typeof( isDynamicResultImpl( T.init ))); }
-private void isDynamicResultImpl( R, Q )( Dynamic_Result!( R, Q ) result ) {}
-
-
-struct Static_Result( Result_T, QT, uint Capacity ) {
-    alias   Query_T = QT;
-    alias   Array_T = Static_Array!( Result_T, Capacity );
-    alias   array this;
-    Query_T query;
-    Array_T array;
-}
-
-template isStaticResult( T ) { enum isStaticResult = is( typeof( isStaticResultImpl( T.init ))); }
-private void isStaticResultImpl( R, Q, uint C )( Static_Result!( R, Q, C ) result ) {}
-
-
-template isDynamicOrStaticResult( T ) { enum isDynamicOrStaticResult = isDynamicResult!T || isStaticResult!T; }
 
 //auto listVulkanProperty( Result_T, alias vkFunc, Args... )( ref Arena_Array arena, string file, size_t line, string func, Args args ) {
 //    alias Result_AT = Block_Array!( Result_T );

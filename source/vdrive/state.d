@@ -49,34 +49,37 @@ struct Vulkan {
 template isVulkan( T ) { enum isVulkan = is( T == Vulkan ); }
 
 
-/// this struct is not in util.util to avoid dependency on state
-struct Scratch_Result( Result_T ) {
-    nothrow @nogc:
-    private Vulkan* vk_ptr;
-    alias           array this;
-    alias           Array_T = Block_Array!Result_T;
+deprecated( "Scratch_Result struct template is not necessary, as we now rely on zero copy RVO." ) {
+    /// this struct is not in util.util to avoid dependency on state
+    struct Scratch_Result( Result_T ) {
+        nothrow @nogc:
+        private Vulkan* vk_ptr;
+        alias           array this;
+        alias           Array_T = Block_Array!Result_T;
 
 
-    nothrow @nogc:
-    Array_T         array;
-    @disable        this();
-    @disable        this( this );
+        nothrow @nogc:
+        Array_T         array;
+        @disable        this();
+        @disable        this( this );
 
-    ref Vulkan vk()         { return * vk_ptr; }
-    bool isValid()          { return vk_ptr !is null; }
+        ref Vulkan vk()         { return * vk_ptr; }
+        bool isValid()          { return vk_ptr !is null; }
 
-    this( ref Vulkan vk, size_t count = 0 ) {
-        vk_ptr = & vk;
-        array = Array_T( vk.scratch );
-        if( count > 0 ) {
-            array.reserve( count );         // first reserve
-            array.length(  count, true );   // then resize to the same size, to no eagerly over allocate
+        this( ref Vulkan vk, size_t count = 0 ) {
+            vk_ptr = & vk;
+            array = Array_T( vk.scratch );
+            if( count > 0 ) {
+                array.reserve( count );         // first reserve
+                array.length(  count, true );   // then resize to the same size, to no eagerly over allocate
+            }
         }
     }
+
+    template isScratchResult( T ) { enum isScratchResult = is( typeof( isScratchResultImpl( T.init ))); }
+    private void isScratchResultImpl( R )( Scratch_Result!R result ) {}
 }
 
-template isScratchResult( T ) { enum isScratchResult = is( typeof( isScratchResultImpl( T.init ))); }
-private void isScratchResultImpl( R )( Scratch_Result!R result ) {}
 
 
 void destroyInstance( ref Vulkan vk ) {
@@ -89,7 +92,6 @@ void destroyDevice( ref Vulkan vk ) {
     destroyDevice( vk.device, vk.allocator );
     vk.device = VK_NULL_HANDLE;
 }
-
 
 void destroyDevice( VkDevice device, const( VkAllocationCallbacks )* allocator = null ) {
     //vkDeviceWaitIdle( device );

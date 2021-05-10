@@ -14,8 +14,8 @@ nothrow @nogc:
 
 bool verbose_init = true;
 
-private template isVkOrGpu( T )         { enum isVkOrGpu        = is( T == Vulkan ) || is( T == VkPhysicalDevice ); }
-private template isVkOrInstance( T )    { enum isVkOrInstance   = is( T == Vulkan ) || is( T == VkInstance ); }
+private template isVkOrGpu( T )         { enum isVkOrGpu        = isVulkan!T || is( T == VkPhysicalDevice ); }
+private template isVkOrInstance( T )    { enum isVkOrInstance   = isVulkan!T || is( T == VkInstance ); }
 
 
 ////////////////
@@ -26,7 +26,7 @@ private template isVkOrInstance( T )    { enum isVkOrInstance   = is( T == Vulka
 private void printExtensionProperties( Array_T )( VkPhysicalDevice gpu, ref Array_T extension_properties, bool layer_extensions ) {
 
     // header buffer
-    SArray!( char, 60 ) header;
+    Static_Array!( char, 60 ) header;
 
     // header text
     gpu.is_null
@@ -56,132 +56,77 @@ private void printExtensionProperties( Array_T )( VkPhysicalDevice gpu, ref Arra
 }
 
 
-
-
-// All of this _Result based stuff is overcomplicated crap!
-// There should be only one base function and various convenience functions.
-// This base function takes and any kind of resizing array, including an Arena, for which it creates a Block
-
-/// Result type to list extensions using Vulkan_State scratch memory
-alias List_Extensions_Result = Scratch_Result!VkExtensionProperties;
-
-
-
-/// list all available ( layer per ) instance / device extensions, using scratch memory
-auto ref listExtensions( Result_T )(
-    ref Result_T    result,
-    const( char )*  layer,
-    bool            print_info = true,
-    string          file = __FILE__,
-    size_t          line = __LINE__,
-    string          func = __FUNCTION__
-    ) if( isScratchResult!Result_T || isDynamicResult!Result_T ) {
-
-    // extract gpu member based on template argument
-    static if( isScratchResult!Result_T )   auto gpu = result.vk.gpu;
-    else                                    auto gpu = result.query;
-
-    // Enumerate Instance or Device extensions
-    if( gpu.is_null )   listVulkanProperty!( Result_T.Array_T, vkEnumerateInstanceExtensionProperties,                 const( char )* )( result.array, file, line, func, layer );
-    else                listVulkanProperty!( Result_T.Array_T, vkEnumerateDeviceExtensionProperties, VkPhysicalDevice, const( char )* )( result.array, file, line, func, gpu, layer );
-    if( print_info ) gpu.printExtensionProperties( result.array, layer != null );
-    return result.array;
-}
-
-
 /// list all available ( layer per ) instance / device extensions, sub-allocates from scratch arena memory
-auto listExtensions( ref Vulkan vk, const( char )* layer, bool print_info = true, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+auto listExtensions( ref Vulkan vk, string_z layer, bool print_info = true, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
     alias Array_T = Block_Array!VkExtensionProperties;
     auto result = Array_T( vk.scratch );
-    if( vk.gpu.is_null ) listVulkanProperty!( Array_T, vkEnumerateInstanceExtensionProperties,                 const( char )* )( result, file, line, func, layer );
-    else                 listVulkanProperty!( Array_T, vkEnumerateDeviceExtensionProperties, VkPhysicalDevice, const( char )* )( result, file, line, func, vk.gpu, layer );
+    if( vk.gpu.is_null ) listVulkanProperty!( Array_T, vkEnumerateInstanceExtensionProperties,                 string_z )( result, file, line, func, layer );
+    else                 listVulkanProperty!( Array_T, vkEnumerateDeviceExtensionProperties, VkPhysicalDevice, string_z )( result, file, line, func, vk.gpu, layer );
     if( print_info )  vk.gpu.printExtensionProperties( result, layer != null );
     return result;
 }
 
-
-/// list all available ( layer per ) instance / device extensions, allocates heap memory
-auto listExtensions( VkPhysicalDevice gpu, const( char )* layer, bool print_info = true, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
-    // Todo(pp): try to get rid of Dynamic_Result, use Dynamic_Array instead, and get rid of .release method.
-    auto result = Dynamic_Result!( VkExtensionProperties, VkPhysicalDevice )( gpu );
-    listExtensions!( typeof( result ))( result, layer, print_info, file, line, func );
-    return result.array.release;
+/// list all available ( layer per ) instance / device extensions, sub-allocates from scratch arena memory
+auto listExtensions( VkPhysicalDevice gpu, string_z layer, bool print_info = true, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+    alias Array_T = Dynamic_Array!VkExtensionProperties;
+    Array_T result;
+    if( gpu.is_null ) listVulkanProperty!( Array_T, vkEnumerateInstanceExtensionProperties,                 string_z )( result, file, line, func, layer );
+    else              listVulkanProperty!( Array_T, vkEnumerateDeviceExtensionProperties, VkPhysicalDevice, string_z )( result, file, line, func, gpu, layer );
+    if( print_info )  gpu.printExtensionProperties( result, layer != null );
+    return result;
 }
-
 
 
 /// get the version of any available instance / device / layer extension
-auto extensionVersion( String_T, VK_OR_GPU )(
-    String_T            extension,
-    ref VK_OR_GPU       vk_or_gpu,
-    const( char )*      layer = null,
-    bool                print_info = true,
-    string              file = __FILE__,
-    size_t              line = __LINE__,
-    string              func = __FUNCTION__
-    ) if( isStringT!String_T && isVkOrGpu!VK_OR_GPU ) {
+private uint32_t extensionVersionImpl( VK_OR_GPU )(
+    ref VK_OR_GPU   vk_or_gpu,
+    string_z        extension,
+    string_z        layer = null,
+    bool            print_info = true,
+    string          file = __FILE__,
+    size_t          line = __LINE__,
+    string          func = __FUNCTION__
 
-    static if( isVulkan!VK_OR_GPU ) auto query_result = Scratch_Result!( VkExtensionProperties )( vk_or_gpu );
-    else                            auto query_result = Dynamic_Result!( VkExtensionProperties, VK_OR_GPU )( vk_or_gpu );
+    ) if( isVkOrGpu!VK_OR_GPU ) {
 
-    uint32_t result = 0;                                                // version result
-    listExtensions( query_result, layer, false, file, line, func );     // list all extensions
-    foreach( ref properties; query_result.array ) {                     // search for requested extension
-        static if( is( String_T : const( char )* )) {
-            import core.stdc.string : strcmp;
-            if( strcmp( properties.extensionName.ptr, extension )) {
-                result = properties.specVersion;
-                break;
-            }
-        } else {
-            import core.stdc.string : strncmp, strlen;
-            if( extension.length == properties.extensionName.ptr.strlen
-            &&  strncmp( properties.extensionName.ptr, extension.ptr, extension.length ) == 0 ) {
-                result = properties.specVersion;
-                break;
-            }
+    uint32_t result = 0;                                                                    // version result
+    auto extension_properties = vk_or_gpu.listExtensions( layer, false, file, line, func ); // list all extensions
+    import core.stdc.string : strcmp;
+    foreach( ref props; extension_properties ) {                                            // search for requested extension
+        if( strcmp( props.extensionName.ptr, extension )) {
+            result = props.specVersion;
+            break;
         }
     }
-    //pragma( msg, String_T.stringof );
-    if( print_info ) {
-        static if( is( String_T : const( char )* )) {
-            printf( "%s version: %u\n", layer, result );
-        } else {
-            // Todo(pp): why is this here evaluated in the case of  T : const( char )* ?????
-            //auto layer_z = layer.toStringz;
-            //printf( "%s version: %u\n", layer_z.ptr, result );
-        }
-    }
-
+    if( print_info )
+        printf( "%s version: %u\n", extension, result );
     return result;
 }
+
+alias extensionVersion = extensionVersionImpl!Vulkan;
+alias extensionVersion = extensionVersionImpl!VkPhysicalDevice;
+
 
 /// check if an instance / device / layer extension of any version is available
-auto isExtension( String_T, VK_OR_GPU )(
-    String_T            extension,
-    ref VK_OR_GPU       vk_or_gpu,
-    const( char )*      layer = null,
-    bool                print_info = true,
-    string              file = __FILE__,
-    size_t              line = __LINE__,
-    string              func = __FUNCTION__
-    ) if( isStringT!String_T && isVkOrGpu!VK_OR_GPU ) {
+private bool isExtensionImpl( VK_OR_GPU )(
+    ref VK_OR_GPU   vk_or_gpu,
+    string_z        extension,
+    string_z        layer = null,
+    bool            print_info = true,
+    string          file = __FILE__,
+    size_t          line = __LINE__,
+    string          func = __FUNCTION__
 
-    auto result = extensionVersion!( String_T, VK_OR_GPU )( extension, vk_or_gpu, layer, false, file, line, func ) > 0;
+    ) if( isVkOrGpu!VK_OR_GPU ) {
 
-    if( print_info ) {
-        static if( is( String_T : const( char )* )) {
-            printf( "%s available: %u\n", extension, result );
-        } else {
-            // if we have passed Vulkan_State instead of just the VkPhysicalDevice, we can use the scratch array to sub-allocate string z conversion
-            static if( isVulkan!VK_OR_GPU ) auto extension_z = Block_Array!char( vk_or_gpu.scratch );
-            else                            auto extension_z = Dynamic_Array!char();    // allocates
-            extension.toStringz( extension_z );
-            printf( "%s available: %u\n", extension_z.ptr, result );
-        }
-    }
+    bool result = vk_or_gpu.extensionVersion( extension, layer, false, file, line, func ) > 0;
+    if( print_info )
+        printf( "%s available: %u\n", extension, result );
     return result;
 }
+
+alias isExtension = isExtensionImpl!Vulkan;
+alias isExtension = isExtensionImpl!VkPhysicalDevice;
 
 
 
@@ -204,28 +149,24 @@ unittest {
 ////////////
 
 /// helper function to print listed layer properties, drills down into extension properties of each layer
-private void printLayerProperties( Array_T, VK_OR_GPU )(
-    ref Array_T     layer_properties,
+private void printLayerProperties( VK_OR_GPU, Array_T )(
     ref VK_OR_GPU   vk_or_gpu,
+    ref Array_T     layer_properties,
     string          file = __FILE__,
     size_t          line = __LINE__,
     string          func = __FUNCTION__
+
     ) if( isVkOrGpu!VK_OR_GPU ) {
 
     if( layer_properties.length == 0 ) {
         printf( "\tLayers: None\n" );
     } else {
-        static if( isVulkan!VK_OR_GPU ) {
-            auto gpu = vk_or_gpu.gpu;
-            auto result = Scratch_Result!( VkExtensionProperties )( vk_or_gpu );
-        } else {
-            auto gpu = vk_or_gpu;
-            auto result = Dynamic_Result!( VkExtensionProperties, VK_OR_GPU )( gpu );
-        }
+        static if( isVulkan!VK_OR_GPU ) auto gpu = vk_or_gpu.gpu;
+        else                            auto gpu = vk_or_gpu;
 
         if ( gpu != VK_NULL_HANDLE ) {
             VkPhysicalDeviceProperties gpu_properties;
-            vkGetPhysicalDeviceProperties( gpu, & gpu_properties );
+            gpu.vkGetPhysicalDeviceProperties( & gpu_properties );
             println;
             printf( "Layers of: %s\n", gpu_properties.deviceName.ptr );
             import core.stdc.string : strlen;
@@ -241,140 +182,83 @@ private void printLayerProperties( Array_T, VK_OR_GPU )(
             printf( "\tDescription: %s\n", property.description.ptr );
 
             // drill into layer extensions
-            //gpu.listExtensions( property.layerName.ptr, true );
-            listExtensions!( typeof( result ))( result, property.layerName.ptr, true, file, line, func );
+            vk_or_gpu.listExtensions( property.layerName.ptr, true, file, line, func );
         }
     }
     println;
 }
 
 
-
-/// Result type to list layers using Vulkan_State scratch memory
-alias List_Layers_Result = Scratch_Result!VkLayerProperties;
-
-
-
 /// list all available instance / device layers
-auto ref listLayers( Result_T )(
-    ref Result_T    layer_properties,
-    bool            print_info = true,
-    string          file = __FILE__,
-    size_t          line = __LINE__,
-    string          func = __FUNCTION__
-    ) if( isScratchResult!Result_T || isDynamicResult!Result_T ) {
-
-    // extract gpu member based on template argument
-    static if( isScratchResult!Result_T )   auto gpu = layer_properties.vk.gpu;
-    else                                    auto gpu = layer_properties.query;
-
-    // Enumerate Instance or Device layers
-    if( gpu.is_null )   listVulkanProperty!( Result_T.Array_T, vkEnumerateInstanceLayerProperties,                )( layer_properties, file, line, func );
-    else                listVulkanProperty!( Result_T.Array_T, vkEnumerateDeviceLayerProperties, VkPhysicalDevice )( layer_properties, file, line, func, gpu );
-
-    if( print_info ) {
-        // if we received a Scratch_Result, we should pass on its Vulkan_State with scratch array, otherwise just the gpu
-        static if( isScratchResult!Result_T )   printLayerProperties( layer_properties, layer_properties.vk );
-        else                                    printLayerProperties( layer_properties, gpu );
-    }
-    return layer_properties.array;
-}
-
-
-
-auto listLayers( VkPhysicalDevice gpu, bool print_info = true, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
-    auto result = Dynamic_Result!( VkLayerProperties, VkPhysicalDevice )( gpu );
-    listLayers!( typeof( result ))( result, print_info, file, line, func );
-    if( print_info )
-        printLayerProperties( result, gpu );
-    return result;
-}
-
-
-
 auto listLayers( ref Vulkan vk, bool print_info = true, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
     alias Array_T = Block_Array!VkLayerProperties;
     auto result = Array_T( vk.scratch );
-
-    // Enumerate Instance or Device layers
-    if( vk.gpu.is_null ) listVulkanProperty!( Array_T, vkEnumerateInstanceLayerProperties,                )( result, file, line, func );
-    else                 listVulkanProperty!( Array_T, vkEnumerateDeviceLayerProperties, VkPhysicalDevice )( result, file, line, func, vk.gpu );
-
-    if( print_info ) printLayerProperties( result, vk );
+    if( vk.gpu.is_null )    listVulkanProperty!( Array_T, vkEnumerateInstanceLayerProperties,                )( result, file, line, func );
+    else                    listVulkanProperty!( Array_T, vkEnumerateDeviceLayerProperties, VkPhysicalDevice )( result, file, line, func, vk.gpu );
+    if( print_info )        vk.printLayerProperties( result );
     return result;
 }
 
+
+/// list all available instance / device layers
+auto listLayers( VkPhysicalDevice gpu, bool print_info = true, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+    alias Array_T = Dynamic_Array!VkLayerProperties;
+    Array_T result;
+    if( gpu.is_null )    listVulkanProperty!( Array_T, vkEnumerateInstanceLayerProperties,                )( result, file, line, func );
+    else                 listVulkanProperty!( Array_T, vkEnumerateDeviceLayerProperties, VkPhysicalDevice )( result, file, line, func, gpu );
+    if( print_info )     gpu.printLayerProperties( result );
+    return result;
+}
 
 
 /// get the version of any available instance / device layer
-auto layerVersion( String_T, VK_OR_GPU )(
-    String_T        layer,
+private uint32_t layerVersionImpl( VK_OR_GPU )(
     ref VK_OR_GPU   vk_or_gpu,
+    string_z        layer,
     bool            print_info = true,
     string          file = __FILE__,
     size_t          line = __LINE__,
     string          func = __FUNCTION__
-    ) if( isStringT!String_T && isVkOrGpu!VK_OR_GPU ) {
 
-    static if( isVulkan!VK_OR_GPU ) auto query_result = Scratch_Result!( VkLayerProperties )( vk_or_gpu );
-    else                            auto query_result = Dynamic_Result!( VkLayerProperties, VK_OR_GPU )( vk_or_gpu );
+    ) if( isVkOrGpu!VK_OR_GPU ) {
 
-    uint32_t result = 0;                                    // version result
-    listLayers( query_result, false, file, line, func );    // list all layers
-    foreach( ref properties; query_result.array ) {         // search for requested layer
-        static if( is( String_T : const( char )* )) {
-            import core.stdc.string : strcmp;
-            if( strcmp( properties.layerName.ptr, layer ) == 0 ) {
-                result = properties.implementationVersion;
-                break;
-            }
-        } else {
-            import core.stdc.string : strncmp, strlen;
-            if( layer.length == properties.layerName.ptr.strlen && strncmp( properties.layerName.ptr, layer.ptr, layer.length ) == 0 ) {
-                result = properties.implementationVersion;
-                break;
-            }
+    uint32_t result = 0;                                                        // version result
+    auto layer_properties = vk_or_gpu.listLayers( false, file, line, func );    // list all layers
+    import core.stdc.string : strcmp;
+    foreach( ref props; layer_properties ) {                                    // search for requested layer
+        if( strcmp( props.layerName.ptr, layer ) == 0 ) {
+            result = props.implementationVersion;
+            break;
         }
     }
-
-    if( print_info ) {
-        static if( is( String_T : const( char )* )) {
-            printf( "%s version: %u\n", layer, result );
-        } else {
-            auto layer_z = layer.toStringz;
-            printf( "%s version: %u\n", layer_z.ptr, result );
-        }
-    }
-
+    if( print_info )
+        printf( "%s version: %u\n", layer, result );
     return result;
 }
+
+alias layerVersion = layerVersionImpl!Vulkan;
+alias layerVersion = layerVersionImpl!VkPhysicalDevice;
+
 
 /// check if an instance / device layer of any version is available
-auto isLayer( String_T, VK_OR_GPU )(
-    String_T        layer,
+private bool isLayerImpl( VK_OR_GPU )(
     ref VK_OR_GPU   vk_or_gpu,
+    string_z        layer,
     bool            print_info = true,
     string          file = __FILE__,
     size_t          line = __LINE__,
     string          func = __FUNCTION__
-    ) if( isStringT!String_T && isVkOrGpu!VK_OR_GPU ) {
 
-    auto result = layerVersion( layer, vk_or_gpu, false, file, line, func ) > 0;
+    ) if( isVkOrGpu!VK_OR_GPU ) {
 
-    if( print_info ) {
-        static if( is( String_T : const( char )* )) {
-            printf( "%s available: %u\n", layer, result );
-        } else {
-            // if we have passed Vulkan_State instead of just the VkPhysicalDevice, we can use the scratch array to sub-allocate string z conversion
-            static if( isVulkan!VK_OR_GPU ) auto layer_z = Block_Array!char( vk_or_gpu.scratch );
-            else                            auto layer_z = Dynamic_Array!char();    // allocates
-            layer.toStringz( layer_z );
-            printf( "%s available: %u\n", layer_z.ptr, result );
-        }
-    }
-
+    bool result = vk_or_gpu.layerVersion( layer, false, file, line, func ) > 0;
+    if( print_info )
+        printf( "%s available: %u\n", layer, result );
     return result;
 }
+
+alias isLayer = isLayerImpl!Vulkan;
+alias isLayer = isLayerImpl!VkPhysicalDevice;
 
 
 
@@ -382,53 +266,51 @@ auto isLayer( String_T, VK_OR_GPU )(
 // Physical Device //
 /////////////////////
 
-/// Result type to list Physical Devices (GPUs) using Vulkan_State scratch memory
-alias listPhysicalDevicesResult = Scratch_Result!VkPhysicalDevice;
-
-
-
-auto ref listPhysicalDevices( Result_T )(
-    ref Result_T    result,
-    bool            print_info = true,
-    string          file = __FILE__,
-    size_t          line = __LINE__,
-    string          func = __FUNCTION__
-    ) if( isScratchResult!Result_T || isDynamicResult!Result_T ) {
-
-    static if( isScratchResult!Result_T )   auto instance = result.vk.instance;
-    else                                    auto instance = result.query;
-
-    vkAssert( !instance.is_null, "List physical devices: Vulkan.instance must not be VK_NULL_HANDLE!", file, line, func );
-    listVulkanProperty!( Result_T.Array_T, vkEnumeratePhysicalDevices, VkInstance )( result.array, file, line, func, instance );
-
-    if( result.array.length == 0 ) {
+/// helper function to print info about available gpu count
+private void printGpuCount( uint gpu_count, bool print_info ) {
+    pragma( inline, true );
+    if( gpu_count == 0 ) {
         import core.stdc.stdio : fprintf, stderr;
         fprintf( stderr, "No gpus found.\n" );
     }
-
     if( print_info ) {
         println;
-        printf( "GPU count: %d\n", result.array.length );
+        printf( "GPU count: %d\n", gpu_count );
         printf( "============\n" );
     }
-    return result.array;
 }
 
-//alias listPhysicalDevices = listPhysicalDevices_T!Vulkan;
-//alias listPhysicalDevices = listPhysicalDevices_T!VkInstance;
+/// List all physical devices
+private auto listPhysicalDevicesImpl( VK_OR_INSTANCE )(
+    ref VK_OR_INSTANCE  vk_or_instance,
+    bool                print_info = true,
+    string              file = __FILE__,
+    size_t              line = __LINE__,
+    string              func = __FUNCTION__
 
+    ) if( isVkOrInstance!VK_OR_INSTANCE ) {
 
-auto listPhysicalDevices( VkInstance instance, bool print_info = true, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
-    auto result = Dynamic_Result!( VkPhysicalDevice, VkInstance )( instance );
-    listPhysicalDevices( result, print_info, file, line, func );
-    return result.array.release;
+    // extract instance member and result array type based on template argument
+    static if( isVulkan!VK_OR_INSTANCE ) {
+        VkInstance instance = vk_or_instance.instance;
+        alias Array_T = Block_Array!VkPhysicalDevice;
+        Array_T result = Array_T( vk_or_instance.scratch );
+    } else {
+        VkInstance instance = vk_or_instance;
+        alias Array_T = Dynamic_Array!VkPhysicalDevice;
+        Array_T result;
+    }
+    vkAssert( !instance.is_null, "List physical devices: Vulkan.instance must not be VK_NULL_HANDLE!", file, line, func );
+    listVulkanProperty!( Array_T, vkEnumeratePhysicalDevices, VkInstance )( result, file, line, func, instance );
+    return result;
 }
+
+alias listPhysicalDevices = listPhysicalDevicesImpl!Vulkan;
+alias listPhysicalDevices = listPhysicalDevicesImpl!VkInstance;
 
 
 // flags to determine if and which gpu properties should be printed
 enum GPU_Info_Flags { none = 0, name, properties, limits = 4, sparse_properties = 8 };
-
-
 
 // returns gpu properties and can also print the properties, limits and sparse properties
 // the passed in Result_Type (Scratch or Dynamic) is only for string z conversion purpose
@@ -511,7 +393,7 @@ auto presentSupport( ref VkPhysicalDevice gpu, VkSurfaceKHR surface, bool print_
     uint32_t queue_family_property_count;
     vkGetPhysicalDeviceQueueFamilyProperties( gpu, & queue_family_property_count, null );
     VkBool32 present_supported;
-    foreach( family_index; 0..queue_family_property_count ) {
+    foreach( family_index; 0 .. queue_family_property_count ) {
         vkGetPhysicalDeviceSurfaceSupportKHR( gpu, family_index, surface, & present_supported );
         if( present_supported ) {
             return true;
@@ -524,65 +406,84 @@ auto presentSupport( ref VkPhysicalDevice gpu, VkSurfaceKHR surface, bool print_
 // Queues //
 ////////////
 
-alias listQueuesResult = Scratch_Result!VkQueueFamilyProperties;
+private void printQueueFamilyProperties( Array_T )( VkPhysicalDevice gpu, ref Array_T queue_family_properties, VkSurfaceKHR surface ) {
+    foreach( i, ref queue; queue_family_properties.data ) {
+        println;
+        printf( "Queue Family %llu\n", i );
+        printf( "\tQueues in Family         : %d\n", queue.queueCount );
+        printf( "\tQueue timestampValidBits : %d\n", queue.timestampValidBits );
 
-
-/// list all available queue families and their queue count
-auto ref listQueues( Result_T )(
-    ref Result_T    queue_family_properties,
-    bool            print_info = true,
-    VkSurfaceKHR    surface = VK_NULL_HANDLE,
-    string          file = __FILE__,
-    size_t          line = __LINE__,
-    string          func = __FUNCTION__
-    ) if( isScratchResult!Result_T || isDynamicResult!Result_T ) {
-
-    // extract gpu member based on template argument
-    static if( isScratchResult!Result_T )   auto gpu = queue_family_properties.vk.gpu;
-    else                                    auto gpu = queue_family_properties.query;
-
-    // Enumerate Queues
-    listVulkanProperty!( Result_T.Array_T, vkGetPhysicalDeviceQueueFamilyProperties, VkPhysicalDevice )( queue_family_properties, file, line, func, gpu );
-
-    // log the info
-    if( print_info ) {
-        foreach( q, ref queue; queue_family_properties.data ) {
-            println;
-            printf( "Queue Family %lu\n", cast( int )q );
-            printf( "\tQueues in Family         : %d\n", queue.queueCount );
-            printf( "\tQueue timestampValidBits : %d\n", queue.timestampValidBits );
-
-            if( surface != VK_NULL_HANDLE ) {
-                VkBool32 present_supported;
-                vkGetPhysicalDeviceSurfaceSupportKHR( gpu, q.toUint, surface, & present_supported );
-                printf( "\tPresentation supported   : %d\n", present_supported );
-            }
-
-            if( queue.queueFlags & VK_QUEUE_GRAPHICS_BIT )
-                printf( "\tVK_QUEUE_GRAPHICS_BIT\n" );
-
-            if( queue.queueFlags & VK_QUEUE_COMPUTE_BIT )
-                printf( "\tVK_QUEUE_COMPUTE_BIT\n" );
-
-            if( queue.queueFlags & VK_QUEUE_TRANSFER_BIT )
-                printf( "\tVK_QUEUE_TRANSFER_BIT\n" );
-
-            if( queue.queueFlags & VK_QUEUE_SPARSE_BINDING_BIT )
-                printf( "\tVK_QUEUE_SPARSE_BINDING_BIT\n" );
+        if( surface != VK_NULL_HANDLE ) {
+            VkBool32 present_supported;
+            vkGetPhysicalDeviceSurfaceSupportKHR( gpu, i.toUint32, surface, & present_supported );
+            printf( "\tPresentation supported   : %d\n", present_supported );
         }
+
+        if( queue.queueFlags & VK_QUEUE_GRAPHICS_BIT )
+            printf( "\tVK_QUEUE_GRAPHICS_BIT\n" );
+
+        if( queue.queueFlags & VK_QUEUE_COMPUTE_BIT )
+            printf( "\tVK_QUEUE_COMPUTE_BIT\n" );
+
+        if( queue.queueFlags & VK_QUEUE_TRANSFER_BIT )
+            printf( "\tVK_QUEUE_TRANSFER_BIT\n" );
+
+        if( queue.queueFlags & VK_QUEUE_SPARSE_BINDING_BIT )
+            printf( "\tVK_QUEUE_SPARSE_BINDING_BIT\n" );
+    }
+}
+
+
+/// list all available ( layer per ) instance / device extensions, sub-allocates from scratch arena memory
+auto listQueues( ref Vulkan vk, bool print_info = true, VkSurfaceKHR surface = VK_NULL_HANDLE, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+    alias Array_T = Block_Array!VkQueueFamilyProperties;
+    auto result = Array_T( vk.scratch );
+    listVulkanProperty!( Array_T, vkGetPhysicalDeviceQueueFamilyProperties, VkPhysicalDevice )( result, file, line, func, vk.gpu );
+    if( print_info )  vk.gpu.printQueueFamilyProperties( result, surface );
+    return result;
+}
+
+/// list all available ( layer per ) instance / device extensions, sub-allocates from scratch arena memory
+auto listQueues( VkPhysicalDevice gpu, bool print_info = true, VkSurfaceKHR surface = VK_NULL_HANDLE, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+    alias Array_T = Dynamic_Array!VkQueueFamilyProperties;
+    Array_T result;
+    listVulkanProperty!( Array_T, vkGetPhysicalDeviceQueueFamilyProperties, VkPhysicalDevice )( result, file, line, func, gpu );
+    if( print_info )  gpu.printQueueFamilyProperties( result, surface );
+    return result;
+}
+
+
+deprecated( "Scratch_Result struct template is not necessary, as we now rely on zero copy RVO." ) {
+    alias listQueuesResult = Scratch_Result!VkQueueFamilyProperties;
+
+    /// list all available queue families and their queue count
+    auto ref listQueues( Result_T )(
+        ref Result_T    queue_family_properties,
+        bool            print_info = true,
+        VkSurfaceKHR    surface = VK_NULL_HANDLE,
+        string          file = __FILE__,
+        size_t          line = __LINE__,
+        string          func = __FUNCTION__
+
+        ) if( isScratchResult!Result_T || isDynamicResult!Result_T ) {
+
+        // extract gpu member based on template argument
+        static if( isScratchResult!Result_T )   auto gpu = queue_family_properties.vk.gpu;
+        else                                    auto gpu = queue_family_properties.query;
+
+        // Enumerate Queues
+        listVulkanProperty!( Result_T.Array_T, vkGetPhysicalDeviceQueueFamilyProperties, VkPhysicalDevice )( queue_family_properties, file, line, func, gpu );
+
+        if( print_info )  gpu.printQueueFamilyProperties( printQueueProperties.array, surface );  // log the info
+        return queue_family_properties;
     }
 
-    return queue_family_properties;
+    //auto listQueues( VkPhysicalDevice gpu, bool print_info = true, VkSurfaceKHR surface = VK_NULL_HANDLE, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+    //    auto result = Dynamic_Result!( VkQueueFamilyProperties, VkPhysicalDevice )( gpu );
+    //    listQueues!( typeof( result ))( result, print_info, surface, file, line, func );
+    //    return result.array.release;
+    //}
 }
-
-
-
-auto listQueues( VkPhysicalDevice gpu, bool print_info = true, VkSurfaceKHR surface = VK_NULL_HANDLE, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
-    auto result = Dynamic_Result!( VkQueueFamilyProperties, VkPhysicalDevice )( gpu );
-    listQueues!( typeof( result ))( result, print_info, surface, file, line, func );
-    return result.array.release;
-}
-
 
 
 // Wraps a VkQueueFamilyProperties
@@ -652,34 +553,36 @@ struct Queue_Family_T( uint Capacity, Size_T = uint ) {
 
 alias  Queue_Family = Queue_Family_T!4;     // Todo(pp): Queue_Family is used excessively, but it should always be Queue_Family_T!4. Fix this!
 
-alias listQueueFamiliesResult = Scratch_Result!Queue_Family;
-alias listQueueFamiliesResult_T( uint Capacity ) = Scratch_Result!( Queue_Family_T!Capacity );     // enables us to pass in a max count for the families as template argument
-
 /// get list of Queue_Family structs
-/// the struct wraps VkQueueFamilyProperties with its family index
-/// and a priority array, with which the count of queues an their priorities can be specified
-/// filter functions exist to get queues with certain properties for the Result_T family_queues.array
-/// the initDevice function consumes an array of these structs to specify queue families and queues to be created
+/// the struct wraps VkQueueFamilyProperties with its family index and a priority array,
+/// with which the count of queues and their priorities can be specified
+/// filter functions exist to get queues with certain properties for the resulting list
+/// the initDevice function consumes sauch a list to specify queue families and queues to be created
 /// Params:
-///     gpu = reference to a VulkanState struct
+///     vk_or_gpu = reference (templated) to either a VulkanState struct or a VK_PhysicalDevice, determines if scratch space can be used (former case)
 ///     print_info = optional: if true prints struct content to stdout
 ///     surface = optional: if passed in the printed info includes whether a queue supports presenting to that surface
-/// Returns: Array embedded in Result_T family_queues
-auto ref listQueueFamilies( Result_T )(
-    ref Result_T    family_queues,
+/// Returns: list (array) of family_queues
+private auto ref listQueueFamiliesImpl( VK_OR_GPU )(
+    ref VK_OR_GPU   vk_or_gpu,
     bool            print_info = true,
     VkSurfaceKHR    surface = VK_NULL_HANDLE,
     string          file = __FILE__,
     size_t          line = __LINE__,
     string          func = __FUNCTION__
 
-    ) if( isScratchResult!Result_T || isDynamicResult!Result_T ) {
+    ) if( isVkOrGpu!VK_OR_GPU ) {
 
     // extract gpu member based on template argument
-    static if( isScratchResult!Result_T )   auto gpu = family_queues.vk.gpu;
-    else                                    auto gpu = family_queues.query;
+    static if( isVulkan!VK_OR_GPU ) auto gpu = vk_or_gpu.gpu;
+    else                            auto gpu = vk_or_gpu;
 
+    // check if gpu is available
     vkAssert( !gpu.is_null, "List Queue Families, gpu must not be VK_NULL_HANDLE!", file, line, func );
+
+    // create result array based on template argument
+    static if( isVulkan!VK_OR_GPU )   Block_Array!Queue_Family family_queues = Block_Array!Queue_Family( vk_or_gpu.scratch );
+    else                            Dynamic_Array!Queue_Family family_queues;
 
     // Care must be taken if using scratch space to gather the required information
     // at this point the referenced result family_queues is already part of scratch
@@ -687,47 +590,26 @@ auto ref listQueueFamilies( Result_T )(
     // sub-allocate the required queue family properties, or the former would not have
     // any space to be resized, as the latter is consecutively behind it
     uint32_t queue_family_property_count;
-    vkGetPhysicalDeviceQueueFamilyProperties( gpu, & queue_family_property_count, null );
+    gpu.vkGetPhysicalDeviceQueueFamilyProperties( & queue_family_property_count, null );
 
-    family_queues.reserve( queue_family_property_count, file, line, func );     // we reserve first as we do not need...
-    family_queues.length(  queue_family_property_count, file, line, func );     // ... extra space to grow after the requested length
+    family_queues.reserve( queue_family_property_count, file, line, func );     // we reserve first as we do not need ...
+    family_queues.length(  queue_family_property_count, file, line, func );     //  ... extra space to grow after the requested length
 
     // now enumerate all the queues
-    static if( isScratchResult!Result_T ) {
-        auto queue_family_properties = listQueuesResult ( family_queues.vk );
-        listQueues( queue_family_properties, print_info, surface );
-    } else {
-        auto queue_family_properties = listQueues( gpu, print_info, surface );
-    }
+    auto queue_family_properties = vk_or_gpu.listQueues( print_info, surface );
 
-    foreach( family_index, ref family; queue_family_properties.data ) {
-        family_queues[ family_index ] = Queue_Family( cast( uint32_t )family_index, family );
-    }
-    return family_queues.array;//.release;
+    foreach( family_index, ref family; queue_family_properties.data )
+        family_queues[ family_index ] = Queue_Family( family_index.toUint32, family );
+
+    return family_queues;
 }
 
+alias listQueueFamilies = listQueueFamiliesImpl!Vulkan;
+alias listQueueFamilies = listQueueFamiliesImpl!VkPhysicalDevice;
 
 
-auto listQueueFamilies( VkPhysicalDevice gpu, bool print_info = true, VkSurfaceKHR surface = VK_NULL_HANDLE, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
-    auto result = Dynamic_Result!( Queue_Family, VkPhysicalDevice )( gpu );
-    listQueueFamilies!( typeof( result ))( result, print_info, surface, file, line, func );
-    return result.array.release;
-}
-
-
-/*
-auto listQueueFamilies_T( size_t max_queues_per_family )( VkPhysicalDevice gpu, bool print_info = true, VkSurfaceKHR surface = VK_NULL_HANDLE ) {
-    auto queue_family_properties = listQueues( gpu, print_info, surface );   // get Array of VkQueueFamilyProperties
-    auto family_queues = sizedArray!( Queue_Family_T!max_queues_per_family )( queue_family_properties.length );
-    foreach( family_index, ref family; queue_family_properties.data ) {
-        family_queues[ family_index ] = Queue_Family( cast( uint32_t )family_index, family );
-    }
-    return family_queues;//.release;
-}
-alias listQueueFamilies = listQueueFamilies_T!64;
-*/
-
-alias filter = filterQueueFlags;
+// filter queues for specific queue flags, sorts and shrinks the passed in array in place
+// Todo(pp): create Range interface for arrays and filter lazilly
 auto ref filterQueueFlags( Array_T )(
     ref Array_T     family_queues,
     VkQueueFlags    include_queue,
@@ -737,7 +619,7 @@ auto ref filterQueueFlags( Array_T )(
 
     // remove invalid entries by overwriting them with valid ones
     size_t valid_index = 0;
-    foreach( i; 0..family_queues.length ) {
+    foreach( i; 0 .. family_queues.length ) {
         if(( family_queues[ i ].queueFlags & include_queue ) && !( family_queues[ i ].queueFlags & exclude_queue )) {
             if( valid_index < i ) {     // no need to replace if the current loop index equals the valid index
                 family_queues[ valid_index ] = family_queues[ i ];
@@ -750,8 +632,11 @@ auto ref filterQueueFlags( Array_T )(
     return family_queues;
 }
 
+alias filter = filterQueueFlags;
 
-alias filter = filterPresentSupport;
+
+// filter queues for prsent support, sorts and shrinks the passed in array in place
+// Todo(pp): create Range interface for arrays and filter lazilly
 auto ref filterPresentSupport( Array_T )(
     ref Array_T         family_queues,
     VkPhysicalDevice    gpu,
@@ -777,6 +662,8 @@ auto ref filterPresentSupport( Array_T )(
     return family_queues;
 }
 
+alias filter = filterPresentSupport;
+
 
 
 
@@ -785,104 +672,79 @@ auto ref filterPresentSupport( Array_T )(
 ///////////////////////////
 
 /// list all available instance extensions
-auto listExtensions( bool print_info = true, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+auto listInstanceExtensions( bool print_info = true, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
     if ( print_info ) printf( "\nInstance Extensions\n===================\n" );
-    return listExtensions( VK_NULL_HANDLE, null, print_info, file, line, func );
+    VkPhysicalDevice vk_null = VK_NULL_HANDLE; return vk_null.listExtensions( null, print_info, file, line, func );
 }
 
 /// list all available per layer instance extensions
-auto listExtensions( const( char )* layer, bool print_info = true, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+auto listInstanceLayerExtensions( string_z layer, bool print_info = true, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
     if ( print_info ) printf( "\nInstance Layer Extensions\n=========================\n" );
-    return listExtensions( VK_NULL_HANDLE, layer, print_info, file, line, func );
+    VkPhysicalDevice vk_null = VK_NULL_HANDLE; return vk_null.listExtensions( layer, print_info, file, line, func );
 }
 
 /// list all available device extensions
-auto listExtensions( VkPhysicalDevice gpu, bool print_info = true, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+auto listDeviceExtensions( VK_OR_GPU )( ref VK_OR_GPU vk_or_gpu, bool print_info = true, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
     if ( print_info ) printf( "\nPhysical Device Extensions\n==========================\n" );
-    return listExtensions( gpu, null, print_info, file, line, func );
+    return vk_or_gpu.listExtensions( null, print_info, file, line, func );
 }
 
 /// list all available layer per device extensions
-auto listDeviceLayerExtensions( VkPhysicalDevice gpu, const( char )* layer, bool print_info = true, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
-    if ( print_info ) printf( "\nPhysical Device Layer Extensions\n================================\n" );
-    return listExtensions( gpu, layer, print_info, file, line, func );
-}
+alias listDeviceLayerExtensions = listExtensions;
 
-
-// Get the version of an instance layer extension
-auto extensionVersion( String_T )( String_T extension, const( char )* layer, bool print_info = false, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) if( isStringT!String_T ) {
-    VkPhysicalDevice vkNull = VK_NULL_HANDLE; return extensionVersion!( String_T, VkPhysicalDevice )( extension, vkNull, layer, print_info, file, line, func );
-}
 
 // Get the version of an instance extension
-auto extensionVersion( String_T )( String_T extension, bool print_info, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) if( isStringT!String_T ) {
-    VkPhysicalDevice vkNull = VK_NULL_HANDLE; return extensionVersion!( String_T, VkPhysicalDevice )( extension, vkNull, null, print_info, file, line, func );
+auto instanceExtensionVersion( string_z extension, bool print_info, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+    VkPhysicalDevice vk_null = VK_NULL_HANDLE; return vk_null.extensionVersion( extension, null, print_info, file, line, func );
+}
+
+// Get the version of an instance layer extension
+auto instanceLayerExtensionVersion( string_z extension, string_z layer, bool print_info = false, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+    VkPhysicalDevice vk_null = VK_NULL_HANDLE; return vk_null.extensionVersion( extension, layer, print_info, file, line, func );
+}
+
+// Get the version of a device extension
+auto deviceExtensionVersion( VK_OR_GPU )( ref VK_OR_GPU vk_or_gpu, string_z extension, bool print_info, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+    return vk_or_gpu.extensionVersion( extension, null, print_info, file, line, func );
+}
+
+// Get the version of a device layer extension
+alias deviceLayerExtensionVersion = extensionVersion;
+
+
+/// check if an instance extension of any version is available
+auto isInstanceExtension( string_z extension, bool print_info, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+    VkPhysicalDevice vk_null = VK_NULL_HANDLE; return vk_null.isExtension( extension, null, print_info, file, line, func );
 }
 
 /// check if an instance layer extension of any version is available
-auto isExtension( String_T )( String_T extension, const( char )* layer, bool print_info = true, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) if( isStringT!String_T ) {
-    VkPhysicalDevice vkNull = VK_NULL_HANDLE; return isExtension( extension, vkNull, layer, print_info, file, line, func );
-}
-
-/// check if an instance extension of any version is available
-auto isExtension( String_T )( String_T extension, bool print_info, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) if( isStringT!String_T ) {
-    VkPhysicalDevice vkNull = VK_NULL_HANDLE; return isExtension!( String_T, VkPhysicalDevice )( extension, vkNull, null, print_info, file, line, func );
+auto isInstanceLayerExtension( string_z extension, string_z layer, bool print_info = true, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+    VkPhysicalDevice vk_null = VK_NULL_HANDLE; return vk_null.isExtension( extension, layer, print_info, file, line, func );
 }
 
 /// check if a device extension of any version is available
-auto isExtension( String_T )( String_T extension, VkPhysicalDevice gpu, bool print_info = true, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) if( isStringT!String_T ) {
-    return isExtension!( String_T, VkPhysicalDevice )( extension, gpu, null, print_info, file, line, func );
+auto isDeviceExtension( VK_OR_GPU )( ref VK_OR_GPU vk_or_gpu, string_z extension, bool print_info = true, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+    return gpu.isExtension( extension, null, print_info, file, line, func );
 }
 
+/// check if a device layer extension of any version is available
+alias isDeviceLayerExtension = isExtension;
+
+
 // list all instance layers
-auto listLayers( bool print_info = true, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+auto listInstanceLayers( bool print_info = true, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
     if( print_info ) printf( "\nInstance Layers\n===============\n" );
-    VkPhysicalDevice vkNull = VK_NULL_HANDLE; return listLayers( vkNull, print_info, file, line, func );
+    VkPhysicalDevice vk_null = VK_NULL_HANDLE; return vk_null.listLayers( print_info, file, line, func );
 }
 
 /// check if an instance layer of any version is available
-auto isLayer( String_T )( String_T layer, bool print_info = true, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) if( isStringT!String_T ) {
-    VkPhysicalDevice vkNull = VK_NULL_HANDLE; return isLayer( layer, vkNull, print_info, file, line, func );
+auto isInstanceLayer( string_z layer, bool print_info = true, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+    VkPhysicalDevice vk_null = VK_NULL_HANDLE; return vk_null.isLayer( layer, print_info, file, line, func );
 }
 
 
 
-/////////////////////////////////////////////
-// Convenience Functions Vulkan State base //
-/////////////////////////////////////////////
-
-/// list all available instance or device extensions, depends on whteher gpu is set in Vulkan State
-auto ref listExtensions( Result_T )( ref Result_T result, bool print_info = true, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) if( isScratchResult!Result_T || isDynamicResult!Result_T ) {
-    return listExtensions( result, null, print_info, file, line, func );
-}
-
-/// list all available instance or device layer extensions, depends on whteher gpu is set in Vulkan State
-auto listExtensions( ref Vulkan vk, bool print_info = true, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
-    return listExtensions( vk, null, print_info, file, line, func );
-}
-
-// Get the version of an instance extension
-auto extensionVersion( String_T )( String_T extension, ref Vulkan vk, bool print_info, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) if( isStringT!String_T ) {
-    return extensionVersion( extension, vk, null, print_info, file, line, func );
-}
-
-/// check if a device extension of any version is available, depends on whteher gpu is set in Vulkan State
-auto isExtension( String_T )( String_T extension, ref Vulkan vk, bool print_info = true, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) if( isStringT!String_T ) {
-    return isExtension!( String_T, Vulkan )( extension, vk, null, print_info, file, line, func );
-}
-/*
-// list all instance layers
-auto listLayers( ref Vulkan vk, bool print_info = true, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
-    if( print_info ) printf( "\nInstance Layers\n===============\n" );
-    return listLayers!Vulkan( vk, print_info, file, line, func );
-}
-*/
-/// check if an instance layer of any version is available
-auto isLayer( String_T )( String_T layer, ref Vulkan vk, bool print_info = true, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) if( isStringT!String_T ) {
-    return isLayer!( String_T, Vulkan )( layer, vk, print_info, file, line, func );
-}
-
-
+/// initialize a vulkan device
 auto initDevice( T )(
     ref Vulkan                  vk,
     Queue_Family[]              queue_families,
@@ -892,7 +754,7 @@ auto initDevice( T )(
     string                      file = __FILE__,
     size_t                      line = __LINE__,
     string                      func = __FUNCTION__
-    ) if( is( T == string ) || is( T == string[] ) || isDataArray!( T, stringz ) || is( T : const( char* )[] )) {
+    ) if( is( T == string ) || is( T == string[] ) || isDataArray!( T, string_z ) || is( T : string_z[] )) {
 
     // check if Vulkan state has a gpu set properly
     vkAssert( vk.gpu != VK_NULL_HANDLE,
@@ -907,22 +769,22 @@ auto initDevice( T )(
 
     // Pre-process arguments if passed as string or string[] at compile time
     static if( is( T == string )) {
-        auto ppExtensionNames = Block_Array!stringz( vk.scratch );
+        auto ppExtensionNames = Block_Array!string_z( vk.scratch );
         if( extension_names.length > 0 )
             extension_names.toPtrArray( ppExtensionNames );
 
-        auto ppLayerNames = Block_Array!stringz( vk.scratch );
+        auto ppLayerNames = Block_Array!string_z( vk.scratch );
         if( layer_names.length > 0 )
             layer_names.toPtrArray( ppLayerNames );
 
     } else static if( is( T == string[] )) {
         auto extension_concat_buffer = Block_Array!char( vk.scratch );
-        auto ppExtensionNames = Block_Array!stringz( vk.scratch );
+        auto ppExtensionNames = Block_Array!string_z( vk.scratch );
         if( layer_names.length > 0 )
             extension_names.toPtrArray( ppExtensionNames, extension_concat_buffer );
 
         auto layer_concat_buffer = Block_Array!char( vk.scratch );
-        auto ppLayerNames = Block_Array!stringz( vk.scratch );
+        auto ppLayerNames = Block_Array!string_z( vk.scratch );
         if( layer_names.length > 0 )
             layer_names.toPtrArray( ppLayerNames, layer_concat_buffer );
 
@@ -934,7 +796,7 @@ auto initDevice( T )(
     }
 
     // arrange queue_families into VkdeviceQueueCreateInfos
-    auto queue_cis = Scratch_Result!VkDeviceQueueCreateInfo( vk, queue_families.length );
+    auto queue_cis = Block_Array!VkDeviceQueueCreateInfo( vk.scratch, queue_families.length );
     foreach( i, ref queue_family; queue_families ) {
         queue_cis[i].queueFamilyIndex  = queue_family.family_index;
         queue_cis[i].queueCount        = queue_family.queueCount;
@@ -942,11 +804,11 @@ auto initDevice( T )(
     }
 
     VkDeviceCreateInfo device_ci = {
-        queueCreateInfoCount    : cast( uint32_t )queue_cis.length,
+        queueCreateInfoCount    : queue_cis.length.toUint,
         pQueueCreateInfos       : queue_cis.ptr,
-        enabledExtensionCount   : cast( uint32_t )ppExtensionNames.length,
+        enabledExtensionCount   : ppExtensionNames.length.toUint,
         ppEnabledExtensionNames : ppExtensionNames.ptr,
-        enabledLayerCount       : cast( uint32_t )ppLayerNames.length,
+        enabledLayerCount       : ppLayerNames.length.toUint,
         ppEnabledLayerNames     : ppLayerNames.ptr,
         pEnabledFeatures        : gpu_features,
     };
@@ -988,14 +850,14 @@ auto initDevice(
 auto initDevice(
     ref Vulkan                  vk,
     Queue_Family[]              queue_families,
-    stringz[]            		extension_names,
-    stringz[]            		layer_names,
+    string_z[]            		extension_names,
+    string_z[]            		layer_names,
     VkPhysicalDeviceFeatures*   gpu_features = null,
     string                      file = __FILE__,
     size_t                      line = __LINE__,
     string                      func = __FUNCTION__
     ) {
-    return initDevice!( const( char* )[] )( vk, queue_families, extension_names, layer_names, gpu_features, file, line, func );
+    return initDevice!( string_z[] )( vk, queue_families, extension_names, layer_names, gpu_features, file, line, func );
 }
 
 
@@ -1008,7 +870,7 @@ void initInstance( T )(
     size_t              line = __LINE__,
     string              func = __FUNCTION__
 
-    ) if( is( T == string ) || is( T == string[] ) || isDataArray!( T, stringz ) || is( T : const( char* )[] )) {
+    ) if( is( T == string ) || is( T == string[] ) || isDataArray!( T, string_z ) || is( T : string_z[] )) {
 
     // Default information about the application, in case none was passed in by the user
     VkApplicationInfo application_info = {
@@ -1025,22 +887,22 @@ void initInstance( T )(
 
     // Pre-process arguments if passed as string or string[] at compile time
     static if( is( T == string )) {
-        auto ppExtensionNames = Block_Array!stringz( vk.scratch );
+        auto ppExtensionNames = Block_Array!string_z( vk.scratch );
         if( extension_names.length > 0 )
             extension_names.toPtrArray( ppExtensionNames );
 
-        auto ppLayerNames = Block_Array!stringz( vk.scratch );
+        auto ppLayerNames = Block_Array!string_z( vk.scratch );
         if( layer_names.length > 0 )
             layer_names.toPtrArray( ppLayerNames );
 
     } else static if( is( T == string[] )) {
         auto extension_concat_buffer = Block_Array!char( vk.scratch );
-        auto ppExtensionNames = Block_Array!stringz( vk.scratch );
+        auto ppExtensionNames = Block_Array!string_z( vk.scratch );
         if( extension_names.length > 0 )
             extension_names.toPtrArray( ppExtensionNames, extension_concat_buffer );
 
         auto layer_concat_buffer = Block_Array!char( vk.scratch );
-        auto ppLayerNames = Block_Array!stringz( vk.scratch );
+        auto ppLayerNames = Block_Array!string_z( vk.scratch );
         if( layer_names.length > 0 )
             layer_names.toPtrArray( ppLayerNames, layer_concat_buffer );
 
@@ -1052,9 +914,9 @@ void initInstance( T )(
     // Specify initialization of the vulkan instance
     VkInstanceCreateInfo instance_ci = {
         pApplicationInfo        : application_info_ptr,
-        enabledExtensionCount   : cast( uint32_t )ppExtensionNames.length,
+        enabledExtensionCount   : ppExtensionNames.length.toUint,
         ppEnabledExtensionNames : ppExtensionNames.ptr,
-        enabledLayerCount       : cast( uint32_t )ppLayerNames.length,
+        enabledLayerCount       : ppLayerNames.length.toUint,
         ppEnabledLayerNames     : ppLayerNames.ptr,
     };
 
@@ -1098,12 +960,12 @@ void initInstance(
 
 void initInstance(
     ref Vulkan          vk,
-    const( char* )[]    extension_names,
-    const( char* )[]    layer_names = [],
+    string_z[]    extension_names,
+    string_z[]    layer_names = [],
     VkApplicationInfo*  application_info_ptr = null,
     string              file = __FILE__,
     size_t              line = __LINE__,
     string              func = __FUNCTION__
     ) {
-    initInstance!( const( char* )[] )( vk, extension_names, layer_names, application_info_ptr, file, line, func );
+    initInstance!( string_z[] )( vk, extension_names, layer_names, application_info_ptr, file, line, func );
 }
