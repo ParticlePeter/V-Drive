@@ -1,4 +1,4 @@
-module vdrive.initialize;
+module vdrive.initializer;
 
 import core.stdc.stdio : printf;
 
