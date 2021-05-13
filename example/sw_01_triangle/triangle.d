@@ -23,9 +23,9 @@ auto ref createResources( ref VDrive_State vd, bool recreate = false ) {
     // create fence and semaphores //
     /////////////////////////////////
 
-    import vdrive.synchronize;
     vd.submit_fence[0] = vd.createFence;            // fence to sync CPU and GPU once per frame
     vd.submit_fence[1] = vd.createFence;            // fence to sync CPU and GPU once per frame
+    import vdrive.synchronizer;
 
     // rendering and presenting semaphores for VkSubmitInfo, VkPresentInfoKHR and vkAcquireNextImageKHR
     vd.acquired_semaphore = vd.createSemaphore;    // signaled when a new swapchain image is acquired
