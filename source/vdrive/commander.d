@@ -1,4 +1,4 @@
-module vdrive.command;
+module vdrive.commander;
 
 import core.stdc.stdio : printf;
 
