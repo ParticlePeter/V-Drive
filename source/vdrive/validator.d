@@ -1,4 +1,4 @@
-module vdrive.validate;
+module vdrive.validator;
 
 import erupted;
 
