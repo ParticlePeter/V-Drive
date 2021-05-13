@@ -1,4 +1,4 @@
-module vdrive.synchronize;
+module vdrive.synchronizer;
 
 import erupted;
 
