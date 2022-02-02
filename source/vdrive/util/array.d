@@ -337,14 +337,21 @@ struct Arena_Array_T( ST = uint ) {   //, bool biderectional = false ) {
         link.Next = null;                                   // remove invalid reference, which would be reachable outside this function
         */
 
-        if( link is Head )      Head = link.Next;
-        else                    link.Prev.Next = link.Next;
-        if( link is Tail )      Tail = link.Prev;
-        else                    link.Next.Prev = link.Prev;
+        if( link is Head )
+            Head = link.Next;
+        else
+            link.Prev.Next = link.Next;
+
+        if( link is Tail )
+            Tail = link.Prev;
+        else
+            link.Next.Prev = link.Prev;
 
         // adjust the length of the source array
-        if( Tail is null )      Source.length( 0, file, line, func );
-        else                    Source.length( Tail.Offset + Tail.Size, file, line, func );
+        if( Tail is null )
+            Source.length( 0, file, line, func );
+        else
+            Source.length( Tail.Offset + Tail.Size, file, line, func );
 
         static if( debug_arena ) {
             --Num_Links;
