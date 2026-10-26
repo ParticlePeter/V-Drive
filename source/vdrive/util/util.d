@@ -406,9 +406,10 @@ auto listVulkanProperty( Result_T, alias vkFunc, Args... )( string file, size_t 
 //}
 
 
-alias vkMajor = VK_VERSION_MAJOR;
-alias vkMinor = VK_VERSION_MINOR;
-alias vkPatch = VK_VERSION_PATCH;
+alias vkVariant = VK_API_VERSION_VARIANT;
+alias vkMajor = VK_API_VERSION_MAJOR;
+alias vkMinor = VK_API_VERSION_MINOR;
+alias vkPatch = VK_API_VERSION_PATCH;
 
 alias toUint    = toUint32_t;
 alias to_uint   = toUint32_t;
@@ -480,8 +481,10 @@ E to_enum( E )( uint32_t index ) if( is( E == enum )) {
 }
 
 T aligned( T )( T value, T alignment ) {
-    if( value % alignment > 0 ) {
-        value = ( value / alignment + 1 ) * alignment;
-    }
-    return value;
+    return ( value + alignment - 1 ) & ~( alignment - 1 );
+
+    //if( value % alignment > 0 )
+    //    value = ( value / alignment + 1 ) * alignment;
+    //return value;
+
 }
