@@ -115,10 +115,8 @@ auto ref listPresentModes( VK_OR_GPU )(
     else                            VkPhysicalDevice gpu = vk_or_gpu;
 
     // As the list of available presentation modes is quite short (6 entries) we return the available list in a Static_Array.
-    // Static_Array count should not be set to VK_PRESENT_MODE_RANGE_SIZE_KHR, as that count leaves out extension entries.
-    // It is more future proof to get the count of entries and subtract the four meta entries at the end of the enum
-    // using: __traits( allMembers, VkPresentModeKHR ).length - 4
-    Static_Array!( VkPresentModeKHR, __traits( allMembers, VkPresentModeKHR ).length - 4 ) result;
+    // using: __traits( allMembers, VkPresentModeKHR ).length - 1 ( -1 for VK_PRESENT_MODE_MAX_ENUM_KHR)
+    Static_Array!( VkPresentModeKHR, __traits( allMembers, VkPresentModeKHR ).length - 1 ) result;
     listVulkanProperty!( typeof( result ), vkGetPhysicalDeviceSurfacePresentModesKHR, VkPhysicalDevice, VkSurfaceKHR )( result, file, line, func, gpu, surface );
 
     if( print_info ) {
@@ -379,6 +377,7 @@ struct Meta_Swapchain_T( int32_t max_image_count, uint member_copies = SMC.None 
         swapchain_ci.imageSharingMode       = sharing_queue_family_indices.length > 1 ? VK_SHARING_MODE_CONCURRENT : VK_SHARING_MODE_EXCLUSIVE;
         swapchain_ci.queueFamilyIndexCount  = sharing_queue_family_indices.length.toUint;
         swapchain_ci.pQueueFamilyIndices    = sharing_queue_family_indices.ptr;
+        return this;
     }
 
 

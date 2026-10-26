@@ -578,7 +578,12 @@ struct Meta_Descriptor_Layout_T(
         //      the count and index of each required descriptor Packed in the member of count VkDescriptorSetLayoutBinding.
         //      We use a static uint32_t array of VK_DESCRIPTOR_TYPE_RANGE_SIZE to store the total count of each required
         //      descriptor type. As not all descriptor types are required this creates a possible sparse array
-        uint32_t [ VK_DESCRIPTOR_TYPE_RANGE_SIZE ] descriptor_types_count;
+
+        import std.meta : NoDuplicates;
+        import std.traits : EnumMembers;
+        enum unique_descriptor_enum_count = NoDuplicates!(EnumMembers!VkDescriptorType).length - 1; // (-1 for VK_DESCRIPTOR_TYPE_MAX_ENUM)
+
+        uint32_t[ unique_descriptor_enum_count ] descriptor_types_count;
         foreach( ref layout_binding; set_layout_bindings )
             descriptor_types_count[ layout_binding.descriptorType ] += Pack_Index_And_Count( layout_binding.descriptorCount ).count;
 
@@ -589,7 +594,7 @@ struct Meta_Descriptor_Layout_T(
         //      We iterate our descriptor_size_count, while each index corresponds to a VkDescriptorType enum. Each index/type having
         //      a grater value than zero will be recorded in the next VkDescriptorPoolSize.
         size_t pool_size_index;
-        VkDescriptorPoolSize[ VK_DESCRIPTOR_TYPE_RANGE_SIZE ] descriptor_pool_sizes;
+        VkDescriptorPoolSize[ unique_descriptor_enum_count ] descriptor_pool_sizes;
         foreach( descriptor_type, descriptor_count; descriptor_types_count ) {
             if( descriptor_count > 0 ) {
                 descriptor_pool_sizes[ pool_size_index ].type = cast( VkDescriptorType )descriptor_type;
