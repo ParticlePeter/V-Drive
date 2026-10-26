@@ -17,6 +17,12 @@ bool verbose_init = true;
 private template isVkOrGpu( T )         { enum isVkOrGpu        = isVulkan!T || is( T == VkPhysicalDevice ); }
 private template isVkOrInstance( T )    { enum isVkOrInstance   = isVulkan!T || is( T == VkInstance ); }
 
+/// compare two zero terminated strings by content
+private bool isEqual( string_z a, string_z b ) {
+    import core.stdc.string : strcmp;
+    return strcmp( a, b ) == 0;
+}
+
 
 ////////////////
 // Extensions //
@@ -91,9 +97,8 @@ private uint32_t extensionVersionImpl( VK_OR_GPU )(
 
     uint32_t result = 0;                                                                    // version result
     auto extension_properties = vk_or_gpu.listExtensions( layer, false, file, line, func ); // list all extensions
-    import core.stdc.string : strcmp;
     foreach( ref props; extension_properties ) {                                            // search for requested extension
-        if( strcmp( props.extensionName.ptr, extension )) {
+        if( isEqual( props.extensionName.ptr, extension )) {
             result = props.specVersion;
             break;
         }
@@ -336,6 +341,7 @@ auto listProperties(
 
     if( gpu_info & GPU_Info_Flags.properties ) {
         auto ver = gpu_properties.apiVersion;
+        printf( "\tAPI Variant     : %d\n", ver.vkVariant );
         printf( "\tAPI Version     : %d.%d.%d\n", ver.vkMajor, ver.vkMinor, ver.vkPatch );
         printf( "\tDriver Version  : %d\n", gpu_properties.driverVersion );
         printf( "\tVendor ID       : %d\n", gpu_properties.vendorID );
@@ -638,10 +644,20 @@ alias filter = filterPresentSupport;
 // Convenience Functions //
 ///////////////////////////
 
-/// list all available instance extensions
+/// list all available instance extensions, allocates from heap
 auto listInstanceExtensions( bool print_info = true, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
     if ( print_info ) printf( "\nInstance Extensions\n===================\n" );
     VkPhysicalDevice vk_null = VK_NULL_HANDLE; return vk_null.listExtensions( null, print_info, file, line, func );
+}
+
+/// list all available instance extensions, sub-allocates from scratch
+auto listInstanceExtensions( ref Vulkan vk, bool print_info = true, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+    //if ( print_info ) printf( "\nInstance Extensions\n===================\n" );
+    auto gpu = vk.gpu;          // temporary store gpu
+    vk.gpu = VK_NULL_HANDLE;    // erase vk gpu member, we want Instance extensions
+    auto result = vk.listExtensions( null, print_info, file, line, func );
+    vk.gpu = gpu;               // restore vk gpu member
+    return result;
 }
 
 /// list all available per layer instance extensions
@@ -652,7 +668,7 @@ auto listInstanceLayerExtensions( string_z layer, bool print_info = true, string
 
 /// list all available device extensions
 auto listDeviceExtensions( VK_OR_GPU )( ref VK_OR_GPU vk_or_gpu, bool print_info = true, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
-    if ( print_info ) printf( "\nPhysical Device Extensions\n==========================\n" );
+    //if ( print_info ) printf( "\nPhysical Device Extensions\n==========================\n" );
     return vk_or_gpu.listExtensions( null, print_info, file, line, func );
 }
 
@@ -691,7 +707,7 @@ auto isInstanceLayerExtension( string_z extension, string_z layer, bool print_in
 
 /// check if a device extension of any version is available
 auto isDeviceExtension( VK_OR_GPU )( ref VK_OR_GPU vk_or_gpu, string_z extension, bool print_info = true, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
-    return gpu.isExtension( extension, null, print_info, file, line, func );
+    return vk_or_gpu.isExtension( extension, null, print_info, file, line, func );
 }
 
 /// check if a device layer extension of any version is available
@@ -716,7 +732,6 @@ auto initDevice( T )(
     ref Vulkan                  vk,
     Queue_Family[]              queue_families,
     T                           extension_names,
-    T                           layer_names,
     VkPhysicalDeviceFeatures*   gpu_features = null,
     string                      file = __FILE__,
     size_t                      line = __LINE__,
@@ -740,26 +755,14 @@ auto initDevice( T )(
         if( extension_names.length > 0 )
             extension_names.toPtrArray( ppExtensionNames );
 
-        auto ppLayerNames = Block_Array!string_z( vk.scratch );
-        if( layer_names.length > 0 )
-            layer_names.toPtrArray( ppLayerNames );
-
     } else static if( is( T == string[] )) {
         auto extension_concat_buffer = Block_Array!char( vk.scratch );
         auto ppExtensionNames = Block_Array!string_z( vk.scratch );
-        if( layer_names.length > 0 )
+        if( extension_names.length > 0 )
             extension_names.toPtrArray( ppExtensionNames, extension_concat_buffer );
 
-        auto layer_concat_buffer = Block_Array!char( vk.scratch );
-        auto ppLayerNames = Block_Array!string_z( vk.scratch );
-        if( layer_names.length > 0 )
-            layer_names.toPtrArray( ppLayerNames, layer_concat_buffer );
-
     } else {
-
         alias ppExtensionNames = extension_names;
-        alias ppLayerNames = layer_names;
-
     }
 
     // arrange queue_families into VkdeviceQueueCreateInfos
@@ -775,13 +778,13 @@ auto initDevice( T )(
         pQueueCreateInfos       : queue_cis.ptr,
         enabledExtensionCount   : ppExtensionNames.length.toUint,
         ppEnabledExtensionNames : ppExtensionNames.ptr,
-        enabledLayerCount       : ppLayerNames.length.toUint,
-        ppEnabledLayerNames     : ppLayerNames.ptr,
+        enabledLayerCount       : 0,
+        ppEnabledLayerNames     : null,
         pEnabledFeatures        : gpu_features,
     };
 
     // create the device and load all device level Vulkan functions for the device
-    vk.gpu.vkCreateDevice( & device_ci, null, & vk.device ).vkAssert( "Create Device, file, line, func" );
+    vk.gpu.vkCreateDevice( & device_ci, vk.allocator, & vk.device ).vkAssert( "Create Device", file, line, func );
     loadDeviceLevelFunctions( vk.device );
 
     return vk.device;
@@ -792,47 +795,45 @@ auto initDevice(
     ref Vulkan                  vk,
     Queue_Family[]              queue_families,
     string                      extension_names = "",
-    string                      layer_names = "",
     VkPhysicalDeviceFeatures*   gpu_features = null,
     string                      file = __FILE__,
     size_t                      line = __LINE__,
     string                      func = __FUNCTION__
     ) {
-    return initDevice!( string )( vk, queue_families, extension_names, layer_names, gpu_features, file, line, func );
+    return initDevice!( string )( vk, queue_families, extension_names, gpu_features, file, line, func );
 }
 
 auto initDevice(
     ref Vulkan                  vk,
     Queue_Family[]              queue_families,
     string[]                    extension_names = [],
-    string[]                    layer_names = [],
     VkPhysicalDeviceFeatures*   gpu_features = null,
     string                      file = __FILE__,
     size_t                      line = __LINE__,
     string                      func = __FUNCTION__
     ) {
-    return initDevice!( string[] )( vk, queue_families, extension_names, layer_names, gpu_features, file, line, func );
+    return initDevice!( string[] )( vk, queue_families, extension_names, gpu_features, file, line, func );
 }
 
 auto initDevice(
     ref Vulkan                  vk,
     Queue_Family[]              queue_families,
     string_z[]            		extension_names,
-    string_z[]            		layer_names,
     VkPhysicalDeviceFeatures*   gpu_features = null,
     string                      file = __FILE__,
     size_t                      line = __LINE__,
     string                      func = __FUNCTION__
     ) {
-    return initDevice!( string_z[] )( vk, queue_families, extension_names, layer_names, gpu_features, file, line, func );
+    return initDevice!( string_z[] )( vk, queue_families, extension_names, gpu_features, file, line, func );
 }
 
 
-void initInstance( T )(
+VkResult initInstance( T )(
     ref Vulkan          vk,
     T                   extension_names,
     T                   layer_names,
     VkApplicationInfo*  application_info_ptr = null,
+    VkValidationFeaturesEXT* validation_features_ptr = null,
     string              file = __FILE__,
     size_t              line = __LINE__,
     string              func = __FUNCTION__
@@ -842,9 +843,9 @@ void initInstance( T )(
     // Default information about the application, in case none was passed in by the user
     VkApplicationInfo application_info = {
         pEngineName         : "V-Drive",
-        engineVersion       : VK_MAKE_VERSION( 0, 1, 0 ),
+        engineVersion       : VK_MAKE_API_VERSION( 0, 0, 1, 0 ),
         pApplicationName    : "V-Drive-App",
-        applicationVersion  : VK_MAKE_VERSION( 0, 1, 0 ),
+        applicationVersion  : VK_MAKE_API_VERSION( 0, 0, 1, 0 ),
         apiVersion          : VK_API_VERSION_1_0,
     };
 
@@ -880,6 +881,7 @@ void initInstance( T )(
 
     // Specify initialization of the vulkan instance
     VkInstanceCreateInfo instance_ci = {
+        pNext                   : validation_features_ptr,
         pApplicationInfo        : application_info_ptr,
         enabledExtensionCount   : ppExtensionNames.length.toUint,
         ppEnabledExtensionNames : ppExtensionNames.ptr,
@@ -888,7 +890,9 @@ void initInstance( T )(
     };
 
     // Create the vulkan instance
-    vkCreateInstance( & instance_ci, vk.allocator, & vk.instance ).vkAssert( "Instance Initialization", file, line, func );
+    VkResult vkResult = vkCreateInstance( & instance_ci, vk.allocator, & vk.instance ).vkAssert( "Instance Initialization", file, line, func );
+    if( vkResult != VK_SUCCESS )
+        return vkResult;
 
     // load all instance based functions from the instance
     loadInstanceLevelFunctions( vk.instance );
@@ -898,41 +902,642 @@ void initInstance( T )(
         printf( "Instance initialized\n" );
         printf( "====================\n" );
     }
+    return VK_SUCCESS;
 }
 
 
-void initInstance(
+VkResult initInstance(
     ref Vulkan          vk,
     string              extension_names = "",
     string              layer_names = "",
     VkApplicationInfo*  application_info_ptr = null,
+    VkValidationFeaturesEXT* validation_features_ptr = null,
     string              file = __FILE__,
     size_t              line = __LINE__,
     string              func = __FUNCTION__
     ) {
-    initInstance!( string )( vk, extension_names, layer_names, application_info_ptr, file, line, func );
+    return initInstance!( string )( vk, extension_names, layer_names, application_info_ptr, validation_features_ptr, file, line, func );
 }
 
-void initInstance(
+VkResult initInstance(
     ref Vulkan          vk,
     string[]            extension_names,
     string[]            layer_names = [],
     VkApplicationInfo*  application_info_ptr = null,
+    VkValidationFeaturesEXT* validation_features_ptr = null,
     string              file = __FILE__,
     size_t              line = __LINE__,
     string              func = __FUNCTION__
     ) {
-    initInstance!( string[] )( vk, extension_names, layer_names, application_info_ptr, file, line, func );
+    return initInstance!( string[] )( vk, extension_names, layer_names, application_info_ptr, validation_features_ptr, file, line, func );
 }
 
-void initInstance(
+VkResult initInstance(
     ref Vulkan          vk,
-    string_z[]    extension_names,
-    string_z[]    layer_names = [],
+    string_z[]          extension_names,
+    string_z[]          layer_names = [],
     VkApplicationInfo*  application_info_ptr = null,
+    VkValidationFeaturesEXT* validation_features_ptr = null,
     string              file = __FILE__,
     size_t              line = __LINE__,
     string              func = __FUNCTION__
     ) {
-    initInstance!( string_z[] )( vk, extension_names, layer_names, application_info_ptr, file, line, func );
+    return initInstance!( string_z[] )( vk, extension_names, layer_names, application_info_ptr, validation_features_ptr, file, line, func );
+}
+
+
+
+/// a queue requested with Meta_Init.addQueue, resolved to a queue family of the selected gpu when the device is initialized
+struct Queue_Request {
+    VkQueueFlags    include_flags;      // the queue family must support all of these flags
+    VkQueueFlags    exclude_flags;      // the queue family must support none of these flags
+    VkSurfaceKHR    present_surface;    // if not VK_NULL_HANDLE the queue family must be able to present to this surface
+    float           priority;
+    VkQueue*        queue;              // optional, receives the queue after device initialization
+    uint32_t*       family_index;       // optional, receives the queue family index after device initialization
+    VkQueueFlags    share_preference;   // prefer sharing a queue with requests including any of these flags, e.g. present from the compute queue
+}
+
+
+alias  Meta_Init = Meta_Init_T!();
+struct Meta_Init_T(
+    int32_t instance_extension_count            = int32_t.max,
+    int32_t instance_layer_count                = int32_t.max,
+    int32_t enabled_validation_feature_count    = int32_t.max,
+    int32_t disabled_validation_feature_count   = int32_t.max,
+    int32_t available_gpu_count                 = int32_t.max,
+    int32_t device_extension_count              = int32_t.max,
+    int32_t queue_request_count                 = int32_t.max,
+
+    ) {
+
+    nothrow @nogc:
+
+    mixin   Vulkan_State_Pointer;  //false;
+//  alias   Array_T = Block_Array!string_z;
+
+
+    /*private*/ D_OR_S_ARRAY!( string_z, instance_extension_count ) instance_extensions;
+    /*private*/ D_OR_S_ARRAY!( string_z, instance_layer_count     ) instance_layers;
+
+    private D_OR_S_ARRAY!( VkValidationFeatureEnableEXT,  enabled_validation_feature_count  )  enabled_validation_features;
+    private D_OR_S_ARRAY!( VkValidationFeatureDisableEXT, disabled_validation_feature_count ) disabled_validation_features;
+
+    private bool validate_vulkan     = false;
+    private bool validation_features = false;
+
+    // device data, gpus are collected after the instance exists, the device is initialized on one of them
+    private D_OR_S_ARRAY!( VkPhysicalDevice, available_gpu_count )  available_gpus;     // gpus meeting all device requirements, best fit first
+    private bool gpus_collected = false;
+
+    /*private*/ D_OR_S_ARRAY!( string_z, device_extension_count ) device_extensions;
+
+    private D_OR_S_ARRAY!( Queue_Request, queue_request_count ) queue_requests;
+    private D_OR_S_ARRAY!( uint32_t,      queue_request_count ) queue_request_families;   // resolved family index per queue request
+
+    private VkPhysicalDeviceFeatures required_features;     // gpus not supporting all of these are not collected
+    private VkPhysicalDeviceFeatures requested_features;    // enabled only if the selected gpu supports them
+    private VkPhysicalDeviceFeatures enabled_features;      // required and supported requested features, valid after initDevice
+
+    /// include flags of all requests sharing the queue of the (first) present request, valid after initDevice
+    /// e.g. VK_QUEUE_COMPUTE_BIT when presenting from the compute queue, 0 when presenting from a dedicated queue
+    VkQueueFlags present_queue_flags;
+
+    /*
+    this( ref Vulkan vk ) {
+        vk_ptr = & vk;
+
+        instance_extensions = Array_T( vk.scratch );
+        instance_layers     = Array_T( vk.scratch );
+
+         enabled_validation_features = Block_Array!VkValidationFeatureEnableEXT(  vk.scratch );
+        disabled_validation_features = Block_Array!VkValidationFeatureDisableEXT( vk.scratch );
+
+        available_gpus = Block_Array!VkPhysicalDevice( vk.scratch );
+    }
+    */
+
+    ref Meta_Init_T addInstanceExtension( string_z extension ) return {
+        void printWarning( string_z extension ) {
+            printf( "WARNING: adding %s extension only enables Vulkan validation.\nThis in turn enables the newest available system,\nwhile %s is prefered over %s and %s.",
+                extension, VK_EXT_DEBUG_UTILS_EXTENSION_NAME, VK_EXT_DEBUG_REPORT_EXTENSION_NAME, VK_EXT_DEBUG_MARKER_EXTENSION_NAME );
+        }
+        // compare content, not pointers, the same name can be stored at different addresses
+        if( extension.isEqual( VK_EXT_DEBUG_UTILS_EXTENSION_NAME )
+         || extension.isEqual( VK_EXT_DEBUG_REPORT_EXTENSION_NAME )
+         || extension.isEqual( VK_EXT_DEBUG_MARKER_EXTENSION_NAME )) {
+            printWarning( extension );
+            validate_vulkan = true;
+        } else if( extension.isEqual( VK_EXT_VALIDATION_FEATURES_EXTENSION_NAME )) {
+            validation_features = true;
+        } else {
+            instance_extensions.append( extension );
+        }
+        return this;
+    }
+
+    ref Meta_Init_T addInstanceExtensions( string_z[] extensions ) return {
+        instance_extensions.reserve( extensions.length + 3 );   // we might add up to 3 extensions
+        foreach( extension; extensions )
+            addInstanceExtension( extension );
+        return this;
+    }
+
+    ref Meta_Init_T addInstanceLayer( string_z layer ) return {
+        instance_layers.append( layer );
+        return this;
+    }
+
+    ref Meta_Init_T addInstanceLayers( string_z[] layers ) return {
+        instance_layers.append( layers );
+        return this;
+    }
+
+
+    ref Meta_Init_T validateVulkan( bool validate ) return {
+        validate_vulkan = validate;
+        return this;
+    }
+
+
+    ref Meta_Init_T enableValidationFeature( VkValidationFeatureEnableEXT validation_feature ) return {
+        enabled_validation_features.append( validation_feature );
+        return this;
+    }
+
+    ref Meta_Init_T enableValidationFeature( VkValidationFeatureDisableEXT validation_feature ) return {
+        disabled_validation_features.append( validation_feature );
+        return this;
+    }
+
+    // Debug Utils Data
+    private VkDebugUtilsMessageTypeFlagsEXT         debug_utils_type_flags      = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT
+                                                                                | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT
+                                                                                | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+
+    private VkDebugUtilsMessageSeverityFlagsEXT     debug_utils_severity_flags  = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT
+                                                                                | VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT
+                                                                                | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT
+                                                                                | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+
+    private PFN_vkDebugUtilsMessengerCallbackEXT    debug_utils_pfn_callback    = null;
+    private void*                                   debug_utils_user_data       = null;
+
+    // Debug Utils Setup
+    ref Meta_Init_T setDebugUtilsSeverityFlags( VkDebugUtilsMessageSeverityFlagsEXT flags ) return {
+        debug_utils_severity_flags = flags;
+        return this;
+    }
+
+    ref Meta_Init_T setDebugUtilsTypeFlags( VkDebugUtilsMessageTypeFlagsEXT flags ) return {
+        debug_utils_type_flags = flags;
+        return this;
+    }
+
+    ref Meta_Init_T setDebugUtilsCallback( PFN_vkDebugUtilsMessengerCallbackEXT callback, void* user_data ) return {
+        debug_utils_pfn_callback = callback;
+        debug_utils_user_data = user_data;
+        return this;
+    }
+
+
+
+    // Debug Report Data
+    private VkDebugReportFlagsEXT           debug_report_flags          = VK_DEBUG_REPORT_INFORMATION_BIT_EXT
+                                                                        | VK_DEBUG_REPORT_WARNING_BIT_EXT
+                                                                        | VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT
+                                                                        | VK_DEBUG_REPORT_ERROR_BIT_EXT
+                                                                        | VK_DEBUG_REPORT_DEBUG_BIT_EXT;
+
+    private PFN_vkDebugReportCallbackEXT    debug_report_pfn_callback   = null;
+    private void*                           debug_report_user_data      = null;
+
+    // Debug Report Setup
+    ref Meta_Init_T setDebugReportFlags( VkDebugReportFlagsEXT flags ) return {
+        debug_report_flags = flags;
+        return this;
+    }
+
+    ref Meta_Init_T setDebugReportCallback( PFN_vkDebugReportCallbackEXT callback, void* user_data ) return {
+        debug_report_pfn_callback = callback;
+        debug_report_user_data = user_data;
+        return this;
+    }
+
+
+
+    // Initialize Instance
+    VkResult initInstance( bool verbose = false, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+        return initInstance( null, verbose, file, line, func );
+    }
+
+    VkResult initInstance( VkApplicationInfo* application_info_ptr, bool verbose = false, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__  ) {
+
+        bool debug_utils_selected  = false;
+        bool debug_report_selected = false;
+
+        if( validate_vulkan ) {
+
+            // we prefer using the modern debug utils
+            if( VK_EXT_DEBUG_UTILS_EXTENSION_NAME.isInstanceExtension( verbose )) {
+                instance_extensions.append( VK_EXT_DEBUG_UTILS_EXTENSION_NAME );
+                debug_utils_selected = true;
+            }
+
+            // else we use the debug report callback functionality if available
+            else if( VK_EXT_DEBUG_REPORT_EXTENSION_NAME.isInstanceExtension( verbose )) {
+                instance_extensions.append( VK_EXT_DEBUG_REPORT_EXTENSION_NAME );
+                debug_report_selected = true;
+
+                // and also debug marker functionality if available
+                if( VK_EXT_DEBUG_MARKER_EXTENSION_NAME.isInstanceExtension( verbose )) {
+                    instance_extensions.append( VK_EXT_DEBUG_MARKER_EXTENSION_NAME );
+                }
+            }
+        }
+
+
+        // enable validation features if available
+        VkValidationFeaturesEXT  vk_validation_features;
+        VkValidationFeaturesEXT* vk_validation_features_ptr = null;
+        if( validation_features ) {
+            if( VK_EXT_VALIDATION_FEATURES_EXTENSION_NAME.isInstanceExtension( verbose ) && ( enabled_validation_features.count > 0 || disabled_validation_features.count > 0 )) {
+                instance_extensions.append( VK_EXT_VALIDATION_FEATURES_EXTENSION_NAME );
+                vk_validation_features_ptr = & vk_validation_features;
+
+                with( vk_validation_features ) {
+                    pEnabledValidationFeatures = enabled_validation_features.ptr;
+                    pDisabledValidationFeatures = disabled_validation_features.ptr;
+                    enabledValidationFeatureCount = enabled_validation_features.count.toUint;
+                    disabledValidationFeatureCount = disabled_validation_features.count.toUint;
+                }
+            } else {
+                printf( "WARNING: %s was requested, but is not available and will be skipped.", VK_EXT_VALIDATION_FEATURES_EXTENSION_NAME );
+            }
+        }
+
+
+        // check if all of the extensions are available, exit if not
+        foreach( extension; instance_extensions.data ) {
+            if( !extension.isInstanceExtension( verbose )) {
+                printf( "Required extension %s not available. Exiting!\n", extension );
+                return VK_ERROR_INITIALIZATION_FAILED;
+            }
+        }
+
+        // check if all of the layers are available, exit if not
+        foreach( layer; instance_layers.data ) {
+            if( !layer.isInstanceLayer( verbose )) {
+                printf( "Required layers %s not available. Exiting!\n", layer );
+                return VK_ERROR_INITIALIZATION_FAILED;
+            }
+        }
+
+        VkResult vk_result =
+            vk.initInstance( instance_extensions.data, instance_layers.data, application_info_ptr, vk_validation_features_ptr )
+                .vkAssert( "Meta_Init Instance", file, line, func );
+
+        if( vk_result != VK_SUCCESS )
+            return vk_result;
+
+        // Create Debug Messenger or Debug Report
+        import vdrive.validator;
+        if( debug_utils_selected ) {
+            if( debug_utils_pfn_callback is null ) {
+                vk_result = createDebugMessenger( vk, debug_utils_severity_flags, debug_utils_type_flags )
+                    .vkAssert( "Meta_Init Debug Messenger", file, line, func );
+            } else {
+                vk_result = createDebugMessenger( vk, debug_utils_severity_flags, debug_utils_type_flags, debug_utils_pfn_callback, debug_utils_user_data )
+                    .vkAssert( "Meta_Init Debug Messenger User", file, line, func );
+            }
+        }
+
+        else if( debug_report_selected ) {
+            if( debug_report_pfn_callback is null ) {
+                vk_result = createDebugReporter( vk, debug_report_flags )
+                    .vkAssert( "Meta_Init Debug Reporter", file, line, func );
+            } else {
+                vk_result = createDebugReporter( vk, debug_report_flags, debug_report_pfn_callback, debug_report_user_data )
+                    .vkAssert( "Meta_Init Debug Reporter User", file, line, func );
+            }
+        }
+
+        if( vk_result != VK_SUCCESS )
+            return vk_result;
+
+    //  instance_extensions.reset;  // we don't need instance extensions any more
+    //  vk.scratch.defragment;      // defragment the scratch array, moving instance layers to the front
+        return vk_result;
+    }
+
+
+
+    // Device Setup
+    ref Meta_Init_T addDeviceExtension( string_z extension ) return {
+        if( !device_extensions.data.containsName( extension ))
+            device_extensions.append( extension );
+        gpus_collected = false;
+        return this;
+    }
+
+    ref Meta_Init_T addDeviceExtensions( string_z[] extensions ) return {
+        foreach( extension; extensions )
+            addDeviceExtension( extension );
+        return this;
+    }
+
+    /// request a queue with all include_flags and none of the exclude_flags, optionally able to present to a surface
+    /// requests which can be satisfied by the same queue family share one queue, e.g. graphics and present
+    /// queue and family_index pointers receive their values in initDevice, both are optional
+    /// share_preference: if possible share the queue of a request including any of these flags, over sharing any other
+    ref Meta_Init_T addQueue(
+        VkQueueFlags    include_flags,
+        VkQueue*        queue,
+        uint32_t*       family_index        = null,
+        VkSurfaceKHR    present_surface     = VK_NULL_HANDLE,
+        float           priority            = 1.0f,
+        VkQueueFlags    exclude_flags       = 0,
+        VkQueueFlags    share_preference    = 0
+
+        ) return {
+        queue_requests.append( Queue_Request( include_flags, exclude_flags, present_surface, priority, queue, family_index, share_preference ));
+        gpus_collected = false;
+        return this;
+    }
+
+    /// request a queue which can present to surface, has no other flag requirements
+    /// prefer_queue: present preferably from the queue of e.g. the VK_QUEUE_COMPUTE_BIT or VK_QUEUE_GRAPHICS_BIT request,
+    /// if its family can present, otherwise from any other, query present_queue_flags after initDevice
+    ref Meta_Init_T addPresentQueue( VkSurfaceKHR surface, VkQueue* queue, uint32_t* family_index = null, VkQueueFlags prefer_queue = 0 ) return {
+        return addQueue( 0, queue, family_index, surface, 1.0f, 0, prefer_queue );
+    }
+
+    /// gpus which do not support all of these features are not collected
+    ref Meta_Init_T requireFeatures( VkPhysicalDeviceFeatures features ) return {
+        required_features = features;
+        gpus_collected = false;
+        return this;
+    }
+
+    /// these features are enabled if the selected gpu supports them, query enabledFeatures after initDevice
+    ref Meta_Init_T requestFeatures( VkPhysicalDeviceFeatures features ) return {
+        requested_features = features;
+        return this;
+    }
+
+    /// required features plus the requested features supported by the selected gpu, valid after initDevice
+    ref const( VkPhysicalDeviceFeatures ) enabledFeatures() return {
+        return enabled_features;
+    }
+
+
+    /// collect all gpus meeting the device extension, feature and queue requirements, discrete gpus first
+    /// called implicitly by initDevice, call explicitly to inspect or choose from the result
+    uint32_t collectGpus( bool verbose = false, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+        vkAssert( !vk.instance.is_null, "Meta_Init collect GPUs, the instance must be initialized first!", file, line, func );
+
+        // a queue presenting to a surface requires the swapchain extension
+        foreach( ref request; queue_requests.data ) {
+            if( !request.present_surface.is_null ) {
+                addDeviceExtension( VK_KHR_SWAPCHAIN_EXTENSION_NAME );
+                break;
+            }
+        }
+
+        available_gpus.clear;
+        auto gpus = listPhysicalDevices( vk.instance, false, file, line, func );
+        foreach( gpu; gpus.data )
+            if( isSuitable( gpu, verbose ))
+                available_gpus.append( gpu );
+
+        // insertion sort, stable and the gpu count is tiny
+        foreach( i; 1 .. available_gpus.length ) {
+            auto gpu = available_gpus[ i ];
+            size_t j = i;
+            for( ; j > 0 && gpuTypeRank( available_gpus[ j - 1 ] ) > gpuTypeRank( gpu ); --j )
+                available_gpus[ j ] = available_gpus[ j - 1 ];
+            available_gpus[ j ] = gpu;
+        }
+
+        gpus_collected = true;
+        return available_gpus.length.toUint;
+    }
+
+    /// count of collected gpus, valid after collectGpus or initDevice
+    uint32_t availableGpuCount() {
+        return available_gpus.length.toUint;
+    }
+
+    /// collected gpu at index, best fit first, valid after collectGpus or initDevice
+    VkPhysicalDevice availableGpu( size_t index, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+        return available_gpus.opIndex( index, file, line, func );
+    }
+
+
+    // Initialize Device
+    /// initialize the device on the collected gpu at gpu_index, assigns vk.gpu and vk.device and fills requested queues
+    VkResult initDevice( size_t gpu_index = 0, bool verbose = false, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+
+        if( !gpus_collected )
+            collectGpus( verbose, file, line, func );
+
+        if( gpu_index >= available_gpus.length ) {
+            printf( "No GPU meeting the device requirements found at index %llu, %u available. Exiting!\n", cast( ulong )gpu_index, available_gpus.length.toUint );
+            return VK_ERROR_INITIALIZATION_FAILED;
+        }
+
+        vk.gpu = available_gpus[ gpu_index ];
+        resolveQueueFamilies( vk.gpu );   // succeeded already while collecting
+
+        // enable required features and the supported requested ones
+        auto available_features = vk.gpu.listFeatures( false );
+        enabled_features = required_features;
+        auto enabled   = featureFlags( enabled_features );
+        auto requested = featureFlags( requested_features );
+        auto available = featureFlags( available_features );
+        foreach( i; 0 .. enabled.length )
+            if( requested[ i ] && available[ i ] )
+                enabled[ i ] = VK_TRUE;
+
+        // one queue per distinct family, requests sharing a family share its queue with the highest requested priority
+        auto queue_family_properties = vk.gpu.listQueues( false );
+        Dynamic_Array!Queue_Family queue_families;
+        foreach( r, family_index; queue_request_families.data ) {
+            float priority = queue_requests[ r ].priority;
+            bool  found    = false;
+            foreach( ref queue_family; queue_families.data ) {
+                if( queue_family.family_index == family_index ) {
+                    if( queue_family.priority( 0 ) < priority )
+                        queue_family.priority( 0 ) = priority;
+                    found = true;
+                    break;
+                }
+            }
+            if( !found ) {
+                auto queue_family = queue_families.append( Queue_Family( family_index, queue_family_properties[ family_index ] ));
+                queue_family.queueCount = 1;
+                queue_family.priority( 0 ) = priority;
+            }
+        }
+
+        vk.initDevice( queue_families.data, device_extensions.data, & enabled_features, file, line, func );
+        if( vk.device.is_null )
+            return VK_ERROR_INITIALIZATION_FAILED;
+
+        // hand out the requested queues and family indices
+        foreach( r, ref request; queue_requests.data ) {
+            if( request.queue !is null )
+                vkGetDeviceQueue( vk.device, queue_request_families[ r ], 0, request.queue );
+            if( request.family_index !is null )
+                *request.family_index = queue_request_families[ r ];
+        }
+
+        // gather the flags of all requests sharing the queue of the first present request
+        present_queue_flags = 0;
+        foreach( p, ref present_request; queue_requests.data ) {
+            if( present_request.present_surface.is_null )
+                continue;
+            foreach( r, ref request; queue_requests.data )
+                if( queue_request_families[ r ] == queue_request_families[ p ] )
+                    present_queue_flags |= request.include_flags;
+            break;
+        }
+
+        if( verbose_init ) {
+            VkPhysicalDeviceProperties gpu_properties;
+            vkGetPhysicalDeviceProperties( vk.gpu, & gpu_properties );
+            println;
+            printf( "Device initialized on %s\n", gpu_properties.deviceName.ptr );
+            printf( "====================\n" );
+        }
+        return VK_SUCCESS;
+    }
+
+
+    // check device extensions, required features and queue requests of a gpu
+    private bool isSuitable( VkPhysicalDevice gpu, bool verbose ) {
+        VkPhysicalDeviceProperties gpu_properties;
+        vkGetPhysicalDeviceProperties( gpu, & gpu_properties );
+
+        foreach( extension; device_extensions.data ) {
+            if( !gpu.isDeviceExtension( extension, false )) {
+                if( verbose ) printf( "GPU %s skipped, extension %s not available\n", gpu_properties.deviceName.ptr, extension );
+                return false;
+            }
+        }
+
+        auto available_features = gpu.listFeatures( false );
+        auto required  = featureFlags( required_features );
+        auto available = featureFlags( available_features );
+        foreach( i; 0 .. required.length ) {
+            if( required[ i ] && !available[ i ] ) {
+                if( verbose ) printf( "GPU %s skipped, a required feature is not available\n", gpu_properties.deviceName.ptr );
+                return false;
+            }
+        }
+
+        if( !resolveQueueFamilies( gpu )) {
+            if( verbose ) printf( "GPU %s skipped, requested queues not available\n", gpu_properties.deviceName.ptr );
+            return false;
+        }
+
+        if( verbose ) printf( "GPU %s meets the device requirements\n", gpu_properties.deviceName.ptr );
+        return true;
+    }
+
+
+    // resolve each queue request to a queue family index of gpu, stored in queue_request_families
+    // a family which is used by a resolved request or satisfies more of the unresolved requests is preferred,
+    // so that requests share families, a family used by a request matching the share_preference is preferred most
+    // returns false if any request cannot be satisfied
+    private bool resolveQueueFamilies( VkPhysicalDevice gpu ) {
+        auto queue_family_properties = gpu.listQueues( false );
+
+        bool satisfies( ref Queue_Request request, uint32_t family_index ) {
+            auto flags = queue_family_properties[ family_index ].queueFlags;
+            if(( flags & request.include_flags ) != request.include_flags )
+                return false;
+            if( flags & request.exclude_flags )
+                return false;
+            if( !request.present_surface.is_null ) {
+                VkBool32 present_supported;
+                vkGetPhysicalDeviceSurfaceSupportKHR( gpu, family_index, request.present_surface, & present_supported );
+                if( !present_supported )
+                    return false;
+            }
+            return true;
+        }
+
+        enum uint32_t unresolved = uint32_t.max;
+        int request_count = queue_requests.length.toInt;
+
+        queue_request_families.length = queue_requests.length;
+        foreach( ref family_index; queue_request_families.data )
+            family_index = unresolved;
+
+        // requests with a share_preference are resolved in the second pass, when the requests they prefer are resolved
+        foreach( pass; 0 .. 2 ) {
+            foreach( r, ref request; queue_requests.data ) {
+                if(( request.share_preference != 0 ) != ( pass == 1 ))
+                    continue;
+
+                int best_score = -1;
+                foreach( f; 0 .. queue_family_properties.length ) {
+                    uint32_t family_index = f.toUint32;
+                    if( !satisfies( request, family_index ))
+                        continue;
+
+                    // sharing with a resolved request outweighs any count of unresolved requests, sharing with a preferred one doubly
+                    int score = 0;
+                    int share_score = 0;
+                    foreach( o, other_family_index; queue_request_families.data ) {
+                        if( other_family_index == unresolved ) {
+                            if( o != r && satisfies( queue_requests[ o ], family_index ))
+                                ++score;
+                        } else if( other_family_index == family_index ) {
+                            int s = ( queue_requests[ o ].include_flags & request.share_preference ) ? 2 * request_count : request_count;
+                            if( share_score < s )
+                                share_score = s;
+                        }
+                    }
+                    score += share_score;
+
+                    if( score > best_score ) {
+                        best_score = score;
+                        queue_request_families[ r ] = family_index;
+                    }
+                }
+                if( best_score < 0 )
+                    return false;
+            }
+        }
+        return true;
+    }
+}
+
+
+// view a VkPhysicalDeviceFeatures as array of its VkBool32 members
+private VkBool32[] featureFlags( return ref VkPhysicalDeviceFeatures features ) {
+    return ( cast( VkBool32* )( & features ))[ 0 .. VkPhysicalDeviceFeatures.sizeof / VkBool32.sizeof ];
+}
+
+// lower rank is preferred when collecting gpus
+private int gpuTypeRank( VkPhysicalDevice gpu ) {
+    VkPhysicalDeviceProperties gpu_properties;
+    vkGetPhysicalDeviceProperties( gpu, & gpu_properties );
+    switch( gpu_properties.deviceType ) {
+        case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU   : return 0;
+        case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU : return 1;
+        case VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU    : return 2;
+        case VK_PHYSICAL_DEVICE_TYPE_CPU            : return 3;
+        default                                     : return 4;
+    }
+}
+
+// check if a list of zero terminated strings contains name
+private bool containsName( string_z[] names, string_z name ) {
+    foreach( n; names )
+        if( n.isEqual( name ))
+            return true;
+    return false;
 }
