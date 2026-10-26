@@ -62,8 +62,7 @@ extern( System ) VkBool32 debug_messenger(
 }
 
 
-
-void createDebugMessenger(
+VkResult createDebugMessenger(
     ref Vulkan                              vk,
     VkDebugUtilsMessageSeverityFlagsEXT     message_severity,
     VkDebugUtilsMessageTypeFlagsEXT         message_type,
@@ -73,16 +72,15 @@ void createDebugMessenger(
 
     ) {
 
-    createDebugMessenger( vk, message_severity, message_type, & debug_messenger, & vk.scratch, file, line, func );
+    return createDebugMessenger( vk, message_severity, message_type, & debug_messenger, & vk.scratch, file, line, func );
 }
 
 
-
-void createDebugMessenger(
+VkResult createDebugMessenger(
     ref Vulkan                              vk,
-    VkDebugUtilsMessageSeverityFlagsEXT     message_severity,
-    VkDebugUtilsMessageTypeFlagsEXT         message_type,
-    PFN_vkDebugUtilsMessengerCallbackEXT    pfn_user_callback,
+    VkDebugUtilsMessageSeverityFlagsEXT     message_severity_flags,
+    VkDebugUtilsMessageTypeFlagsEXT         message_type_flags,
+    PFN_vkDebugUtilsMessengerCallbackEXT    pfn_callback,
     void*                                   user_data,
     string                                  file = __FILE__,
     size_t                                  line = __LINE__,
@@ -91,12 +89,12 @@ void createDebugMessenger(
     ) {
 
     VkDebugUtilsMessengerCreateInfoEXT messenger_ci = {
-        messageSeverity : message_severity,
-        messageType     : message_type,
-        pfnUserCallback : pfn_user_callback,
+        messageSeverity : message_severity_flags,
+        messageType     : message_type_flags,
+        pfnUserCallback : pfn_callback,
         pUserData       : user_data,
     };
-    vkCreateDebugUtilsMessengerEXT( vk.instance, & messenger_ci, vk.allocator, & vk.debug_utils_messenger )
+    return vkCreateDebugUtilsMessengerEXT( vk.instance, & messenger_ci, vk.allocator, & vk.debug_utils_messenger )
         .vkAssert( "Debug Utils Messenger Callback", file, line, func );
 }
 
@@ -126,6 +124,39 @@ extern( System ) VkBool32 debug_report(
     printf( "Message      : %s\n\n", pMessage );
 
     return VK_FALSE;
+}
+
+
+VkResult createDebugReporter(
+    ref Vulkan                    vk,
+    VkDebugReportFlagsEXT         report_flags,
+    string                        file = __FILE__,
+    size_t                        line = __LINE__,
+    string                        func = __FUNCTION__
+
+    ) {
+
+    return createDebugReporter( vk, report_flags, & debug_report, & vk.scratch, file, line, func );
+}
+
+
+VkResult createDebugReporter(
+    ref Vulkan                    vk,
+    VkDebugReportFlagsEXT         report_flags,
+    PFN_vkDebugReportCallbackEXT  pfn_callback,
+    void*                         user_data,
+    string                        file = __FILE__,
+    size_t                        line = __LINE__,
+    string                        func = __FUNCTION__
+
+    ) {
+
+    VkDebugReportCallbackCreateInfoEXT callback_ci = {
+        flags           : report_flags,
+        pfnCallback     : pfn_callback,
+        pUserData       : user_data,
+    };
+    return vkCreateDebugReportCallbackEXT( vk.instance, & callback_ci, vk.allocator, & vk.debug_report_callback );
 }
 
 
