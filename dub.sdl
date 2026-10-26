@@ -8,18 +8,19 @@ copyright           "Copyright (c) 2016 Peter Particle"
 authors             "Peter Particle"
 license             "MIT"
 
-dependencies        "erupted" version = "~>2.0"
+// use dub.selections.json to test local lib version with setting (e.g.): "erupted": {"path":"../ErupteD"}
+dependency          "erupted" version = "~>2.0"
+//dependency          "erupted"           path    = "../ErupteD"
 
 buildRequirements   "allowWarnings"
-
 
 // example pp_00 : print capabilities
 subPackage {
     name                "vk_caps"
     description         "Vulkan Capabilities"
     targetType          "executable"
-    sourcePaths         "source"    "example/pp_00_capabilities"
-    dependency          "erupted"   version = "~>2.0"
+    sourcePaths         "source"            "example/pp_00_capabilities"
+    dependency          "erupted"           version = "~>2.0"
 //  buildOptions        "profile" "profileGC"
 }
 
@@ -30,7 +31,9 @@ subPackage {
     targetType          "executable"
     sourcePaths         "source" "example/common" "example/sw_01_triangle"
     dependency          "erupted"           version = "~>2.0"
-    dependency          "derelict-glfw3"    version = "~>3.1"
+    dependency          "bindbc-glfw"       version = "~>1.0.0"
+    subConfiguration    "bindbc-glfw"       "dynamicBC"
+    versions            "GLFW_33"
     dependency          "dlsl"              version = "~>0.1"
 //  dependency          "dlsl"              path    = "../../DLang/projects/DLSL"
 //  buildOptions        "profile" "profileGC"

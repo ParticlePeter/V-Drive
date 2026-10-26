@@ -7,7 +7,7 @@
 *   However, in these example only basic features are used, heavier once will be introduced in later examples
 *
 * Example Structure:
-*   appstate    : the struct VDrive_State holds the state of the application, vulkan non- and related data
+*   appstate    : the struct App_State holds the state of the application, vulkan non- and related data
 *   triangle    : initializes all the required Vulkan non- and related data
 *   main        : this module has the render loop and polls glfw events
 *
@@ -38,54 +38,59 @@ module main;
 import input;
 import appstate;
 import triangle;
+//import cone;
+//import morton;
 import initialize;
 
-import derelict.glfw3;
+import bindbc.glfw;
 
 import core.stdc.stdio : printf, sprintf;
+
 
 int main() {
 
     printf( "\n" );
 
     // create the state object
-    VDrive_State vd;                                                    // VDrive state struct
-    auto vkResult = vd.initVulkan( 1600, 900 );                         // initialize instance and (physical) device
-    if( vkResult ) return vkResult;                                     // exit if initialization failed, VK_SUCCESS = 0
-    vd.initTrackball( vd.projection_fovy, vd.windowHeight, 0, 0, 4 );   // initialize the trackball with fov(y), win_height, cam_pos(x,y,z)
-    vd.createResources;                                                 // create all required vulkan resources
+    App_State app;                                                          // VDrive state struct
+    auto vkResult = app.initVulkan( 1440, 960 );                           // initialize instance and (physical) device
 
+    // exit if initialization failed, VK_SUCCESS = 0
+    if( vkResult )
+        return vkResult;
+
+    app.initTrackball( app.projection_fovy, app.windowHeight, 0, 0, 4 );    // initialize the trackball with fov(y), win_height, cam_pos(x,y,z)
+    app.createResources;                                                    // create all required vulkan resources
 
     // vars to compute fps and display in title
     char[32] title;
     uint frame_count;
     double last_time = glfwGetTime();
-    while( !glfwWindowShouldClose( vd.window )) {
+    while( !glfwWindowShouldClose( app.window )) {
 
         // compute fps
         ++frame_count;
         double delta_time = glfwGetTime() - last_time;
+
         if( delta_time >= 1.0 ) {
             sprintf( title.ptr, "Vulkan Erupted, FPS: %.2f", frame_count / delta_time );    // frames per second
             //sprintf( title.ptr, "Vulkan Erupted, FPS: %.2f", 1000.0 / frame_count );        // milli seconds per frame
-            glfwSetWindowTitle( vd.window, title.ptr );
+            glfwSetWindowTitle( app.window, title.ptr );
             last_time += delta_time;
             frame_count = 0;
         }
 
         // draw
-        vd.draw();
-        glfwSwapBuffers( vd.window );
+        app.draw();
+        glfwSwapBuffers( app.window );
 
         // poll events in remaining frame time
         glfwPollEvents();
-        if( vd.tb.dirty )
-            vd.updateWVPM;
     }
 
     // drain work and destroy vulkan
-    vd.destroyResources;
-    vd.destroyVulkan;
+    app.destroyResources;
+    app.destroyVulkan;
 
     printf( "\n" );
     return 0;

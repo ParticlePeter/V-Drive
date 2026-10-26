@@ -1,6 +1,7 @@
 module triangle;
 
-import derelict.glfw3;
+import bindbc.glfw;
+
 import dlsl.matrix;
 
 import input;
@@ -17,19 +18,19 @@ import vdrive.util.array;
 // create window size independent resources once before draw loop //
 ////////////////////////////////////////////////////////////////////
 
-auto ref createResources( ref VDrive_State vd, bool recreate = false ) {
+void createResources( ref App_State app, bool recreate = false ) {
 
     /////////////////////////////////
     // create fence and semaphores //
     /////////////////////////////////
 
-    vd.submit_fence[0] = vd.createFence;            // fence to sync CPU and GPU once per frame
-    vd.submit_fence[1] = vd.createFence;            // fence to sync CPU and GPU once per frame
     import vdrive.synchronizer;
+    app.submit_fence[0] = app.createFence( VK_FENCE_CREATE_SIGNALED_BIT );          // fence to sync CPU and GPU once per frame
+    app.submit_fence[1] = app.createFence( VK_FENCE_CREATE_SIGNALED_BIT );          // fence to sync CPU and GPU once per frame
 
     // rendering and presenting semaphores for VkSubmitInfo, VkPresentInfoKHR and vkAcquireNextImageKHR
-    vd.acquired_semaphore = vd.createSemaphore;    // signaled when a new swapchain image is acquired
-    vd.rendered_semaphore = vd.createSemaphore;    // signaled when submitted command buffer(s) complete execution
+    app.acquired_semaphore = app.createSemaphore;   // signaled when a new swapchain image is acquired
+    app.rendered_semaphore = app.createSemaphore;   // signaled when submitted command buffer(s) complete execution
 
 
 
@@ -38,23 +39,23 @@ auto ref createResources( ref VDrive_State vd, bool recreate = false ) {
     /////////////////////////////////////
 
     // draw submit info for vkQueueSubmit
-    with( vd.submit_info ) {
+    with( app.submit_info ) {
         waitSemaphoreCount      = 1;
-        pWaitSemaphores         = &vd.acquired_semaphore;
-        pWaitDstStageMask       = &vd.submit_wait_stage_mask;   // configured before entering createResources func
+        pWaitSemaphores         = & app.acquired_semaphore;
+        pWaitDstStageMask       = & app.submit_wait_stage_mask; // configured before entering createResources func
         commandBufferCount      = 1;
-    //  pCommandBuffers         = &vd.cmd_buffers[ i ];         // set before submission, choosing cmd_buffers[0/1]
+    //  pCommandBuffers         = & app.cmd_buffers[ i ];       // set before submission, choosing cmd_buffers[0/1]
         signalSemaphoreCount    = 1;
-        pSignalSemaphores       = &vd.rendered_semaphore;
+        pSignalSemaphores       = & app.rendered_semaphore;
     }
 
     // present info for vkQueuePresentKHR
-    with( vd.present_info ) {
+    with( app.present_info ) {
         waitSemaphoreCount      = 1;
-        pWaitSemaphores         = &vd.rendered_semaphore;
+        pWaitSemaphores         = & app.rendered_semaphore;
         swapchainCount          = 1;
-    //  pSwapchains             = &vd.surface.swapchain;        // set after (re)creating swapchain
-    //  pImageIndices           = &next_image_index;            // set before presenting, using the acquired next_image_index
+    //  pSwapchains             = & app.swapchain.swapchain;    // set after (re)creating swapchain
+    //  pImageIndices           = & next_image_index;           // set before presenting, using the acquired next_image_index
     }
 
 
@@ -63,81 +64,21 @@ auto ref createResources( ref VDrive_State vd, bool recreate = false ) {
     // create matrix uniform buffer //
     //////////////////////////////////
 
-    import vdrive.memory;
-    vd.wvpm_buffer = vd;
-    vd.wvpm_buffer.create( VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, 2 * 16 * float.sizeof );
-    vd.wvpm_buffer.createMemory( VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT );
-
-    // map the uniform buffer memory persistently
-    import dlsl.matrix;
-    vd.wvpm = cast( mat4* )vd.wvpm_buffer.mapMemory;
-
-    // specify mapped memory range for the matrix uniform buffer
-    vd.wvpm_flush.memory    = vd.wvpm_buffer.memory;
-    vd.wvpm_flush.size      = vd.wvpm_buffer.memSize;
+    import vdrive.buffer;
+    auto wvpm_buffer = Meta_Buffer_T!( App_State.Ubo_Buffer )( app )
+        .usage( VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT )
+        .bufferSize( 16 * float.sizeof )   // mat4.sizeof
+        .construct( VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT )
+        .mapMemory( app.wvpm )
+        .reset( app.wvpm_buffer );
 
     // update projection matrix from member data _fovy, _near, _far and aspect of
     // the swapchain extent, initialized once, resized by the input.windowSizeCallback
     // however we can set _fovy, _near, _far to desired values before calling updateProjection
-    vd.updateProjection;
+    app.updateProjection;
 
     // multiply projection with trackball (view) matrix and upload to uniform buffer
-    vd.updateWVPM;
-
-
-
-    ////////////////////////////////////////////////
-    // configure swapchain but delay construction //
-    ////////////////////////////////////////////////
-
-    // Note: to get GPU surface capabilities to check for possible image usages
-    //VkSurfaceCapabilitiesKHR surface_capabilities;
-    //vkGetPhysicalDeviceSurfaceCapabilitiesKHR( surface.gpu, surface.surface, &surface_capabilities );
-    //surface_capabilities.printTypeInfo;
-
-    // we need to know the swapchain image format before we create a render pass
-    // to render into that swapcahin image. We don't have to create the swapchain itself
-    // renderpass needs to be created only once in contrary to the swapchain, which must be
-    // recreated if the window surface size changes
-    // We set all required parameters here to avoid configuration at multiple locations
-    // additionally configuration needs to happen only once
-
-    // list of prefered formats and modes, the first found will be used, othervise the first available not in lists
-    VkFormat[4] request_format = [ VK_FORMAT_R8G8B8_UNORM, VK_FORMAT_B8G8R8_UNORM, VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_B8G8R8A8_UNORM ];
-    VkPresentModeKHR[3] request_mode = [ VK_PRESENT_MODE_IMMEDIATE_KHR, VK_PRESENT_MODE_MAILBOX_KHR, VK_PRESENT_MODE_FIFO_KHR ];
-
-    import vdrive.surface;
-
-    vd.surface( vd )
-        .selectSurfaceFormat( request_format )
-        .selectPresentMode( request_mode )
-        .minImageCount( 2 )
-        .imageArrayLayers( 1 )
-        .imageUsage( VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT );
-        // delay .construct; call to finalize in a later step
-
-
-
-    ////////////////////////
-    // create render pass //
-    ////////////////////////
-
-    import vdrive.renderbuffer;
-    vd.render_pass( vd )               // vd.depth_image_format can be set before this function gets called
-        .renderPassAttachment_Clear_None( vd.depth_image_format, vd.sample_count, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL ).subpassRefDepthStencil
-        .renderPassAttachment_Clear_Store( vd.surface.imageFormat, vd.sample_count, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR ).subpassRefColor( VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL )
-
-        // Note: specify dependencies despite of only one subpass, as suggested by:
-        // https://software.intel.com/en-us/articles/api-without-secrets-introduction-to-vulkan-part-4#
-        .addDependencyByRegion
-        .srcDependency( VK_SUBPASS_EXTERNAL, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT         , VK_ACCESS_MEMORY_READ_BIT )
-        .dstDependency( 0                  , VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT )
-
-        .addDependencyByRegion
-        .srcDependency( 0                  , VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT )
-        .dstDependency( VK_SUBPASS_EXTERNAL, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT         , VK_ACCESS_MEMORY_READ_BIT )
-
-        .construct;
+    app.updateWVPM;
 
 
 
@@ -146,16 +87,39 @@ auto ref createResources( ref VDrive_State vd, bool recreate = false ) {
     ///////////////////////////
 
     import vdrive.descriptor;
-    vd.wvpm_descriptor( vd )    // this is the descriptor set for the uniform buffer with the MVP Matrix
-        .addLayoutBinding( 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT )
-            .addBufferInfo( vd.wvpm_buffer.buffer )
-        .construct;
+
+    {   // allocates and frees when leaving scope
+        app.descriptor = Meta_Descriptor( app )
+            .addUniformBufferBinding( 0, VK_SHADER_STAGE_VERTEX_BIT )
+            .addBufferInfo( app.wvpm_buffer.buffer )
+            .construct
+            .reset;
+    }
 
 
 
-    ////////////////////////////////////////
-    // create pipeline state object (PSO) //
-    ////////////////////////////////////////
+
+    ///////////////////////////////////////////////////////
+    // create window size dependent resources first time //
+    ///////////////////////////////////////////////////////
+
+    // this creates, among others, a render pass which is needed for PSO construction
+    app.resizeResources;
+
+
+
+    ////////////////////////////////////////////////////////////////
+    // create command pool, we might need now to move data on GPU //
+    ////////////////////////////////////////////////////////////////
+
+    import vdrive.commander;
+    app.cmd_pool = app.createCommandPool( app.graphics_queue_family_index );
+
+
+
+    /////////////////////////////////
+    // geometry with draw commands //
+    /////////////////////////////////
 
     // declare a vertex structure and use its size in the PSO
     import dlsl.vector;
@@ -164,42 +128,6 @@ auto ref createResources( ref VDrive_State vd, bool recreate = false ) {
         vec3 color;     // color
     }
 
-    // add shader stages - git repo needs only to keep track of the shader sources,
-    // vdrive will compile them into spir-v with glslangValidator (must be in path!)
-    import vdrive.pipeline, vdrive.surface, vdrive.shader;
-    vd.pipeline( vd )
-        .addShaderStageCreateInfo( vd.createPipelineShaderStage( VK_SHADER_STAGE_VERTEX_BIT,   "example/sw_01_triangle/shader/simple.vert" ))
-        .addShaderStageCreateInfo( vd.createPipelineShaderStage( VK_SHADER_STAGE_FRAGMENT_BIT, "example/sw_01_triangle/shader/simple.frag" ))
-        .addBindingDescription( 0, Vertex.sizeof, VK_VERTEX_INPUT_RATE_VERTEX )     // add vertex binding and attribute descriptions
-        .addAttributeDescription( 0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0 )             // ... consecutively and non-interleaved in ...
-        .addAttributeDescription( 1, 0, VK_FORMAT_R32G32B32_SFLOAT, vec3.sizeof )   // ... consecutively and non-interleaved in ...
-        .inputAssembly( VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST )                       // set the inputAssembly
-        .addViewportAndScissors( VkOffset2D( 0, 0 ), vd.surface.imageExtent )       // add viewport and scissor state, necessary even if we use dynamic state
-        .cullMode( VK_CULL_MODE_NONE )                                              // set rasterization state -  this cull mode is the default value
-        .depthState                                                                 // set depth state - enable depth test with default attributes
-        .addColorBlendState( VK_FALSE )                                             // color blend state - append common (default) color blend attachment state
-        .addDynamicState( VK_DYNAMIC_STATE_VIEWPORT )                               // add dynamic states viewport
-        .addDynamicState( VK_DYNAMIC_STATE_SCISSOR )                                // add dynamic states scissor
-        .addDescriptorSetLayout( vd.wvpm_descriptor.descriptor_set_layout )         // describe pipeline layout
-        .renderPass( vd.render_pass.render_pass )                                   // describe COMPATIBLE render pass
-        .construct                                                                  // construct the Pipleine Layout and Pipleine State Object (PSO)
-        .destroyShaderModules;                                                      // shader modules compiled into pipeline, not shared, can be deleted now
-
-
-
-    ///////////////////////////////////////////////////////////////////////////
-    // create command pool, allocate initial command buffer, begin recording //
-    ///////////////////////////////////////////////////////////////////////////
-
-    import vdrive.command;
-    vd.cmd_pool = createCommandPool( vd, vd.graphic_queue_family_index );
-
-
-
-    /////////////////////////////////
-    // geometry with draw commands //
-    /////////////////////////////////
-
     //struct Vertex { float x, y, z; }
     Vertex[3] triangle = [
         Vertex( vec3(  1, -1, 0 ), vec3( 1, 0, 0 )),
@@ -207,41 +135,49 @@ auto ref createResources( ref VDrive_State vd, bool recreate = false ) {
         Vertex( vec3(  0,  1, 0 ), vec3( 0, 0, 1 ))
     ];
 
+    import vdrive.memory, vdrive.buffer;
+
     // prefer getting the vertex data into a device local heap
     // first we need to find out if such a heap exist on the current device
     // we do not check the size of the heap, the triangle will most likely fit if such heap exists
-    if( !vd.memory_properties.hasMemoryHeapType( VK_MEMORY_HEAP_DEVICE_LOCAL_BIT )) {
+    if( !app.memory_properties.hasMemoryHeapType( VK_MEMORY_HEAP_DEVICE_LOCAL_BIT )) {
 
         // edit the internal Meta_Buffer via alias this
-        vd.triangle( vd )                                                   // init Meta_Geometry and its Meta_Buffer structs
-            .create( VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, triangle.sizeof )   // create the internal VkBuffer object
-            .createMemory( VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT )            // create the required VkMemory object
-            .copyData( triangle );                                          // upload the triangle data
+       app.geometry = Meta_Buffer_Memory( app )                     // init Meta_Geometry and its Meta_Buffer structs
+            .usage( VK_BUFFER_USAGE_VERTEX_BUFFER_BIT )             // we want to use the geometry buffer as vertex buffer
+            .bufferSize( triangle.sizeof )                          // specify the required buffer size
+            .construct( VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT )       // create the internal VkBuffer object and required HOST_VISIBLE VkMemory
+            .copyData( triangle )                                   // copy the data to our buffer, this internally maps and unmaps the buffer
+            .reset;
 
     } else {
-        // here we create the staging Meta_Buffer resources and copy the data with a command buffer
-        import vdrive.memory;
-        Meta_Buffer staging_buffer;
-
-        staging_buffer( vd )
-            .create( VK_BUFFER_USAGE_TRANSFER_SRC_BIT, triangle.sizeof )    // only purpose of this buffer is to be a transfer source
-            .createMemory( VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT )
-            .copyData( triangle );
-
+        // Here we create the staging Meta_Buffer resources and copy the data with a command buffer.
+        // The final call staging_buffer.copyData uses a VkMappedMemoryRange to copy the data into the buffer.
+        // Physical devices have a VkPhysicalDeviceLimits::nonCoherentAtomSize, which we must obey.
+        // When our data fits into this (multiple of) nonCoherentAtoSize limit we can soleyly use that data object (triangle).
+        // as argument to the copyData call without specifying an offset and a size.
+        // But e.g. our triangle size ( 0x48 / 72 bytes ) does not obey NVidia GPU GeForce 1080 limit ( 0x40 / 64 bytes ).
+        // We can pass in a corresponding (padded) data object or override the size, in particual, as the spec states, with VK_WHOLE_SIZE.
+        auto staging_buffer = Meta_Buffer( app )                    // begin parametrizing the temporary staging Meta_Buffer
+            .usage( VK_BUFFER_USAGE_TRANSFER_SRC_BIT )              // only purpose of this buffer is to be a transfer source
+            .bufferSize( triangle.sizeof )                          // specify the required buffer size
+            .construct( VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT )       // create the internal VkBuffer object and required HOST_VISIBLE VkMemory
+            .copyData( triangle, 0, VK_WHOLE_SIZE );                // copy the data to our buffer, this internally maps and unmaps the buffer
+                                                                    // this usually works with the data size, but in some scenarios we need to pass in some other size
         // edit the internal Meta_Buffer via alias this
-        vd.triangle( vd )                                                   // init Meta_Geometry and its Meta_Buffer structs
-            .create(
-                VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |                         // we want to use the geometry buffer as vertex buffer
-                VK_BUFFER_USAGE_TRANSFER_DST_BIT,                           // and as transfer data (copy) destination
-                triangle.sizeof )                                           // create the internal VkBuffer object
-            .createMemory( VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );           // create the required device local VkMemory object
+        app.geometry = Meta_Buffer_Memory( app )                    // init Meta_Geometry and its Meta_Buffer structs
+            .usage( VK_BUFFER_USAGE_VERTEX_BUFFER_BIT               // we want to use the geometry buffer as vertex buffer
+                  | VK_BUFFER_USAGE_TRANSFER_DST_BIT )              // and as transfer data (copy) destination
+            .bufferSize( triangle.sizeof )                          // specify the required buffer size
+            .construct( VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT )       // create the internal VkBuffer object and required device local VkMemory
+            .reset;
 
-        // allocate one command buffer, cmd_buffer_init was declared before two scopes
-        VkCommandBuffer cmd_buffer_init = vd.allocateCommandBuffer( vd.cmd_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY );
+        // allocate one command buffer
+        VkCommandBuffer cmd_buffer = app.allocateCommandBuffer( app.cmd_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY );
 
-        // begin command buffer recording, cmd_buffer_begin_info was declared before two scopes
-        VkCommandBufferBeginInfo cmd_buffer_begin_info;
-        vkBeginCommandBuffer( cmd_buffer_init, &cmd_buffer_begin_info );
+        // begin command buffer recording, cmd_buffer_bi was declared before two scopes
+        VkCommandBufferBeginInfo cmd_buffer_bi = { flags : VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT };
+        vkBeginCommandBuffer( cmd_buffer, & cmd_buffer_bi );
 
         // required for the vkCmdCopyBuffer
         VkBufferCopy buffer_copy = {
@@ -251,157 +187,46 @@ auto ref createResources( ref VDrive_State vd, bool recreate = false ) {
         };
 
         // record the buffer copy
-        cmd_buffer_init.vkCmdCopyBuffer( staging_buffer.buffer, vd.triangle.buffer, 1, &buffer_copy );
+        cmd_buffer.vkCmdCopyBuffer( staging_buffer.buffer, app.geometry.buffer, 1, & buffer_copy );
 
         // finish recording
-        vkEndCommandBuffer( cmd_buffer_init );
+        cmd_buffer.vkEndCommandBuffer;
 
-        // submit info stays local in this function scope
-        import vdrive.command : queueSubmitInfo;
-        auto submit_info = queueSubmitInfo( cmd_buffer_init );
+        // submit the command buffer, combines parametrizing a VkSubmitInfo and the submission
+        app.graphics_queue.queueSubmit( cmd_buffer );
 
-        // submit the command buffer
-        vkQueueSubmit( vd.surface.present_queue, 1, &submit_info, vd.submit_fence[ 0 ] ).vkAssert;
-
-        // must wait on fence before destroying the staging buffer. Fence will be reset later in the appstate.draw function
-        vkWaitForFences( vd.device, 1, & vd.submit_fence[ 0 ], VK_TRUE, uint32_t.max );
-        staging_buffer.destroyResources;
+        // destroy staging buffer
+        app.graphics_queue.vkQueueWaitIdle;     // equivalent using a fence per Spec v1.0.48
+        staging_buffer.destroyResources;        // destroy the temporary staging resources
     }
 
-    // now edit additional members of Meta_Geometry
-    import vdrive.geometry;
-    vd.triangle
-        .vertexCount( 3 )               // set the vertex count
-        .addVertexOffset( 0 );          // register the internal buffer as first vertex attribute buffer
 
 
+    ////////////////////////////////////////
+    // create pipeline state object (PSO) //
+    ////////////////////////////////////////
 
-    ///////////////////////////////////////////////////////
-    // create window size dependent resources first time //
-    ///////////////////////////////////////////////////////
-
-    return vd.resizeResources;
-}
-
-
-
-////////////////////////////////////////////
-// create window size dependent resources //
-////////////////////////////////////////////
-
-auto ref resizeResources( ref VDrive_State vd ) {
-
-    //////////////////////////////////////////////////////
-    // (re)construct the already parametrized swapchain //
-    //////////////////////////////////////////////////////
-
-    import vdrive.surface;
-    vd.surface.construct;
-
-    // set the corresponding present info member to the (re)constructed swapchain
-    vd.present_info.pSwapchains = &vd.surface.swapchain;
-
-
-
-    ////////////////////////
-    // create depth image //
-    ////////////////////////
-
-    import vdrive.memory;
-
-    // prefer getting the depth image into a device local heap
-    // first we need to find out if such a heap exist on the current device
-    // we do not check the size of the heap, the depth image will probably fit if such heap exists
-    // Todo(pp): the assumption above is NOT guaranteed, add additional functions to memory module
-    // which consider a minimum heap size for the memory type, heap as well as memory cretaion functions
-    // Todo(pp): this should be a member of VDrive_State and figured out only once
-    // including the proper memory heap index
-    auto depth_image_memory_property = vd.memory_properties.hasMemoryHeapType( VK_MEMORY_HEAP_DEVICE_LOCAL_BIT )
-        ? VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
-        : VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
-
-    // vd.depth_image_format can be set before this function gets called
-    vd.depth_image( vd )
-        .create( vd.depth_image_format, vd.windowWidth, vd.windowHeight, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, vd.sample_count )
-        .createMemory( depth_image_memory_property )
-        .createView( VK_IMAGE_ASPECT_DEPTH_BIT );
-
-
-
-    /////////////////////////
-    // create framebuffers //
-    /////////////////////////
-
-    import vdrive.renderbuffer;
-
-    // compose render targets into an array
-    VkImageView[1] render_targets = [ vd.depth_image.image_view ];
-    vd.framebuffers( vd )
-        .create(                                    // create the vulkan object directly with following params
-            vd.render_pass.render_pass,             // specify render pass COMPATIBILITY
-            vd.surface.imageExtent,                 // extent of the framebuffer
-            render_targets,                         // first ( static ) attachments which will not change ( here only one, our depth buffer )
-            vd.surface.present_image_views.data )   // next one dynamic attachment ( swapchain ) which changes per command buffer
-        .addClearValue( 1, 0 )                      // first param is the image_view index of the Meta_Framebuffer for clearing, ...
-        .addClearValue( 0.3f, 0.3f, 0.3f, 1.0f );   // ... otherwise the clear values would be attached at each resizing / recreating
-
-    // attach one of the framebuffers, the render area and clear values to the render pass begin info
-    // Note: attaching the framebuffer also sets the clear values and render area extent into the render pass begin info
-    // setting clear values coresponding to framebuffer attachments and framebuffer extent could have happend before, e.g.:
-    //      vd.render_pass.clearValues( some_clear_values );
-    //      vd.render_pass.begin_info.renderArea = some_render_area;
-    // but meta framebuffer(s) has a member for them, hence no need to create and manage extra storage/variables
-    vd.render_pass.attachFramebuffer( vd.framebuffers, 0 );
-
-
-
-    ///////////////////////////////////////////////
-    // define dynamic viewport and scissor state //
-    ///////////////////////////////////////////////
-
-    vd.viewport = VkViewport( 0, 0, vd.surface.imageExtent.width, vd.surface.imageExtent.height, 0, 1 );
-    vd.scissors = VkRect2D( VkOffset2D( 0, 0 ), vd.surface.imageExtent );
-
-
-
-    /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    // record transition of depth image from VK_IMAGE_LAYOUT_UNDEFINED to VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL //
-    /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-    import vdrive.command;
-
-    // allocate one command buffer
-    VkCommandBuffer cmd_buffer_init = vd.allocateCommandBuffer( vd.cmd_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY );
-
-    // begin command buffer recording
-    VkCommandBufferBeginInfo cmd_buffer_begin_info;
-    vkBeginCommandBuffer( cmd_buffer_init, &cmd_buffer_begin_info );
-
-    // record the image transition
-    cmd_buffer_init.recordTransition(
-        vd.depth_image.image,
-        vd.depth_image.image_view_create_info.subresourceRange,
-        VK_IMAGE_LAYOUT_UNDEFINED,
-        VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-        0,  // no access mask required here
-        VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
-    );
-
-    // finish recording
-    vkEndCommandBuffer( cmd_buffer_init );
-
-    // submit info stays local in this function scope
-    auto submit_info = queueSubmitInfo( cmd_buffer_init );
-
-    // this fence might or might not be set signaled in the appstate.draw function
-    vd.device.vkResetFences( 1, &vd.submit_fence[ 1 ] ).vkAssert;
-
-    // submit the command buffer with one depth and one color image transitions
-    vkQueueSubmit( vd.surface.present_queue, 1, &submit_info, vd.submit_fence[ 1 ] ).vkAssert;
-
-    // must wait on fence to reset the command pool for recording runtime drawing commands
-    vkWaitForFences( vd.device, 1, & vd.submit_fence[ 1 ], VK_TRUE, uint32_t.max );
-    vd.device.vkResetCommandPool( vd.cmd_pool, 0 ); // second argument is VkCommandPoolResetFlags
+    // add shader stages - git repo needs only to keep track of the shader sources,
+    // vdrive will compile them into spir-v with glslangValidator (must be in path!)
+    import vdrive.pipeline, vdrive.shader;
+    app.pipeline = Meta_Graphics( app )
+        .addShaderStageCreateInfo( app.createPipelineShaderStage( "example/sw_01_triangle/shader/simple.vert" ))    // deduce shader stage from file extension
+        .addShaderStageCreateInfo( app.createPipelineShaderStage( "example/sw_01_triangle/shader/simple.frag" ))    // deduce shader stage from file extension
+        .addBindingDescription( 0, Vertex.sizeof, VK_VERTEX_INPUT_RATE_VERTEX )     // add vertex binding and attribute descriptions
+        .addAttributeDescription( 0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0 )             // ... interleaved in position ...
+        .addAttributeDescription( 1, 0, VK_FORMAT_R32G32B32_SFLOAT, vec3.sizeof )   // ... interleaved in color ...
+        .inputAssembly( VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST )                       // set the inputAssembly
+        .addViewportAndScissors( VkOffset2D( 0, 0 ), app.swapchain.image_extent )   // add viewport and scissor state, necessary even if we use dynamic state
+        .cullMode( VK_CULL_MODE_NONE )                                              // set rasterization state -  this cull mode is the default value
+        .depthState                                                                 // set depth state - enable depth test with default attributes
+        .addColorBlendState( VK_FALSE )                                             // color blend state - append common (default) color blend attachment state
+        .addDynamicState( VK_DYNAMIC_STATE_VIEWPORT )                               // add dynamic states viewport
+        .addDynamicState( VK_DYNAMIC_STATE_SCISSOR )                                // add dynamic states scissor
+        .addDescriptorSetLayout( app.descriptor.descriptor_set_layout )             // describe pipeline layout
+        .renderPass( app.render_pass_bi.renderPass )                                // describe COMPATIBLE render pass
+        .construct                                                                  // construct the Pipleine Layout and Pipleine State Object (PSO)
+        .destroyShaderModules
+        .reset;                                                                     // shader modules compiled into pipeline, not shared, can be deleted now
 
 
 
@@ -409,48 +234,62 @@ auto ref resizeResources( ref VDrive_State vd ) {
     // create draw loop command buffers with resized resources //
     /////////////////////////////////////////////////////////////
 
-    // this time cmd_buffers is an Array!VkCommandBuffer, the array itself will be destroyed after this scope
-    vd.cmd_buffers = vd.allocateCommandBuffers( vd.cmd_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, vd.surface.present_image_views.length );
+    // reset the command pool to start recording drawing commands
+    app.graphics_queue.vkQueueWaitIdle;                 // equivalent using a fence per Spec v1.0.48
+    app.device.vkResetCommandPool( app.cmd_pool, 0 );   // second argument is VkCommandPoolResetFlags
+
+    // this time cmd_buffers is an DArray!VkCommandBuffer, the array itself will be destroyed after this scope
+    app.allocateCommandBuffers( app.cmd_pool, app.cmd_buffers[ 0 .. app.swapchain.image_count ] );
+
+    // define clear values
+    import vdrive.renderbuffer;
+    VkClearValue[ 2 ] clear_values;
+    clear_values
+        .set( 0, 1.0f )                      // set depth clear value
+        .set( 1, 0.0f, 0.0f, 0.0f, 1.0f );   // set color clear value
 
     // record command buffer for each swapchain image
-    foreach( uint32_t i, ref cmd_buffer; vd.cmd_buffers.data ) {
+    foreach( i, ref cmd_buffer; app.cmd_buffers[ 0 .. app.swapchain.image_count ] ) {
 
-        // attach one of the framebuffers to the render pass
-        vd.render_pass.attachFramebuffer( vd.framebuffers( i ));
+        // attach clear values and one of the framebuffers to the render pass
+        app.render_pass_bi.clearValues( clear_values );
+        app.render_pass_bi.framebuffer = app.framebuffers[ i ];
 
         // begin command buffer recording
-        cmd_buffer.vkBeginCommandBuffer( &cmd_buffer_begin_info );
+        VkCommandBufferBeginInfo cmd_buffer_bi;
+        cmd_buffer.vkBeginCommandBuffer( & cmd_buffer_bi );
 
         // begin the render_pass
-        cmd_buffer.vkCmdBeginRenderPass( &vd.render_pass.begin_info, VK_SUBPASS_CONTENTS_INLINE );
+        cmd_buffer.vkCmdBeginRenderPass( & app.render_pass_bi, VK_SUBPASS_CONTENTS_INLINE );
 
-        // bind graphics vd.geom_pipeline
-        cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, vd.pipeline.pipeline );
+        // bind graphics app.geom_pipeline
+        cmd_buffer.vkCmdBindPipeline( VK_PIPELINE_BIND_POINT_GRAPHICS, app.pipeline.pipeline );
 
         // take care of dynamic state
-        cmd_buffer.vkCmdSetViewport( 0, 1, &vd.viewport );
-        cmd_buffer.vkCmdSetScissor(  0, 1, &vd.scissors );
-        cmd_buffer.vkCmdBindDescriptorSets(     // VkCommandBuffer              commandBuffer
-            VK_PIPELINE_BIND_POINT_GRAPHICS,    // VkPipelineBindPoint          pipelineBindPoint
-            vd.pipeline.pipeline_layout,        // VkPipelineLayout             layout
-            0,                                  // uint32_t                     firstSet
-            1,                                  // uint32_t                     descriptorSetCount
-            &vd.wvpm_descriptor.descriptor_set, // const( VkDescriptorSet )*    pDescriptorSets
-            0,                                  // uint32_t                     dynamicOffsetCount
-            null                                // const( uint32_t )*           pDynamicOffsets
+        cmd_buffer.vkCmdSetViewport( 0, 1, & app.viewport );
+        cmd_buffer.vkCmdSetScissor(  0, 1, & app.scissors );
+        cmd_buffer.vkCmdBindDescriptorSets(             // VkCommandBuffer              commandBuffer
+            VK_PIPELINE_BIND_POINT_GRAPHICS,            // VkPipelineBindPoint          pipelineBindPoint
+            app.pipeline.pipeline_layout,               // VkPipelineLayout             layout
+            0,                                          // uint32_t                     firstSet
+            1,                                          // uint32_t                     descriptorSetCount
+            & app.descriptor.descriptor_set,            // const( VkDescriptorSet )*    pDescriptorSets
+            0,                                          // uint32_t                     dynamicOffsetCount
+            null                                        // const( uint32_t )*           pDynamicOffsets
         );
 
         // bind vertex buffer, only one attribute stored in this buffer
+        VkDeviceSize offset = 0;
         cmd_buffer.vkCmdBindVertexBuffers(
             0,                                          // first binding
-            vd.triangle.vertex_buffers.length.toUint,   // binding count
-            vd.triangle.vertex_buffers.ptr,             // pBuffers to bind
-            vd.triangle.vertex_offsets.ptr              // pOffsets into buffers
+            1,                                          // binding count
+            & app.geometry.buffer,                      // pBuffers to bind
+            & offset                                    // pOffsets into buffers
         );
 
         // simple draw command, non indexed
         cmd_buffer.vkCmdDraw(
-            vd.triangle.vertex_count,                   // vertex count
+            3,                                          // vertex count
             1,                                          // instance count
             0,                                          // first vertex
             0                                           // first instance
@@ -462,40 +301,230 @@ auto ref resizeResources( ref VDrive_State vd ) {
         // end command buffer recording
         cmd_buffer.vkEndCommandBuffer;
     }
-
-    return vd;
 }
 
 
+
+////////////////////////////////////////////
+// create window size dependent resources //
+////////////////////////////////////////////
+
+void resizeResources( ref App_State app ) {
+
+    //////////////////////////////////////////////////////
+    // (re)construct the already parametrized swapchain //
+    //////////////////////////////////////////////////////
+
+    /////////////////////////
+    // construct swapchain //
+    /////////////////////////
+
+    import vdrive.swapchain;
+
+    // Just before we create a new swapcahin we destroy old resources.
+    // But we not destroy the Surface
+    if(!app.swapchain.is_null ) {
+        app.device.vkDeviceWaitIdle;            // wait till device is idle
+        app.destroy( app.swapchain, false );    // don't destroy the VkSurfaceKHR
+    }
+
+
+    // Note: to get GPU swapchain capabilities to check for possible image usages
+    //VkSurfaceCapabilitiesKHR surface_capabilities;
+    //vkGetPhysicalDeviceSurfaceCapabilitiesKHR( swapchain.gpu, swapchain.surface, & surface_capabilities );
+    //surface_capabilities.printTypeInfo;
+
+    // We need to know the swapchain image format before we create a render pass
+    // to render into that swapcahin image. We don't have to create the surface itself.
+    // The renderpass needs to be created only once in contrary to the swapchain,
+    // which must be recreated if the window surface size changes.
+    // We set all required parameters here to avoid configuration at multiple locations
+    // additionally configuration needs to happen only once.
+
+    // list of prefered formats and modes, the first found will be used, othervise the first available not in lists
+    VkFormat[4] request_format = [ VK_FORMAT_R8G8B8_UNORM, VK_FORMAT_B8G8R8_UNORM, VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_B8G8R8A8_UNORM ];
+    VkPresentModeKHR[3] request_mode = [ VK_PRESENT_MODE_IMMEDIATE_KHR, VK_PRESENT_MODE_MAILBOX_KHR, VK_PRESENT_MODE_FIFO_KHR ];
+
+
+
+    // We use a predeclared templated Specialization of Core_Swapchain_T to tell the Meta_Swapchain_T
+    // which members we want to extract for bookkeeping after construction.
+    // Core_Swapchain_Queue_Extent can manage up to 4 VkImageViews, 1 Queue (present) and the swapchain extent.
+    auto swapchain = Meta_Swapchain_T!Core_Swapchain_Queue_Extent( app )
+        .surface( app.swapchain.surface )
+        .oldSwapchain( app.swapchain.swapchain )
+        .selectSurfaceFormat( request_format )
+        .selectPresentMode( request_mode )
+        .minImageCount( 2 )
+        .imageArrayLayers( 1 )
+        .imageUsage( VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT )
+        .construct
+        .reset( app.swapchain );
+
+    // set the corresponding present info member to the (re)constructed swapchain
+    app.present_info.pSwapchains = & app.swapchain.swapchain;
+
+
+
+    //////////////////////////////////////////////////
+    // create depth image and record its transition //
+    //////////////////////////////////////////////////
+
+    import vdrive.image, vdrive.memory;
+
+    // first destroy old image and view
+    if(!app.depth_image.is_null )
+        app.destroy( app.depth_image );
+
+    // depth image format is also required for the renderpass
+    VkFormat depth_image_format = VK_FORMAT_D32_SFLOAT;
+
+    // prefer getting the depth image into a device local heap
+    // first we need to find out if such a heap exist on the current device
+    // we do not check the size of the heap, the depth image will probably fit if such heap exists
+    // Todo(pp): the assumption above is NOT guaranteed, add additional functions to memory module
+    // which consider a minimum heap size for the memory type, heap as well as memory cretaion functions
+    // Todo(pp): this should be a member of App_State and figured out only once
+    // including the proper memory heap index
+    auto depth_image_memory_property = app.memory_properties.hasMemoryHeapType( VK_MEMORY_HEAP_DEVICE_LOCAL_BIT )
+        ? VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+        : VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+
+    // depth_image_format can be set before this function gets called
+    auto depth_image = Meta_Image_T!Core_Image_Memory_View( app )
+        .format( depth_image_format )
+        .extent( app.windowWidth, app.windowHeight )
+        .usage( VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT )
+        .sampleCount( app.sample_count )
+        .constructImage
+        .allocateMemory( depth_image_memory_property )
+        .viewAspect( VK_IMAGE_ASPECT_DEPTH_BIT )
+        .constructView
+        .extractCore( app.depth_image );
+
+    // record transition from VK_IMAGE_LAYOUT_UNDEFINED to VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+    import vdrive.commander;
+
+    // first we create a new temporary command pool
+    // our draw commands created in createResources from the main command pool.
+    // we do not want to allocate new command buffers from that pool on resize,
+    // as we would have to reset it and recreate the commands every time.
+    // We also mark all its command buffers as short lived through the passed in flag.
+    VkCommandPool tmp_cmd_pool = app.createCommandPool(
+        app.graphics_queue_family_index, VK_COMMAND_POOL_CREATE_TRANSIENT_BIT );
+
+    // allocate one command buffer
+    VkCommandBuffer cmd_buffer_init = app.allocateCommandBuffer( tmp_cmd_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY );
+
+    // begin command buffer recording
+    VkCommandBufferBeginInfo cmd_buffer_bi = { flags : VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT };
+    vkBeginCommandBuffer( cmd_buffer_init, & cmd_buffer_bi );
+
+    // record the image transition
+    cmd_buffer_init.recordTransition(
+        depth_image.image,                              // not using App_State property Core_Image_T app.depth_image ...
+        depth_image.image_view_ci.subresourceRange,     // ... but instead func local Meta_Image_T with some more (here) required data.
+        VK_IMAGE_LAYOUT_UNDEFINED,
+        VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+        0,  // no access mask required here
+        VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+        VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+        VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,     // this has been caught by the recent validation layers of vulkan spec v1.0.57
+    );
+
+    // finish recording
+    vkEndCommandBuffer( cmd_buffer_init );
+
+    // submit info stays local in this function scope
+    auto submit_info = queueSubmitInfo( cmd_buffer_init );
+
+    // Submit the command buffer.
+    vkQueueSubmit( app.graphics_queue, 1, & submit_info, VK_NULL_HANDLE ).vkAssert;
+
+    // destroy the temp command pool and its only buffer
+    import vdrive.state : destroy;
+    app.graphics_queue.vkQueueWaitIdle;
+    app.destroy( tmp_cmd_pool );
+
+
+
+
+    ////////////////////////
+    // create render pass //
+    ////////////////////////
+
+    // With this meta struct we parametrize its member VkRenderPassBeginInfo and construct our render pass.
+    import vdrive.renderbuffer;
+    app.render_pass_bi = Meta_Render_Pass_T!( 2,2,1,0,1,0,0 )( app )
+        .renderPassAttachment_Clear_None(  depth_image_format,    app.sample_count, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL           ).subpassRefDepthStencil
+        .renderPassAttachment_Clear_Store( swapchain.imageFormat, app.sample_count, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR ).subpassRefColor( VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL )
+
+        // Note: specify dependencies despite of only one subpass, as suggested by:
+        // https://github.com/KhronosGroup/Vulkan-Docs/wiki/Synchronization-Examples#swapchain-image-acquire-and-present
+        .addDependency( VK_DEPENDENCY_BY_REGION_BIT )
+        .srcDependency( VK_SUBPASS_EXTERNAL, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0 )
+        .dstDependency( 0                  , VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT )
+        .construct
+        .beginInfo;
+
+
+
+    /////////////////////////
+    // create framebuffers //
+    /////////////////////////
+
+    import vdrive.renderbuffer;
+
+    // compose render targets into an array
+    VkImageView[1] render_targets = [ app.depth_image.view ];
+    app.createFramebuffers(
+        app.framebuffers,                           // out framebuffers
+        app.render_pass_bi.renderPass,              // specify render pass COMPATIBILITY
+        app.swapchain.image_extent.width,           // framebuffer width
+        app.swapchain.image_extent.height,          // framebuffer height
+        render_targets,                             // first ( static ) attachments which will not change ( here only )
+        app.swapchain.image_views.data              // next one dynamic attachment ( swapchain ) which changes per command buffer
+    );
+
+    // specify the render area extent of our render pass begin info
+    app.render_pass_bi.renderAreaExtent( app.swapchain.image_extent );  // specify the render area extent of our render pass begin info
+
+
+
+    ///////////////////////////////////////////////
+    // define dynamic viewport and scissor state //
+    ///////////////////////////////////////////////
+
+    app.viewport = VkViewport( 0, 0, swapchain.imageExtent.width, swapchain.imageExtent.height, 0, 1 );
+    app.scissors = VkRect2D( VkOffset2D( 0, 0 ), swapchain.imageExtent );
+}
+
+
+
 // destroy resources and vulkan objects for rendering
-auto ref destroyResources( ref VDrive_State vd ) {
+void destroyResources( ref App_State app ) {
 
     import erupted, vdrive;
 
-    vd.device.vkDeviceWaitIdle;
+    app.device.vkDeviceWaitIdle;
 
-    // surface and swapchain
-    vd.surface.destroyResources;
+    // surface, swapchain and present image views
+    app.destroy( app.swapchain );
 
     // memory Resources
-    vd.depth_image.destroyResources;
-    vd.triangle.destroyResources;
-    vd.wvpm_buffer
-        .unmapMemory
-        .destroyResources;
+    app.destroy( app.geometry );
+    app.destroy( app.depth_image );
+    app.destroy( app.wvpm_buffer );
 
     // render setup
-    vd.render_pass.destroyResources;
-    vd.wvpm_descriptor.destroyResources;
-    vd.pipeline.destroyResources;
-    vd.framebuffers.destroyResources;
+    foreach( ref f; app.framebuffers )  app.destroy( f );
+    app.destroy( app.render_pass_bi.renderPass );
+    app.destroy( app.descriptor );
+    app.destroy( app.pipeline );
 
     // command and synchronize
-    vd.destroy( vd.cmd_pool );
-    vd.destroy( vd.submit_fence[0] );
-    vd.destroy( vd.submit_fence[1] );
-    vd.destroy( vd.acquired_semaphore );
-    vd.destroy( vd.rendered_semaphore );
-
-    return vd;
+    foreach( ref f; app.submit_fence )  app.destroy( f );
+    app.destroy( app.cmd_pool );
+    app.destroy( app.acquired_semaphore );
+    app.destroy( app.rendered_semaphore );
 }
