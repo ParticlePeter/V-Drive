@@ -249,7 +249,7 @@ struct Meta_Graphics_T(
 
     /// reset all internal data and return wrapped Vulkan objects
     /// VkPipeline and VkPipelineLayout
-    auto reset() {
+    Core_Pipeline reset() {
         Core_Pipeline result = { pipeline, pipeline_layout };
         shader_stages.clear;
         vertex_input_binding_descriptions.clear;
@@ -266,8 +266,18 @@ struct Meta_Graphics_T(
 
     /// extract core pipeline elements VkPipeline and VkPipelineLayout
     /// without resetting the internal data structures
-    auto extractCore() {
+    Core_Pipeline extractCore() {
         return Core_Pipeline( pipeline, pipeline_layout );
+    }
+
+
+    /// extract core pipeline elements VkPipeline and VkPipelineLayout into passed in Core_Pipeline
+    /// without resetting the internal data structures
+    /// returning this meta struct
+    auto ref extractCore( ref Core_Pipeline core_pso ) {
+        core_pso.pipeline_layout = pipeline_layout;
+        core_pso.pipeline = pipeline;
+        return this;
     }
 
 
@@ -782,7 +792,7 @@ struct Meta_Compute_T(
     D_OR_S_ARRAY!( VkDescriptorSetLayout,       descriptor_set_layout_count )   descriptor_set_layouts;
     D_OR_S_ARRAY!( VkPushConstantRange,         push_constant_range_count )     push_constant_ranges;
 
-    VkPipelineLayout                            pipeline_layout() { return pipeline_ci.layout; }
+    ref VkPipelineLayout                        pipeline_layout() { return pipeline_ci.layout; }
 
 
 
@@ -797,15 +807,15 @@ struct Meta_Compute_T(
 
     void destroyResources() {
         vk.destroyHandle( pipeline );
-        vk.destroyHandle( pipeline_ci.layout );
+        vk.destroyHandle( pipeline_layout );
     }
 
 
 
     /// reset all internal data and return wrapped Vulkan objects
     /// VkPipeline and VkPipelineLayout
-    auto reset() {
-        Core_Pipeline result = { pipeline, pipeline_ci.layout };
+    Core_Pipeline reset() {
+        Core_Pipeline result = { pipeline, pipeline_layout };
         descriptor_set_layouts.clear;
         push_constant_ranges.clear;
         return result;
@@ -814,8 +824,17 @@ struct Meta_Compute_T(
 
     /// extract core pipeline elements VkPipeline and VkPipelineLayout
     /// without resetting the internal data structures
-    auto extractCore() {
-        return Core_Pipeline( pipeline, pipeline_ci.layout );
+    Core_Pipeline extractCore() {
+        return Core_Pipeline( pipeline, pipeline_layout );
+    }
+
+    /// extract core pipeline elements VkPipeline and VkPipelineLayout into passed in Core_Pipeline
+    /// without resetting the internal data structures
+    /// returning this meta struct
+    auto ref extractCore( ref Core_Pipeline core_pso ) {
+        core_pso.pipeline_layout = pipeline_layout;
+        core_pso.pipeline = pipeline;
+        return this;
     }
 
 
