@@ -10,12 +10,13 @@ import erupted;
 nothrow @nogc:
 
 
-mixin template Vulkan_State_Pointer() {
+mixin template Vulkan_State_Pointer( bool default_constructor = true ) {
     nothrow @nogc:
     private Vulkan*         vk_ptr;
     alias                   vk this;
 
-    this( ref Vulkan vk )               { vk_ptr = & vk; }
+    static if( default_constructor )
+        this( ref Vulkan vk )           { vk_ptr = & vk; }
     ref Vulkan vk()                     { return * vk_ptr; }
     void vk( ref Vulkan vk )            { vk_ptr = & vk; }
     auto ref opCall( ref Vulkan vk )    { vk_ptr = & vk; return this; }

@@ -314,6 +314,7 @@ VkPipelineShaderStageCreateInfo createPipelineShaderStage(
 
 import vdrive.util;
 union  MapEntry32 {
+    nothrow @nogc :
     uint32_t u = 0;
     int32_t  i;
     float    f;
@@ -336,6 +337,7 @@ alias Meta_Specialization = Meta_Specialization_T!( int32_t.max );
 // - change the first addMapEntry overloads first argument to a template argument
 // - compute its size in bytes and append the bytes to our byte array
 struct Meta_Specialization_T( int32_t specialization_count ) {
+    nothrow @nogc :
     alias sz_count = specialization_count;
     VkSpecializationInfo specialization_info;
 
