@@ -6,7 +6,7 @@ enum debug_arena = true;
 
 
 import core.stdc.stdlib : malloc, free;
-import core.stdc.string : memcpy;
+import core.stdc.string : memcpy, memmove;
 import core.stdc.stdio  : printf;
 
 import vdrive.util.util : Log_Info, vkAssert;
@@ -263,12 +263,34 @@ alias DArray = Dynamic_Array;
 // it can be single linked or bidirectional, linking to its previous or next block
 // The size of the block is the Capacity of the borrowing array
 struct Block_Link( ST = uint /*, bool bidirectional = false*/ ) {
-    alias                   Size_T  = ST;
-    //static if( bidirectional ) private BLink* Prev = null;
-    private BLink!Size_T*   Prev    = null;
-    private BLink!Size_T*   Next    = null;
-    private Size_T          Offset  = 0;
-    private Size_T          Size    = 0;
+    alias           Size_T  = ST;
+
+    private:
+
+    BLink!Size_T*   Prev    = null;
+    BLink!Size_T*   Next    = null;
+
+    //*
+
+    Size_T          Offset  = 0;
+    Size_T          Size    = 0;
+
+    /*/
+
+    // We might need to take care of alignment
+    static if( Size_T.sizeof == 1 ) {   // no need for alignment member for byte sized entries
+        Size_T      Offset  = 0;
+        Size_T      Size    = 0;
+    } else {
+        import std.bitmanip : bitfields;
+        mixin( bitfields!(
+            Size_T, "Offset",    Size_T.sizeof * 8 - 2,
+            Size_T, "Size",      Size_T.sizeof * 8 - 2,
+            Size_T, "Alignment", 4,
+        ));
+    }
+
+    //*/
 }
 
 alias BLink = Block_Link;
@@ -291,21 +313,19 @@ struct Arena_Array_T( ST = uint ) {   //, bool biderectional = false ) {
 
 
     private void attach( BLink_T* link, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+
         if( Head is null ) {
+
             vkAssert( Tail is null, file, line, func, "If Head is null, Tail must be null as well!" );
-            //vkAssert( List.Prev is null, file, line, func, "If Next of the linked list is null, Prev must be null as well!" );
+        //  vkAssert( List.Prev is null, file, line, func, "If Next of the linked list is null, Prev must be null as well!" );
             Head = link;        // if no blocks were registered so far
             Tail = link;        // attach this block link as head and as tail
 
-            //List.Next = List.Prev = link;
-            //link.Next = link.Prev = & List;
-
         } else {
+
             link.Prev = Tail;
             Tail.Next = link;
             Tail = link;
-
-            //link.Prev = List.
         }
 
         link.Offset = length;
@@ -318,24 +338,6 @@ struct Arena_Array_T( ST = uint ) {   //, bool biderectional = false ) {
 
 
     private void detach( BLink_T* link, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
-        /*
-        vkAssert( Head !is null, file, line, func, "No Block_Array registered!" );
-        BLink_T* prev = null;
-        BLink_T* curr = Head;
-
-        // search the passed in link in the linked list
-        while( link !is curr ) {
-            vkAssert( curr.Next !is null, file, line, func, "Borrowed link not found in linked list!" );
-            prev = curr;
-            curr = curr.Next;
-        }
-
-        // arriving here link == current, now we let prev.Next point to curr.Next
-        if( prev is null )      Head = link.Next;           // -> found link is the first in the list -> link.next becomes first in list
-        else                    prev.Next = link.Next;      // -> othervise link had a predcessor (prev) -> prev.Next points to link.Next
-        if( link is Tail )      Tail = prev;                // -> if link was at the end -> Tail becomes its predcessor (prev), which might be null
-        link.Next = null;                                   // remove invalid reference, which would be reachable outside this function
-        */
 
         if( link is Head )
             Head = link.Next;
@@ -347,15 +349,74 @@ struct Arena_Array_T( ST = uint ) {   //, bool biderectional = false ) {
         else
             link.Next.Prev = link.Prev;
 
+        // clear data of detached link
+        *link = BLink_T.init;
+
         // adjust the length of the source array
         if( Tail is null )
             Source.length( 0, file, line, func );
         else
             Source.length( Tail.Offset + Tail.Size, file, line, func );
 
+        *link = BLink_T.init;
+
         static if( debug_arena ) {
             --Num_Links;
         }
+    }
+
+    private void moveToEnd( BLink_T* link, Size_T new_block_size, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
+
+        vkAssert( link !is Tail, file, line, func, "Link is already at the end!" );
+
+        Size_T cpy_byte_count = new_block_size < link.Size ? new_block_size : link.Size;
+        Size_T old_arena_size = Source.length;
+        Source.length = old_arena_size + new_block_size;
+
+        Source[ old_arena_size .. old_arena_size + cpy_byte_count ] = Source[ link.Offset .. link.Offset + cpy_byte_count ];
+        link.Offset = old_arena_size;
+        link.Size = new_block_size;
+
+        if( link is Head )
+            Head = link.Next;
+        else
+            link.Prev.Next = link.Next;
+
+        link.Next.Prev = link.Prev;
+        Tail.Next = link;
+        link.Prev = Tail;
+        link.Next = null;
+        Tail = link;
+    }
+
+    // Todo: questionable that this works, as we ignore any kind of alignment.
+    // First test exhaustively if alignment is a problem. If it is, see commented
+    // code in Block_Link to stuff alignment into lightweight struct, and use the
+    // alignment when allocating and defragmenting.
+    void defragment() {
+
+        if( Head is null )
+            return;
+
+        // links are ordered by ascending offset, so each block moves towards the front, never over a block not yet moved
+        BLink_T* curr = Head;
+        Size_T global_offset = 0;
+
+        do {
+
+            if( curr.Offset > global_offset ) {
+                // source and destination overlap if the block is larger than the gap in front of it
+                memmove( Source.ptr + global_offset, Source.ptr + curr.Offset, curr.Size );
+                curr.Offset = global_offset;
+            }
+
+            global_offset += curr.Size;
+            curr = curr.Next;
+
+        } while( curr !is null );
+
+        // the arena ends with the last block, attaching a link appends at this length
+        Source.length = global_offset;
     }
 
 
@@ -428,7 +489,7 @@ struct Block_Array( T, ST = uint ) {
     // must have an arena array to borrow from, possibly sets capacity and initializes array with count of init values
     this( ref Arena_T arena, size_t count = 0, size_t capacity = 0, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
         Arena = & arena;
-        Arena.attach( & Link );
+        //Arena.attach( & Link );
 
         // reserve specified capacity only if is larger then specified count, then fill with count elemnts
         // otherwise reserve and resize exactly count of default initialized elements
@@ -464,7 +525,7 @@ struct Block_Array( T, ST = uint ) {
 
     // free data on destruction
     ~this() {
-        if( Link.Offset != Size_T.max && Link.Size != Size_T.max )
+        if( Capacity > 0 && Link.Offset != Size_T.max && Link.Size != Size_T.max )
             Arena.detach( & Link );
     }
 
@@ -586,7 +647,13 @@ struct Block_Array( T, ST = uint ) {
     void reserve( size_t capacity, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
         vkAssert( capacity <= Size_T.max, mem_block_too_large, file, line, func, Size_T.stringof );
 
-        if( capacity <= Capacity ) return;                              // return if we have more capacity than requested
+        Size_T current_capacity = Capacity();
+        if( capacity <= current_capacity )
+            return;                             // return if we have more capacity than requested
+
+        if( current_capacity == 0 )
+            Arena.attach( & Link );             // Arena needs to register this link as soon as we start allocating
+
         Size_T new_block_size = cast( Size_T )( capacity * T.sizeof );  // compute new block size
 
         // if our Link is at the end of the linked Link list, simply resize the length of the borrowing array, this might re-allocate
@@ -596,11 +663,15 @@ struct Block_Array( T, ST = uint ) {
         }
 
         // else check if there is some space left to the next Link ... for now!
-        else {
-            if( Link.Offset + new_block_size <= Link.Next.Offset ) {
-                Link.Size = new_block_size;
-            }   // Todo(pp): else figure out if there is enough room in between blocks, if so move data there, else move to the back
+        // Todo(pp): figure out if there is enough room in between blocks, if so move data there
+        else if( Link.Offset + new_block_size <= Link.Next.Offset ) {
+            Link.Size = new_block_size;
+
         }
+
+        // else copy data and move link to the end
+        else
+            Arena.moveToEnd( & Link, new_block_size, file, line, func );
     }
 
 
@@ -616,11 +687,13 @@ struct Block_Array( T, ST = uint ) {
 
     // reset internal state
     void reset( Arena_T* arena, T[] stuff = null, string file = __FILE__, size_t line = __LINE__, string func = __FUNCTION__ ) {
-        length( 0, file, line, func );
-        Arena.detach( & Link );
+        if( Capacity > 0 ) {
+            length( 0, file, line, func );
+            Arena.detach( & Link );
+        }
         Arena = arena;
-        Arena.attach( & Link );
-        if( stuff.length > 0 ) append( stuff );
+        if( stuff.length > 0 )
+            append( stuff );
     }
 
 
@@ -628,9 +701,6 @@ struct Block_Array( T, ST = uint ) {
     Block_Array dup( Arena_T* arena = null ) {
         auto duplicate = Block_Array( arena !is null ? *arena : *Arena, data );
         return duplicate;
-        //T* new_data = cast( T* )malloc( Capacity * T.sizeof );
-        //memcpy( new_data, Data, Capacity * T.sizeof );
-        //return Block_Array( new_data, Count, Capacity );
     }
 
 
@@ -867,7 +937,3 @@ template D_OR_S_ARRAY( T, int count, ST = uint ) {
     else static if( count <   0 )       alias D_OR_S_ARRAY = T[ - count ];                      // static array
     else                                alias D_OR_S_ARRAY = EArray!( T, Size_T );              // array with no element/memory
 }
-
-
-
-
