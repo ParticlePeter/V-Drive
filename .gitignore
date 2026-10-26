@@ -1,0 +1,31 @@
+# dub / build output
+.dub/
+dub.selections.json
+*.exe
+*.dll
+*.lib
+*.pdb
+*.obj
+*.sln
+*.spv
+
+# profiler output
+trace.*
+*.log
+
+# generated docs
+docs/
+docs.json
+
+# editor
+.vs/
+*.sublime-workspace
+
+# local reference material and notes
+reference/
+backup/
+imconfig/
+_*
+*.bat
+dub_backup.json
+d-profile-viewer.exe
